@@ -1211,7 +1211,7 @@ wheels = [
 ]
 
 [[package]]
-name = "stss"
+name = "stss-g1"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

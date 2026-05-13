@@ -1,9 +1,4 @@
-# STSS 团队协作指导手册
-
-> 本文档面向 STSS 信息管理子系统（Auth Service + Info Service）的 4 位开发与 1 位测试。
-> 所有成员均使用 AI Agent（Claude Code 或同类工具）辅助开发。
-
----
+# STSS-g1 团队协作指导手册
 
 ## 1. 让 Agent 快速了解项目
 
@@ -27,18 +22,18 @@ Claude Code 会在启动时自动加载项目根目录的 `CLAUDE.md`。这是 A
 ### 1.2 设计文档作为 Agent 知识库
 
 ```
-design/v2/           ← 架构设计（Agent 编码前必读）
-require-spec/        ← 需求规格（验收标准来源）
+docs/design/v2/      ← 架构设计（Agent 编码前必读）
+docs/require-spec/   ← 需求规格（验收标准来源）
 ```
 
 **推荐做法：**
 
 | 场景 | Agent 应该读什么 |
 |------|-----------------|
-| 开发 Auth 相关功能 | `design/v2/04-security-architecture.md` + `design/v2/02-module-architecture.md` |
-| 开发 CRUD 接口 | `design/v2/05-api-architecture.md` + `design/v2/03-data-architecture.md` |
-| 写测试 / QA 验证 | `require-spec/validation_matrices/` 下对应矩阵 |
-| 理解业务流程 | `design/v2/06-business-flows.md` + `require-spec/use_cases/` |
+| 开发 Auth 相关功能 | `docs/design/v2/04-security-architecture.md` + `docs/design/v2/02-module-architecture.md` |
+| 开发 CRUD 接口 | `docs/design/v2/05-api-architecture.md` + `docs/design/v2/03-data-architecture.md` |
+| 写测试 / QA 验证 | `docs/require-spec/validation_matrices/` 下对应矩阵 |
+| 理解业务流程 | `docs/design/v2/06-business-flows.md` + `docs/require-spec/use_cases/` |
 
 ### 1.3 保证开发质量的实践
 
@@ -143,15 +138,15 @@ chore/ci-setup
 
 | 目录 | 定位 | 修改规则 |
 |------|------|---------|
-| `design/v2/` | **当前版本的架构设计** | 只读参考。修改需全组讨论 + 更新 README.md 索引 |
-| `require-spec/` | **需求规格基线** | 原则上冻结。发现矛盾时先沟通，不直接修改 |
+| `docs/design/v2/` | **当前版本的架构设计** | 只读参考。修改需全组讨论 + 更新 README.md 索引 |
+| `docs/require-spec/` | **需求规格基线** | 原则上冻结。发现矛盾时先沟通，不直接修改 |
 | `design/v1/`（如有） | 历史版本，保留备查 | 不修改 |
 
 ### 3.2 版本管理建议
 
 - 两个目录都纳入 Git 版本控制（它们是项目的"宪法"）
 - 当设计发生重大变更时，创建 `design/v3/` 而非覆盖 v2
-- 在 `design/v2/README.md` 中已经维护了与 `require-spec/` 的对应关系表，保持更新
+- 在 `design/v2/README.md` 中已经维护了与 `docs/require-spec/` 的对应关系表，保持更新
 
 ### 3.3 日常开发中的使用
 
@@ -161,9 +156,9 @@ chore/ci-setup
 
 ---
 
-## 4. 快速启动清单（新组员入职）
+## 4. 快速启动清单
 
-- [ ] 克隆仓库：`git clone <repo-url> && cd STSS`
+- [ ] 克隆仓库：`git clone <repo-url> && cd group1-base`
 - [ ] 安装依赖：`uv sync --group dev`
 - [ ] 复制环境变量：`cp .env.example .env`（然后填入开发用密钥）
 - [ ] 阅读 `CLAUDE.md`（了解项目全貌）
