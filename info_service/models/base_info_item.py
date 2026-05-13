@@ -1,0 +1,21 @@
+"""BaseInfoItem model — generic key-value info entries (e.g. departments, titles)."""
+
+from datetime import datetime
+from typing import Optional
+
+from sqlmodel import Field, SQLModel
+
+
+class BaseInfoItem(SQLModel, table=True):
+    """Generic lookup / reference data entry."""
+
+    __tablename__ = "base_info_items"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    category: str = Field(max_length=64, index=True)  # e.g. "department", "title"
+    item_code: str = Field(max_length=64)
+    item_name: str = Field(max_length=256)
+    description: str = Field(default="", max_length=512)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

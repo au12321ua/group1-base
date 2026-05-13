@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  auth_service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    volumes:
+      - auth_data:/app/data
+      - ./auth_service:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+
+  info_service:
+    build:
+      context: ./info_service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    volumes:
+      - info_data:/app/data
+      - uploads:/app/uploads
+      - logs:/app/logs
+      - ./info_service:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+
+volumes:
+  auth_data:
+  info_data:
+  uploads:
+  logs:

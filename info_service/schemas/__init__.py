@@ -1,0 +1,1 @@
+"""Info Service Pydantic schemas."""
