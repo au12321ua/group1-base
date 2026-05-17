@@ -1,6 +1,6 @@
 """Authentication session model — login session lifecycle."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from sqlmodel import Field, SQLModel
@@ -23,5 +23,5 @@ class AuthenticationSession(SQLModel, table=True):
     refresh_token_id: int
     status: SessionStatus = Field(default=SessionStatus.ACTIVE)
     client_ip: str | None = Field(default=None, max_length=45)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
     ended_at: datetime | None = Field(default=None)

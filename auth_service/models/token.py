@@ -1,6 +1,6 @@
 """Token model — persisted JWT records with revocation support."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from sqlmodel import Field, SQLModel
@@ -21,6 +21,6 @@ class Token(SQLModel, table=True):
     user_id: str = Field(max_length=64, index=True)
     type: TokenType
     token_value: str = Field(max_length=512)
-    issued_at: datetime = Field(default_factory=datetime.utcnow)
+    issued_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
     expires_at: datetime
     revoked_at: datetime | None = Field(default=None)

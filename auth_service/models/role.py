@@ -1,6 +1,6 @@
 """Role and UserRole models for RBAC."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -15,7 +15,7 @@ class Role(SQLModel, table=True):
     name: str = Field(max_length=128)
     description: str = Field(default="", max_length=512)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
 class UserRole(SQLModel, table=True):

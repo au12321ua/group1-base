@@ -1,6 +1,6 @@
 """Course model — core curriculum data."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -18,5 +18,5 @@ class Course(SQLModel, table=True):
     assessment_method: str = Field(default="", max_length=128)
     is_active: bool = Field(default=True)
     is_deleted: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
