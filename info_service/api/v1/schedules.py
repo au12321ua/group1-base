@@ -46,14 +46,18 @@ async def get_schedule(schedule_id: int) -> SingleResponse[ScheduleResponse]:
 
 
 @router.put("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
-async def update_schedule(schedule_id: int, request: ScheduleUpdateRequest) -> SingleResponse[ScheduleResponse]:
+async def update_schedule(
+    schedule_id: int, request: ScheduleUpdateRequest
+) -> SingleResponse[ScheduleResponse]:
     """Full update schedule."""
     warnings.warn("TODO: implement PUT /schedules/{id}")
     raise NotImplementedError("PUT /schedules/{id} not implemented")
 
 
 @router.patch("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
-async def patch_schedule(schedule_id: int, request: SchedulePatchRequest) -> SingleResponse[ScheduleResponse]:
+async def patch_schedule(
+    schedule_id: int, request: SchedulePatchRequest
+) -> SingleResponse[ScheduleResponse]:
     """Partial update schedule."""
     warnings.warn("TODO: implement PATCH /schedules/{id}")
     raise NotImplementedError("PATCH /schedules/{id} not implemented")
@@ -94,7 +98,10 @@ async def add_teachers(
     raise NotImplementedError("POST /schedules/{id}/teachers not implemented")
 
 
-@router.put("/{schedule_id}/teachers/{teacher_id}", response_model=SingleResponse[TeacherAssignmentResponse])
+@router.put(
+    "/{schedule_id}/teachers/{teacher_id}",
+    response_model=SingleResponse[TeacherAssignmentResponse],
+)
 async def assign_teacher(
     schedule_id: int, teacher_id: str, request: TeacherAssignmentCreateRequest
 ) -> SingleResponse[TeacherAssignmentResponse]:

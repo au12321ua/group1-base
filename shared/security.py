@@ -6,13 +6,12 @@ X-User-Permissions) and does NOT perform local JWT verification.
 
 import warnings
 from collections.abc import Callable
-from typing import Optional
 
 from fastapi import Header
 
 
 async def get_current_user_id(
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
 ) -> str:
     """Extract current user ID from Gateway-transmitted header.
 
@@ -26,7 +25,7 @@ async def get_current_user_id(
 
 
 async def get_current_user_role(
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
 ) -> str:
     """Extract current user role from Gateway-transmitted header."""
     warnings.warn("TODO: implement get_current_user_role - validate header presence")
@@ -36,7 +35,7 @@ async def get_current_user_role(
 
 
 async def get_current_user_permissions(
-    x_user_permissions: Optional[str] = Header(None, alias="X-User-Permissions"),
+    x_user_permissions: str | None = Header(None, alias="X-User-Permissions"),
 ) -> list[str]:
     """Extract current user permissions from Gateway-transmitted header.
 

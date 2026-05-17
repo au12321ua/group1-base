@@ -2,7 +2,7 @@
 
 import warnings
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 
 from info_service.schemas.user_schema import (
     UserCreateRequest,

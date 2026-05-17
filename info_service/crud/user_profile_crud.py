@@ -1,7 +1,6 @@
 """UserProfile CRUD — profile table operations."""
 
 import warnings
-from typing import Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,7 +13,7 @@ class UserProfileCRUD:
     def __init__(self) -> None:
         warnings.warn("TODO: UserProfileCRUD — implement all methods")
 
-    async def get_by_user_id(self, db: AsyncSession, user_id: int) -> Optional[UserProfile]:
+    async def get_by_user_id(self, db: AsyncSession, user_id: int) -> UserProfile | None:
         """Get profile by user_id."""
         warnings.warn("TODO: implement get_by_user_id")
         raise NotImplementedError("get_by_user_id not implemented")

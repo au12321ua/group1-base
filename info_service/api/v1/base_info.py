@@ -41,14 +41,18 @@ async def get_base_info(item_id: int) -> SingleResponse[BaseInfoResponse]:
 
 
 @router.put("/{item_id}", response_model=SingleResponse[BaseInfoResponse])
-async def update_base_info(item_id: int, request: BaseInfoUpdateRequest) -> SingleResponse[BaseInfoResponse]:
+async def update_base_info(
+    item_id: int, request: BaseInfoUpdateRequest
+) -> SingleResponse[BaseInfoResponse]:
     """Full update base info."""
     warnings.warn("TODO: implement PUT /base-info/{id}")
     raise NotImplementedError("PUT /base-info/{id} not implemented")
 
 
 @router.patch("/{item_id}", response_model=SingleResponse[BaseInfoResponse])
-async def patch_base_info(item_id: int, request: BaseInfoPatchRequest) -> SingleResponse[BaseInfoResponse]:
+async def patch_base_info(
+    item_id: int, request: BaseInfoPatchRequest
+) -> SingleResponse[BaseInfoResponse]:
     """Partial update base info."""
     warnings.warn("TODO: implement PATCH /base-info/{id}")
     raise NotImplementedError("PATCH /base-info/{id} not implemented")

@@ -1,7 +1,6 @@
 """CourseSchedule model — time/room scheduling for an offering."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -9,9 +8,9 @@ from sqlmodel import Field, SQLModel
 class CourseSchedule(SQLModel, table=True):
     """A scheduled session of a course offering."""
 
-    __tablename__ = "course_schedules"
+    __tablename__: str = "course_schedules"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     offering_id: int = Field(foreign_key="course_offerings.id", index=True)
     classroom_id: int = Field(foreign_key="classrooms.id")
     day_of_week: int = Field(ge=1, le=7)  # 1=Mon, 7=Sun

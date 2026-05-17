@@ -6,7 +6,7 @@ import sys
 import time
 import warnings
 from contextvars import ContextVar
-from typing import Any, Optional
+from typing import Any
 
 # ContextVar for X-Request-ID propagation across async tasks
 _request_id_var: ContextVar[str] = ContextVar("request_id", default="")
@@ -107,7 +107,7 @@ class AppLogger:
 def get_logger(
     name: str,
     service_name: str = "",
-    level: Optional[str] = None,
+    level: str | None = None,
 ) -> AppLogger:
     """Factory for creating AppLogger instances."""
     warnings.warn("TODO: implement get_logger - read LOG_LEVEL from config")

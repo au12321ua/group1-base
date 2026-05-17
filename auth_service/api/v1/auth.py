@@ -2,8 +2,7 @@
 
 import warnings
 
-from fastapi import APIRouter, Depends
-from sqlmodel.ext.asyncio.session import AsyncSession
+from fastapi import APIRouter
 
 from auth_service.schemas.auth_schema import (
     ChangePasswordRequest,

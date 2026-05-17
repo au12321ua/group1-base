@@ -2,7 +2,7 @@
 
 import warnings
 
-from auth_service.schemas.auth_schema import JwksKey, JwksResponse
+from auth_service.schemas.auth_schema import JwksResponse
 
 
 class KeyService:

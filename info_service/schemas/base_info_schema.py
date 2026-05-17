@@ -1,7 +1,6 @@
 """BaseInfoItem request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,8 +12,8 @@ class BaseInfoResponse(BaseModel):
     item_name: str
     description: str = ""
     is_active: bool = True
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class BaseInfoCreateRequest(BaseModel):
@@ -33,8 +32,8 @@ class BaseInfoUpdateRequest(BaseModel):
 
 
 class BaseInfoPatchRequest(BaseModel):
-    category: Optional[str] = Field(default=None, max_length=64)
-    item_code: Optional[str] = Field(default=None, max_length=64)
-    item_name: Optional[str] = Field(default=None, max_length=256)
-    description: Optional[str] = Field(default=None, max_length=512)
-    is_active: Optional[bool] = None
+    category: str | None = Field(default=None, max_length=64)
+    item_code: str | None = Field(default=None, max_length=64)
+    item_name: str | None = Field(default=None, max_length=256)
+    description: str | None = Field(default=None, max_length=512)
+    is_active: bool | None = None

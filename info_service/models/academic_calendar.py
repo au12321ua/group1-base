@@ -1,7 +1,6 @@
 """AcademicCalendar model — term/semester calendar data."""
 
 from datetime import date, datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -9,9 +8,9 @@ from sqlmodel import Field, SQLModel
 class AcademicCalendar(SQLModel, table=True):
     """Academic calendar entry (typically one per term)."""
 
-    __tablename__ = "academic_calendars"
+    __tablename__: str = "academic_calendars"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     term_code: str = Field(max_length=32, unique=True, index=True)
     term_name: str = Field(max_length=128)
     start_date: date

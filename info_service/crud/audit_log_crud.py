@@ -2,7 +2,6 @@
 
 import warnings
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -36,12 +35,12 @@ class AuditLogCRUD:
         self,
         db: AsyncSession,
         *,
-        operator_user_id: Optional[str] = None,
-        target_type: Optional[str] = None,
-        action: Optional[str] = None,
-        result: Optional[str] = None,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        operator_user_id: str | None = None,
+        target_type: str | None = None,
+        action: str | None = None,
+        result: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[AuditLog], int]:

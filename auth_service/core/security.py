@@ -1,16 +1,13 @@
 """JWT token creation, verification, and password hashing utilities."""
 
 import warnings
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
-
-from auth_service.core.config import get_auth_settings
+from typing import Any
 
 
 def create_access_token(
     user_id: str,
     role: str,
-    permissions: Optional[list[str]] = None,
+    permissions: list[str] | None = None,
     is_admin: bool = False,
 ) -> str:
     """Create a JWT access token.
@@ -19,13 +16,6 @@ def create_access_token(
     Admin tokens have shorter expiry (ADMIN_ACCESS_TOKEN_EXPIRE_MINUTES).
     """
     warnings.warn("TODO: implement create_access_token - JWT encoding with HS256")
-    settings = get_auth_settings()
-    expire_minutes = (
-        settings.admin_access_token_expire_minutes
-        if is_admin
-        else settings.access_token_expire_minutes
-    )
-    expire = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
     # Placeholder — will use python-jose
     raise NotImplementedError("create_access_token not implemented")
 
@@ -55,7 +45,7 @@ def create_service_token(
 def verify_token(token: str) -> dict[str, Any]:
     """Verify and decode a JWT token. Returns the payload dict.
 
-    Raises TokenExpiredException / AuthenticationException on failure.
+    Raises TokenExpiredError / AuthenticationError on failure.
     """
     warnings.warn("TODO: implement verify_token - JWT decoding with HS256")
     raise NotImplementedError("verify_token not implemented")

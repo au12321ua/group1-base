@@ -15,7 +15,9 @@ class DataProvisionService:
     def __init__(self) -> None:
         warnings.warn("TODO: DataProvisionService — implement all methods")
 
-    async def list_teachers(self, db: AsyncSession, page: int = 1, page_size: int = 100) -> tuple[list, int]:
+    async def list_teachers(
+        self, db: AsyncSession, page: int = 1, page_size: int = 100
+    ) -> tuple[list, int]:
         """List all teachers (role=TEACHER) for B system consumption."""
         warnings.warn("TODO: implement list_teachers")
         raise NotImplementedError("list_teachers not implemented")

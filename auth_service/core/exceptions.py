@@ -1,25 +1,25 @@
 """Auth Service specific exception handlers (re-exports shared exceptions)."""
 
 from shared.exceptions import (
-    AccountDisabledException,
-    AccountLockedException,
-    AppException,
-    AuthenticationException,
-    AuthorizationException,
-    BusinessRuleException,
-    ResourceNotFoundException,
-    ServiceCredentialInvalidException,
-    TokenExpiredException,
+    AccountDisabledError,
+    AccountLockedError,
+    AppError,
+    AuthenticationError,
+    AuthorizationError,
+    BusinessRuleError,
+    ResourceNotFoundError,
+    ServiceCredentialInvalidError,
+    TokenExpiredError,
 )
 
 __all__ = [
-    "AppException",
-    "AuthenticationException",
-    "AuthorizationException",
-    "ResourceNotFoundException",
-    "BusinessRuleException",
-    "AccountLockedException",
-    "AccountDisabledException",
-    "TokenExpiredException",
-    "ServiceCredentialInvalidException",
+    "AppError",
+    "AuthenticationError",
+    "AuthorizationError",
+    "ResourceNotFoundError",
+    "BusinessRuleError",
+    "AccountLockedError",
+    "AccountDisabledError",
+    "TokenExpiredError",
+    "ServiceCredentialInvalidError",
 ]

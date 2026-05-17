@@ -25,7 +25,9 @@ async def verify_token(request: InternalVerifyRequest) -> APIResponse[InternalVe
 
 
 @router.post("/users", response_model=APIResponse[InternalUserResponse])
-async def create_internal_user(request: InternalCreateUserRequest) -> APIResponse[InternalUserResponse]:
+async def create_internal_user(
+    request: InternalCreateUserRequest,
+) -> APIResponse[InternalUserResponse]:
     """Create minimal auth user + credential (called by Info Service on user creation)."""
     warnings.warn("TODO: implement POST /internal/users")
     raise NotImplementedError("POST /internal/users not implemented")
@@ -46,7 +48,9 @@ async def enable_user(user_id: str) -> APIResponse[None]:
 
 
 @router.post("/users/{user_id}/roles", response_model=APIResponse[InternalRoleSyncResponse])
-async def sync_user_roles(user_id: str, request: InternalSyncRolesRequest) -> APIResponse[InternalRoleSyncResponse]:
+async def sync_user_roles(
+    user_id: str, request: InternalSyncRolesRequest
+) -> APIResponse[InternalRoleSyncResponse]:
     """Sync user role assignments (called by Info Service on role change)."""
     warnings.warn("TODO: implement POST /internal/users/{id}/roles")
     raise NotImplementedError("POST /internal/users/{id}/roles not implemented")

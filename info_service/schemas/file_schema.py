@@ -1,7 +1,6 @@
 """File upload/download request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -13,7 +12,7 @@ class FileResponse(BaseModel):
     file_type: str
     file_size: int
     checksum: str = ""
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 class FileUploadResponse(BaseModel):

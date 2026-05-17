@@ -39,6 +39,6 @@ class AuthSettings(BaseSettings):
     log_level: str = "DEBUG"
 
 
-@lru_cache()
+@lru_cache
 def get_auth_settings() -> AuthSettings:
     return AuthSettings()

@@ -1,7 +1,6 @@
 """CourseSchedule request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,8 +13,8 @@ class ScheduleResponse(BaseModel):
     start_period: int
     end_period: int
     week_range: str = ""
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ScheduleCreateRequest(BaseModel):
@@ -37,11 +36,11 @@ class ScheduleUpdateRequest(BaseModel):
 
 
 class SchedulePatchRequest(BaseModel):
-    classroom_id: Optional[int] = None
-    day_of_week: Optional[int] = Field(default=None, ge=1, le=7)
-    start_period: Optional[int] = Field(default=None, ge=1, le=12)
-    end_period: Optional[int] = Field(default=None, ge=1, le=12)
-    week_range: Optional[str] = None
+    classroom_id: int | None = None
+    day_of_week: int | None = Field(default=None, ge=1, le=7)
+    start_period: int | None = Field(default=None, ge=1, le=12)
+    end_period: int | None = Field(default=None, ge=1, le=12)
+    week_range: str | None = None
 
 
 class TeacherAssignmentResponse(BaseModel):
@@ -49,7 +48,7 @@ class TeacherAssignmentResponse(BaseModel):
     teacher_id: str
     offering_id: int
     role_type: str = "instructor"
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 class TeacherAssignmentCreateRequest(BaseModel):
