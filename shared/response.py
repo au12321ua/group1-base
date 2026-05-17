@@ -1,6 +1,6 @@
 """Unified API response format."""
 
-from typing import Any, Generic, Optional, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel
 
@@ -15,7 +15,7 @@ class PaginationMeta(BaseModel):
     page_size: int
 
 
-class APIResponse(BaseModel, Generic[T]):
+class APIResponse[T](BaseModel):
     """Standard API response wrapper.
 
     Success:
@@ -26,24 +26,24 @@ class APIResponse(BaseModel, Generic[T]):
 
     code: int = 0
     message: str = "success"
-    data: Optional[T] = None
-    errors: Optional[list[dict[str, str]]] = None
+    data: T | None = None
+    errors: list[dict[str, str]] | None = None
 
 
-class PaginatedData(BaseModel, Generic[T]):
+class PaginatedData[T](BaseModel):
     """Wraps list data with pagination info."""
 
     items: list[T]
     pagination: PaginationMeta
 
 
-class ListResponse(APIResponse[PaginatedData[T]], Generic[T]):
+class ListResponse[T](APIResponse[PaginatedData[T]]):
     """Response wrapper for paginated list endpoints."""
 
     pass
 
 
-class SingleResponse(APIResponse[T], Generic[T]):
+class SingleResponse[T](APIResponse[T]):
     """Response wrapper for single-item endpoints."""
 
     pass

@@ -1,7 +1,6 @@
 """Course model — core curriculum data."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -9,9 +8,9 @@ from sqlmodel import Field, SQLModel
 class Course(SQLModel, table=True):
     """Course master data."""
 
-    __tablename__ = "courses"
+    __tablename__: str = "courses"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     course_code: str = Field(max_length=64, unique=True, index=True)
     course_name: str = Field(max_length=256)
     credit: int = Field(default=0)

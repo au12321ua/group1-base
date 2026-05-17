@@ -1,7 +1,7 @@
 """Unified exception hierarchy for both services."""
 
 
-class AppException(Exception):
+class AppError(Exception):
     """Base application exception."""
 
     def __init__(self, code: int, message: str, detail: str = "") -> None:
@@ -11,21 +11,21 @@ class AppException(Exception):
         super().__init__(message)
 
 
-class AuthenticationException(AppException):
+class AuthenticationError(AppError):
     """Authentication failures (invalid credentials, expired tokens)."""
 
     def __init__(self, message: str = "Authentication failed", code: int = 1001) -> None:
         super().__init__(code=code, message=message)
 
 
-class AuthorizationException(AppException):
+class AuthorizationError(AppError):
     """Authorization failures (insufficient permissions)."""
 
     def __init__(self, message: str = "Insufficient permissions", code: int = 4030) -> None:
         super().__init__(code=code, message=message)
 
 
-class ResourceNotFoundException(AppException):
+class ResourceNotFoundError(AppError):
     """Resource not found."""
 
     def __init__(self, resource: str = "Resource", identifier: str = "") -> None:
@@ -33,35 +33,35 @@ class ResourceNotFoundException(AppException):
         super().__init__(code=4040, message=detail)
 
 
-class BusinessRuleException(AppException):
+class BusinessRuleError(AppError):
     """Business rule violations (e.g. duplicate, state conflict)."""
 
     def __init__(self, message: str, code: int = 4090) -> None:
         super().__init__(code=code, message=message)
 
 
-class AccountLockedException(AppException):
+class AccountLockedError(AppError):
     """Account locked due to repeated failed login attempts."""
 
     def __init__(self, message: str = "Account locked, please try again later") -> None:
         super().__init__(code=1003, message=message)
 
 
-class AccountDisabledException(AppException):
+class AccountDisabledError(AppError):
     """Account has been disabled."""
 
     def __init__(self, message: str = "Account has been disabled") -> None:
         super().__init__(code=1002, message=message)
 
 
-class TokenExpiredException(AuthenticationException):
+class TokenExpiredError(AuthenticationError):
     """Token has expired."""
 
     def __init__(self, message: str = "Token has expired") -> None:
         super().__init__(message=message, code=1004)
 
 
-class ServiceCredentialInvalidException(AuthenticationException):
+class ServiceCredentialInvalidError(AuthenticationError):
     """Service credential (client_id/client_secret) is invalid."""
 
     def __init__(self, message: str = "Service credential invalid") -> None:

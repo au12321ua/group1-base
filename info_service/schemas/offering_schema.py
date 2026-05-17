@@ -1,7 +1,6 @@
 """CourseOffering request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,8 +13,8 @@ class OfferingResponse(BaseModel):
     teacher_ids: str = ""
     capacity: int = 0
     status: str = "ACTIVE"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class OfferingCreateRequest(BaseModel):
@@ -36,8 +35,8 @@ class OfferingUpdateRequest(BaseModel):
 
 
 class OfferingPatchRequest(BaseModel):
-    term_code: Optional[str] = Field(default=None, max_length=32)
-    class_no: Optional[str] = Field(default=None, max_length=32)
-    teacher_ids: Optional[list[str]] = None
-    capacity: Optional[int] = Field(default=None, ge=0)
-    status: Optional[str] = Field(default=None, max_length=32)
+    term_code: str | None = Field(default=None, max_length=32)
+    class_no: str | None = Field(default=None, max_length=32)
+    teacher_ids: list[str] | None = None
+    capacity: int | None = Field(default=None, ge=0)
+    status: str | None = Field(default=None, max_length=32)

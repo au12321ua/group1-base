@@ -20,16 +20,21 @@ class UserManagementService:
         warnings.warn("TODO: UserManagementService — implement all methods")
 
     async def create_user(self, db: AsyncSession, request: UserCreateRequest) -> UserResponse:
-        """Create a user: write Info DB → HTTP call Auth Service /internal/users → compensate on failure."""
+        """Create a user: write Info DB → HTTP call Auth /internal/users
+        → compensate on failure."""
         warnings.warn("TODO: implement create_user — cross-service sync with compensation")
         raise NotImplementedError("create_user not implemented")
 
-    async def update_user(self, db: AsyncSession, user_id: int, request: UserUpdateRequest) -> UserResponse:
+    async def update_user(
+        self, db: AsyncSession, user_id: int, request: UserUpdateRequest
+    ) -> UserResponse:
         """Full update user info."""
         warnings.warn("TODO: implement update_user")
         raise NotImplementedError("update_user not implemented")
 
-    async def patch_user(self, db: AsyncSession, user_id: int, request: UserPatchRequest) -> UserResponse:
+    async def patch_user(
+        self, db: AsyncSession, user_id: int, request: UserPatchRequest
+    ) -> UserResponse:
         """Partial update user info. If role_ids changed, sync to Auth Service."""
         warnings.warn("TODO: implement patch_user — role sync on role_ids change")
         raise NotImplementedError("patch_user not implemented")

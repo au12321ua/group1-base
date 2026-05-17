@@ -1,7 +1,6 @@
 """User-related request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,7 +12,7 @@ class UserProfileSchema(BaseModel):
     email: str = ""
     phone: str = ""
     status: str = "ACTIVE"
-    avatar_file_id: Optional[int] = None
+    avatar_file_id: int | None = None
 
 
 class UserResponse(BaseModel):
@@ -22,9 +21,9 @@ class UserResponse(BaseModel):
     username: str
     role_ids: str = ""
     is_deleted: bool = False
-    profile: Optional[UserProfileSchema] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    profile: UserProfileSchema | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class UserCreateRequest(BaseModel):
@@ -51,14 +50,14 @@ class UserUpdateRequest(BaseModel):
 
 class UserPatchRequest(BaseModel):
     """Partial update — all fields optional."""
-    user_no: Optional[str] = Field(default=None, max_length=64)
-    username: Optional[str] = Field(default=None, max_length=128)
-    role_ids: Optional[list[int]] = None
-    full_name: Optional[str] = Field(default=None, max_length=128)
-    gender: Optional[str] = Field(default=None, max_length=16)
-    email: Optional[str] = Field(default=None, max_length=256)
-    phone: Optional[str] = Field(default=None, max_length=32)
-    status: Optional[str] = Field(default=None, max_length=32)
+    user_no: str | None = Field(default=None, max_length=64)
+    username: str | None = Field(default=None, max_length=128)
+    role_ids: list[int] | None = None
+    full_name: str | None = Field(default=None, max_length=128)
+    gender: str | None = Field(default=None, max_length=16)
+    email: str | None = Field(default=None, max_length=256)
+    phone: str | None = Field(default=None, max_length=32)
+    status: str | None = Field(default=None, max_length=32)
 
 
 class UserImportResult(BaseModel):
@@ -73,6 +72,6 @@ class UserListQuery(BaseModel):
     page_size: int = Field(default=20, ge=1, le=100)
     sort_by: str = Field(default="created_at")
     sort_order: str = Field(default="desc")
-    keyword: Optional[str] = None
-    status: Optional[str] = None
-    role: Optional[str] = None
+    keyword: str | None = None
+    status: str | None = None
+    role: str | None = None

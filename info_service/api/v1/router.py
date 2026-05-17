@@ -14,7 +14,9 @@ router = APIRouter()
 # router.include_router(offerings_router, prefix="/offerings", tags=["offerings"])
 # router.include_router(schedules_router, prefix="/schedules", tags=["schedules"])
 # router.include_router(calendars_router, prefix="/calendars", tags=["calendars"])
-# router.include_router(training_programs_router, prefix="/training-programs", tags=["training-programs"])
+# router.include_router(
+#     training_programs_router, prefix="/training-programs", tags=["training-programs"]
+# )
 # router.include_router(base_info_router, prefix="/base-info", tags=["base-info"])
 # router.include_router(recycle_bin_router, prefix="/recycle-bin", tags=["recycle-bin"])
 # router.include_router(files_router, prefix="/files", tags=["files"])

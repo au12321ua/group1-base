@@ -1,7 +1,6 @@
 """TrainingProgram request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,9 +12,9 @@ class TrainingProgramResponse(BaseModel):
     grade: str
     version: str = "1.0"
     required_course_ids: str = ""
-    snapshot_time: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    snapshot_time: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class TrainingProgramCreateRequest(BaseModel):
@@ -35,7 +34,7 @@ class TrainingProgramUpdateRequest(BaseModel):
 
 
 class TrainingProgramPatchRequest(BaseModel):
-    major_code: Optional[str] = Field(default=None, max_length=64)
-    grade: Optional[str] = Field(default=None, max_length=16)
-    version: Optional[str] = Field(default=None, max_length=16)
-    required_course_ids: Optional[list[int]] = None
+    major_code: str | None = Field(default=None, max_length=64)
+    grade: str | None = Field(default=None, max_length=16)
+    version: str | None = Field(default=None, max_length=16)
+    required_course_ids: list[int] | None = None

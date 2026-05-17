@@ -100,17 +100,23 @@ class CourseManagementService:
         warnings.warn("TODO: implement list_teachers_for_schedule")
         raise NotImplementedError("list_teachers_for_schedule not implemented")
 
-    async def replace_teachers(self, db: AsyncSession, schedule_id: int, teacher_ids: list[str]) -> list:
+    async def replace_teachers(
+        self, db: AsyncSession, schedule_id: int, teacher_ids: list[str]
+    ) -> list:
         """Replace all teacher assignments for a schedule."""
         warnings.warn("TODO: implement replace_teachers")
         raise NotImplementedError("replace_teachers not implemented")
 
-    async def add_teachers(self, db: AsyncSession, schedule_id: int, teacher_ids: list[str]) -> list:
+    async def add_teachers(
+        self, db: AsyncSession, schedule_id: int, teacher_ids: list[str]
+    ) -> list:
         """Add teacher assignments to a schedule."""
         warnings.warn("TODO: implement add_teachers")
         raise NotImplementedError("add_teachers not implemented")
 
-    async def assign_teacher(self, db: AsyncSession, schedule_id: int, teacher_id: str, role_type: str) -> dict:
+    async def assign_teacher(
+        self, db: AsyncSession, schedule_id: int, teacher_id: str, role_type: str
+    ) -> dict:
         """Assign a single teacher."""
         warnings.warn("TODO: implement assign_teacher")
         raise NotImplementedError("assign_teacher not implemented")

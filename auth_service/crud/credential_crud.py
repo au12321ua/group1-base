@@ -2,7 +2,6 @@
 
 import warnings
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -16,18 +15,28 @@ class CredentialCRUD:
     def __init__(self) -> None:
         warnings.warn("TODO: CredentialCRUD — implement all methods")
 
-    async def get_by_user_id(self, db: AsyncSession, user_id: str) -> Optional[Credential]:
+    async def get_by_user_id(self, db: AsyncSession, user_id: str) -> Credential | None:
         """Get credential by user_id."""
         warnings.warn("TODO: implement get_by_user_id")
         result = await db.exec(select(Credential).where(Credential.user_id == user_id))
-        return result.scalars().first()
+        return result.first()
 
-    async def create(self, db: AsyncSession, *, user_id: str, username: str, password_hash: str, password_salt: str) -> Credential:
+    async def create(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: str,
+        username: str,
+        password_hash: str,
+        password_salt: str,
+    ) -> Credential:
         """Create a new credential record."""
         warnings.warn("TODO: implement create")
         raise NotImplementedError("create not implemented")
 
-    async def update_password(self, db: AsyncSession, user_id: str, password_hash: str, password_salt: str) -> Optional[Credential]:
+    async def update_password(
+        self, db: AsyncSession, user_id: str, password_hash: str, password_salt: str
+    ) -> Credential | None:
         """Update password hash for a user."""
         warnings.warn("TODO: implement update_password")
         raise NotImplementedError("update_password not implemented")

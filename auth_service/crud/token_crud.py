@@ -2,9 +2,7 @@
 
 import warnings
 from datetime import datetime
-from typing import Optional
 
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auth_service.models.token import Token, TokenType
@@ -29,7 +27,7 @@ class TokenCRUD:
         warnings.warn("TODO: implement create")
         raise NotImplementedError("create not implemented")
 
-    async def get_by_value(self, db: AsyncSession, token_value: str) -> Optional[Token]:
+    async def get_by_value(self, db: AsyncSession, token_value: str) -> Token | None:
         """Find a token by its value."""
         warnings.warn("TODO: implement get_by_value")
         raise NotImplementedError("get_by_value not implemented")

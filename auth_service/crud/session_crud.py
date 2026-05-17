@@ -1,12 +1,10 @@
 """Session CRUD — login session lifecycle management."""
 
 import warnings
-from datetime import datetime
-from typing import Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from auth_service.models.session import AuthenticationSession, SessionStatus
+from auth_service.models.session import AuthenticationSession
 
 
 class SessionCRUD:
@@ -22,7 +20,7 @@ class SessionCRUD:
         user_id: str,
         access_token_id: int,
         refresh_token_id: int,
-        client_ip: Optional[str] = None,
+        client_ip: str | None = None,
     ) -> AuthenticationSession:
         """Create a new login session."""
         warnings.warn("TODO: implement create")

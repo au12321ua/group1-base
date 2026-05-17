@@ -1,7 +1,6 @@
 """TrainingProgram model — degree/major curriculum plan."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -9,9 +8,9 @@ from sqlmodel import Field, SQLModel
 class TrainingProgram(SQLModel, table=True):
     """Training program / curriculum plan for a major."""
 
-    __tablename__ = "training_programs"
+    __tablename__: str = "training_programs"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     program_code: str = Field(max_length=64, unique=True, index=True)
     major_code: str = Field(max_length=64, index=True)
     grade: str = Field(max_length=16)  # e.g. "2024"

@@ -5,12 +5,7 @@ import warnings
 from fastapi import APIRouter, Query
 
 from info_service.schemas.data_provision_schema import (
-    CalendarResponse,
-    CandidateStudentResponse,
     DataProvisionWrapper,
-    SelectedStudentsResponse,
-    TeacherDataResponse,
-    TrainingProgramResponse,
 )
 from shared.response import APIResponse
 

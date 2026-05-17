@@ -43,14 +43,18 @@ async def get_offering(offering_id: int) -> SingleResponse[OfferingResponse]:
 
 
 @router.put("/{offering_id}", response_model=SingleResponse[OfferingResponse])
-async def update_offering(offering_id: int, request: OfferingUpdateRequest) -> SingleResponse[OfferingResponse]:
+async def update_offering(
+    offering_id: int, request: OfferingUpdateRequest
+) -> SingleResponse[OfferingResponse]:
     """Full update offering."""
     warnings.warn("TODO: implement PUT /offerings/{id}")
     raise NotImplementedError("PUT /offerings/{id} not implemented")
 
 
 @router.patch("/{offering_id}", response_model=SingleResponse[OfferingResponse])
-async def patch_offering(offering_id: int, request: OfferingPatchRequest) -> SingleResponse[OfferingResponse]:
+async def patch_offering(
+    offering_id: int, request: OfferingPatchRequest
+) -> SingleResponse[OfferingResponse]:
     """Partial update offering."""
     warnings.warn("TODO: implement PATCH /offerings/{id}")
     raise NotImplementedError("PATCH /offerings/{id} not implemented")

@@ -1,7 +1,6 @@
 """DataProvision schemas — responses for B/C/F system consumption."""
 
-from datetime import date, datetime
-from typing import Optional
+from datetime import datetime
 
 from pydantic import BaseModel
 

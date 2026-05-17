@@ -2,7 +2,7 @@
 
 import warnings
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
@@ -42,14 +42,18 @@ async def get_course(course_id: int) -> SingleResponse[CourseResponse]:
 
 
 @router.put("/{course_id}", response_model=SingleResponse[CourseResponse])
-async def update_course(course_id: int, request: CourseUpdateRequest) -> SingleResponse[CourseResponse]:
+async def update_course(
+    course_id: int, request: CourseUpdateRequest
+) -> SingleResponse[CourseResponse]:
     """Full update course."""
     warnings.warn("TODO: implement PUT /courses/{id}")
     raise NotImplementedError("PUT /courses/{id} not implemented")
 
 
 @router.patch("/{course_id}", response_model=SingleResponse[CourseResponse])
-async def patch_course(course_id: int, request: CoursePatchRequest) -> SingleResponse[CourseResponse]:
+async def patch_course(
+    course_id: int, request: CoursePatchRequest
+) -> SingleResponse[CourseResponse]:
     """Partial update course."""
     warnings.warn("TODO: implement PATCH /courses/{id}")
     raise NotImplementedError("PATCH /courses/{id} not implemented")

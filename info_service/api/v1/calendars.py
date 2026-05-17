@@ -47,14 +47,18 @@ async def get_calendar(calendar_id: int) -> SingleResponse[CalendarResponse]:
 
 
 @router.put("/{calendar_id}", response_model=SingleResponse[CalendarResponse])
-async def update_calendar(calendar_id: int, request: CalendarUpdateRequest) -> SingleResponse[CalendarResponse]:
+async def update_calendar(
+    calendar_id: int, request: CalendarUpdateRequest
+) -> SingleResponse[CalendarResponse]:
     """Full update calendar."""
     warnings.warn("TODO: implement PUT /calendars/{id}")
     raise NotImplementedError("PUT /calendars/{id} not implemented")
 
 
 @router.patch("/{calendar_id}", response_model=SingleResponse[CalendarResponse])
-async def patch_calendar(calendar_id: int, request: CalendarPatchRequest) -> SingleResponse[CalendarResponse]:
+async def patch_calendar(
+    calendar_id: int, request: CalendarPatchRequest
+) -> SingleResponse[CalendarResponse]:
     """Partial update calendar."""
     warnings.warn("TODO: implement PATCH /calendars/{id}")
     raise NotImplementedError("PATCH /calendars/{id} not implemented")

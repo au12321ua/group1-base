@@ -1,7 +1,6 @@
 """AuthService — login, token issuance/refresh/revocation, password management."""
 
 import warnings
-from typing import Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 

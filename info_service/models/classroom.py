@@ -1,7 +1,6 @@
 """Classroom model — physical teaching space."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -9,9 +8,9 @@ from sqlmodel import Field, SQLModel
 class Classroom(SQLModel, table=True):
     """Classroom/teaching space resource."""
 
-    __tablename__ = "classrooms"
+    __tablename__: str = "classrooms"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     room_no: str = Field(max_length=64, unique=True)
     building: str = Field(default="", max_length=128)
     capacity: int = Field(default=0)

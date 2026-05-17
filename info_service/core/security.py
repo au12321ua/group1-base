@@ -5,12 +5,9 @@ local JWT verification. This module provides permission-checking helpers.
 """
 
 import warnings
-from typing import Optional
-
-from fastapi import Header
 
 
-def parse_permissions_header(x_user_permissions: Optional[str]) -> list[str]:
+def parse_permissions_header(x_user_permissions: str | None) -> list[str]:
     """Parse comma-separated permissions from X-User-Permissions header."""
     if not x_user_permissions:
         return []
@@ -20,8 +17,8 @@ def parse_permissions_header(x_user_permissions: Optional[str]) -> list[str]:
 def check_resource_access(
     current_user_id: str,
     current_role: str,
-    resource_owner_id: Optional[str] = None,
-    resource_teacher_ids: Optional[list[str]] = None,
+    resource_owner_id: str | None = None,
+    resource_teacher_ids: list[str] | None = None,
 ) -> bool:
     """Resource-level access control.
 

@@ -1,21 +1,21 @@
 """Info Service exception handlers (re-exports shared exceptions)."""
 
 from shared.exceptions import (
-    AccountDisabledException,
-    AccountLockedException,
-    AppException,
-    AuthenticationException,
-    AuthorizationException,
-    BusinessRuleException,
-    ResourceNotFoundException,
+    AccountDisabledError,
+    AccountLockedError,
+    AppError,
+    AuthenticationError,
+    AuthorizationError,
+    BusinessRuleError,
+    ResourceNotFoundError,
 )
 
 __all__ = [
-    "AppException",
-    "AuthenticationException",
-    "AuthorizationException",
-    "ResourceNotFoundException",
-    "BusinessRuleException",
-    "AccountLockedException",
-    "AccountDisabledException",
+    "AppError",
+    "AuthenticationError",
+    "AuthorizationError",
+    "ResourceNotFoundError",
+    "BusinessRuleError",
+    "AccountLockedError",
+    "AccountDisabledError",
 ]

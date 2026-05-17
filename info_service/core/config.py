@@ -34,6 +34,6 @@ class InfoSettings(BaseSettings):
     log_level: str = "DEBUG"
 
 
-@lru_cache()
+@lru_cache
 def get_info_settings() -> InfoSettings:
     return InfoSettings()

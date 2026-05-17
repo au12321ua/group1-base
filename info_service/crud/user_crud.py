@@ -1,7 +1,6 @@
 """UserInfo CRUD — main user table operations."""
 
 import warnings
-from typing import Optional
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -15,23 +14,23 @@ class UserCRUD:
     def __init__(self) -> None:
         warnings.warn("TODO: UserCRUD — implement all methods")
 
-    async def get_by_id(self, db: AsyncSession, user_id: int) -> Optional[UserInfo]:
+    async def get_by_id(self, db: AsyncSession, user_id: int) -> UserInfo | None:
         """Get user by primary key."""
         warnings.warn("TODO: implement get_by_id")
         result = await db.exec(select(UserInfo).where(UserInfo.id == user_id))
-        return result.scalars().first()
+        return result.first()
 
-    async def get_by_user_no(self, db: AsyncSession, user_no: str) -> Optional[UserInfo]:
+    async def get_by_user_no(self, db: AsyncSession, user_no: str) -> UserInfo | None:
         """Get user by user_no (unique)."""
         warnings.warn("TODO: implement get_by_user_no")
         result = await db.exec(select(UserInfo).where(UserInfo.user_no == user_no))
-        return result.scalars().first()
+        return result.first()
 
-    async def get_by_username(self, db: AsyncSession, username: str) -> Optional[UserInfo]:
+    async def get_by_username(self, db: AsyncSession, username: str) -> UserInfo | None:
         """Get user by username (unique)."""
         warnings.warn("TODO: implement get_by_username")
         result = await db.exec(select(UserInfo).where(UserInfo.username == username))
-        return result.scalars().first()
+        return result.first()
 
     async def get_multi(
         self,
@@ -39,9 +38,9 @@ class UserCRUD:
         *,
         skip: int = 0,
         limit: int = 100,
-        keyword: Optional[str] = None,
-        status: Optional[str] = None,
-        role: Optional[str] = None,
+        keyword: str | None = None,
+        status: str | None = None,
+        role: str | None = None,
         include_deleted: bool = False,
     ) -> tuple[list[UserInfo], int]:
         """Get paginated user list with optional filters. Returns (items, total)."""
