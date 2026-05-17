@@ -126,7 +126,7 @@ class TestAuditDB:
             operator_user_id="u-001",
             operator_role="SYS_ADMIN",
             target_type="user",
-            target_id=1,
+            target_id="1",
             action="user_created",
             result="success",
             request_id="req-001",
