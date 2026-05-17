@@ -1,6 +1,6 @@
 """AuditLog model — audit trail stored in Log DB (audit.db)."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -19,7 +19,9 @@ class AuditLog(SQLModel, table=True):
     result: str = Field(max_length=32)  # success / failed
     reason: str = Field(default="", max_length=512)
     request_id: str = Field(max_length=64, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None), index=True
+    )
 
 
 class DeadLetterQueue(SQLModel, table=True):
@@ -34,7 +36,7 @@ class DeadLetterQueue(SQLModel, table=True):
     error_message: str = Field(default="", max_length=1024)
     retry_count: int = Field(default=0)
     max_retries: int = Field(default=3)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
     last_retry_at: datetime | None = Field(default=None)
 
 
@@ -47,4 +49,4 @@ class OperationLog(SQLModel, table=True):
     caller_id: str = Field(max_length=64, index=True)  # client_id of calling service
     query_condition: str = Field(default="", max_length=1024)
     snapshot_version: str = Field(default="", max_length=64)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))

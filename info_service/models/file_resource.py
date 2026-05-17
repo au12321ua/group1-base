@@ -1,6 +1,6 @@
 """FileResource model — uploaded file metadata."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -17,4 +17,4 @@ class FileResource(SQLModel, table=True):
     file_size: int = Field(default=0)  # bytes
     storage_path: str = Field(max_length=512)
     checksum: str = Field(default="", max_length=128)  # SHA-256 hex
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))

@@ -1,6 +1,6 @@
 """Classroom model — physical teaching space."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -15,5 +15,5 @@ class Classroom(SQLModel, table=True):
     building: str = Field(default="", max_length=128)
     capacity: int = Field(default=0)
     type: str = Field(default="standard", max_length=64)  # standard / lab / lecture_hall
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))

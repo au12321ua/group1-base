@@ -1,6 +1,6 @@
 """Permission and RolePermission models for RBAC."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -15,7 +15,7 @@ class Permission(SQLModel, table=True):
     name: str = Field(max_length=256)
     resource: str = Field(max_length=64)
     action: str = Field(max_length=64)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
 class RolePermission(SQLModel, table=True):
