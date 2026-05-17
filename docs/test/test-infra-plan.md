@@ -57,9 +57,9 @@ tests/
 
 ### 3.4 测试工具函数（tests/utils.py）
 
-- `build_auth_headers(user_id, role, permissions)`：构建 Gateway 透传的身份 Header
-- `create_test_user(db, ...)`：快速创建测试用户
-- `create_test_token()`：生成测试用 JWT Token（Auth Service 测试用）
+- `build_identity_headers(user_id, role, permissions)`：构建 Gateway 透传的身份 Header
+- `build_auth_header(token)`：构建携带 Bearer Token 的认证 Header
+- `make_user_payload(...)`：生成测试用户数据载荷
 
 ## 4. pytest 配置
 
