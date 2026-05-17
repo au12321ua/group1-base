@@ -29,9 +29,9 @@ tests/
 
 **实现要点**：
 - 使用 `sqlalchemy.ext.asyncio.create_async_engine` 创建异步引擎
-- 通过 `conn.run_sync(SQLModel.metadata.create_all)` 创建所有表
-- 每个 fixture 作用域为 `function`（每个测试独立数据库状态）
-- 事务回滚策略：`AsyncSession` + `db.begin()` → rollback（保证测试隔离）
+- 各引擎只创建本服务所属的表（按 `__tablename__` 过滤 `SQLModel.metadata.sorted_tables`），保持 auth.db / info.db / audit.db 三库分离
+- 每个 fixture 作用域为 `function`（每个测试独立的 in-memory 数据库）
+- 隔离策略：引擎为函数级 scope，每个测试获得全新的数据库实例，无需手动事务回滚
 
 ### 3.2 异步 HTTP 客户端 Fixture
 
@@ -57,9 +57,9 @@ tests/
 
 ### 3.4 测试工具函数（tests/utils.py）
 
-- `build_identity_headers(user_id, role, permissions)`：构建 Gateway 透传的身份 Header
-- `build_auth_header(token)`：构建携带 Bearer Token 的认证 Header
-- `make_user_payload(...)`：生成测试用户数据载荷
+- `build_identity_headers(user_id, role, permissions)`：构建 Gateway 透传的身份 Header（`X-User-Id`、`X-User-Role`、`X-User-Permissions`）
+- `build_auth_header(token)`：构建携带 Bearer Token 的认证 Header（`Authorization: Bearer <token>`）
+- `make_user_payload(**kwargs)`：生成测试用户数据载荷（含 username、user_no、role_ids 等默认字段）
 
 ## 4. pytest 配置
 

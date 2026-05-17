@@ -7,9 +7,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 # ---------------------------------------------------------------------------
 # Import all models so their tables are registered in SQLModel.metadata.
-# Using SQLModel.metadata.create_all is the pragmatic approach — it creates
-# tables for all imported models in each test database, which is harmless
-# for in-memory SQLite.
+# Each engine fixture then filters to only create the tables that belong to
+# its own service, keeping Auth DB / Info DB / Audit DB properly separated.
 # ---------------------------------------------------------------------------
 import auth_service.models.credential  # noqa: F401
 import auth_service.models.permission  # noqa: F401
@@ -31,6 +30,58 @@ import info_service.models.training_program  # noqa: F401
 import info_service.models.user  # noqa: F401
 import info_service.models.user_profile  # noqa: F401
 
+# ---------------------------------------------------------------------------
+# Per-service table name sets — each engine only creates the tables that
+# belong to its service, mirroring the auth.db / info.db / audit.db split.
+# ---------------------------------------------------------------------------
+_AUTH_TABLES: frozenset[str] = frozenset(
+    {
+        "users",
+        "credentials",
+        "roles",
+        "user_roles",
+        "permissions",
+        "role_permissions",
+        "tokens",
+        "authentication_sessions",
+    }
+)
+
+_INFO_TABLES: frozenset[str] = frozenset(
+    {
+        "users_info",
+        "user_profiles",
+        "courses",
+        "course_offerings",
+        "course_prerequisites",
+        "course_schedules",
+        "teacher_course_assignments",
+        "classrooms",
+        "training_programs",
+        "academic_calendars",
+        "base_info_items",
+        "file_resources",
+    }
+)
+
+_AUDIT_TABLES: frozenset[str] = frozenset(
+    {
+        "audit_logs",
+        "dead_letter_queue",
+        "operation_logs",
+    }
+)
+
+
+def _make_create_tables(table_names: frozenset[str]):
+    """返回一个同步函数，只在目标连接上创建指定名称的表。"""
+
+    def _create(sync_conn) -> None:
+        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in table_names]
+        SQLModel.metadata.create_all(sync_conn, tables=tables)
+
+    return _create
+
 
 @pytest.fixture(scope="session")
 def anyio_backend():
@@ -45,21 +96,19 @@ def anyio_backend():
 
 @pytest.fixture(scope="function")
 async def auth_db_engine():
-    """In-memory SQLite engine for Auth DB — tables created once per test."""
+    """In-memory SQLite engine for Auth DB — only Auth Service tables are created."""
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.run_sync(_make_create_tables(_AUTH_TABLES))
     yield engine
     await engine.dispose()
 
 
 @pytest.fixture(scope="function")
 async def auth_db_session(auth_db_engine):
-    """AsyncSession for Auth DB — rolled back after each test for isolation."""
+    """AsyncSession for Auth DB — fresh engine per test already ensures isolation."""
     async with AsyncSession(auth_db_engine, expire_on_commit=False) as session:
-        async with session.begin() as trans:
-            yield session
-            await trans.rollback()
+        yield session
 
 
 # ===========================================================================
@@ -69,40 +118,36 @@ async def auth_db_session(auth_db_engine):
 
 @pytest.fixture(scope="function")
 async def info_db_engine():
-    """In-memory SQLite engine for Info DB — tables created once per test."""
+    """In-memory SQLite engine for Info DB — only Info Service tables are created."""
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.run_sync(_make_create_tables(_INFO_TABLES))
     yield engine
     await engine.dispose()
 
 
 @pytest.fixture(scope="function")
 async def info_db_session(info_db_engine):
-    """AsyncSession for Info DB — rolled back after each test for isolation."""
+    """AsyncSession for Info DB — fresh engine per test already ensures isolation."""
     async with AsyncSession(info_db_engine, expire_on_commit=False) as session:
-        async with session.begin() as trans:
-            yield session
-            await trans.rollback()
+        yield session
 
 
 @pytest.fixture(scope="function")
 async def audit_db_engine():
-    """In-memory SQLite engine for Audit DB — tables created once per test."""
+    """In-memory SQLite engine for Audit DB — only Audit tables are created."""
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.run_sync(_make_create_tables(_AUDIT_TABLES))
     yield engine
     await engine.dispose()
 
 
 @pytest.fixture(scope="function")
 async def audit_db_session(audit_db_engine):
-    """AsyncSession for Audit DB — rolled back after each test for isolation."""
+    """AsyncSession for Audit DB — fresh engine per test already ensures isolation."""
     async with AsyncSession(audit_db_engine, expire_on_commit=False) as session:
-        async with session.begin() as trans:
-            yield session
-            await trans.rollback()
+        yield session
 
 
 # ===========================================================================
