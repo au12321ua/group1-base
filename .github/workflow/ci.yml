@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install and cache uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: "latest"
+          cache: true
+          cache-dependency-path: "pyproject.toml"
+      
+      - name: Install dependencies
+        run: uv sync --group dev
+      
+      - name: Lint with ruff
+        run: uv run ruff check .
+        continue-on-error: false
+      
+      - name: Run tests
+        run: uv run pytest .
+        continue-on-error: false
