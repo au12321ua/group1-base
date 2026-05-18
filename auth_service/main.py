@@ -17,6 +17,8 @@ settings = get_auth_settings()
 engine = create_async_engine(settings.auth_database_url, echo=False)
 get_db = create_get_db(engine)
 
+__all__ = ["app", "engine", "get_db"]
+
 _AUTH_TABLES = frozenset(
     {
         "users",
