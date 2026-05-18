@@ -9,6 +9,12 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+
+    env:
+      # Set database URLs for testing
+      AUTH_DATABASE_URL: sqlite+aiosqlite:///./data/auth.db
+      INFO_DATABASE_URL: sqlite+aiosqlite:///./data/info.db
+      AUDIT_DATABASE_URL: sqlite+aiosqlite:///./data/audit.db
     
     steps:
       - name: Checkout code
