@@ -20,7 +20,7 @@ from shared.exceptions import (
 # Helpers
 # ---------------------------------------------------------------------------
 def _builder():
-    """Try to import register_error_handlers from the (not-yet-existing) module."""
+    """Import and return `register_error_handlers` from `shared.error_handlers`."""
     from shared.error_handlers import register_error_handlers
 
     return register_error_handlers
