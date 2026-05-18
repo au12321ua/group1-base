@@ -40,8 +40,18 @@ def _get_status_code(exc: AppError) -> int:
     return _EXCEPTION_STATUS.get(type(exc), 500)
 
 
-def app_exception_handler(request: Request, exc: AppError) -> JSONResponse:
+def app_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Convert an AppError into an APIResponse JSON body."""
+    if not isinstance(exc, AppError):
+        body = APIResponse(
+            code=1008,
+            message="Unknown error",
+        )
+        return JSONResponse(
+            status_code=500,
+            content=body.model_dump(exclude_none=True),
+        )
+
     status_code = _get_status_code(exc)
     body = APIResponse(
         code=exc.code,
