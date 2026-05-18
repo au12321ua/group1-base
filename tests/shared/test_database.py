@@ -11,7 +11,7 @@ from auth_service.models.user import User, UserStatus
 
 @pytest.fixture
 def get_db():
-    """Import get_db after it exists. Will fail (ImportError) until implemented."""
+    """Import get_db after it exists."""
     from shared.database import create_get_db
 
     return create_get_db
