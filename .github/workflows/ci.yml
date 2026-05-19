@@ -15,6 +15,7 @@ jobs:
       AUTH_DATABASE_URL: sqlite+aiosqlite:///./data/auth.db
       INFO_DATABASE_URL: sqlite+aiosqlite:///./data/info.db
       AUDIT_DATABASE_URL: sqlite+aiosqlite:///./data/audit.db
+      TOKEN_SECRET_KEY: ci-test-key-do-not-use-in-production
     
     steps:
       - name: Checkout code
@@ -40,5 +41,5 @@ jobs:
         continue-on-error: false
       
       - name: Run tests
-        run: uv run pytest .
+        run: uv run pytest
         continue-on-error: false
