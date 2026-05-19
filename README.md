@@ -1,6 +1,6 @@
 # STSS 信息管理子系统
 
-STSS 大组 P2-A 子系统 — 教务信息管理系统，负责认证授权（Auth Service）和基础数据管理（Info Service）。
+STSS 大组 P2-A 子系统 — 教务信息管理系统，负责认证授权（Auth Service）、基础数据管理（Info Service）和前端管理界面（Vue 3 SPA）。
 
 ## 技术栈
 
@@ -16,11 +16,13 @@ STSS 大组 P2-A 子系统 — 教务信息管理系统，负责认证授权（A
 | Lint | ruff | — |
 | 测试 | pytest + pytest-asyncio | — |
 | 容器 | Docker + Compose | — |
+| 前端 | Vue 3 + TS + Element Plus + Pinia | Node 18+ |
 
 ## 前置条件
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)（Python 包管理器）
+- Node.js 18+ / npm（前端）
 - Docker & Docker Compose（可选，用于容器化运行）
 
 ## 快速开始
@@ -45,10 +47,16 @@ uv run uvicorn info_service.main:app --port 8002 --reload &
 # 方式二：Docker Compose
 docker-compose up -d
 
-# 5. 验证
+# 5. 启动前端
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+
+# 6. 验证
 # 浏览器访问 Swagger 文档
 # http://localhost:8001/docs  (Auth Service)
 # http://localhost:8002/docs  (Info Service)
+# http://localhost:5173       (前端管理界面)
 ```
 
 ## 运行测试
@@ -65,6 +73,9 @@ uv run pytest --cov
 
 # Lint 检查
 uv run ruff check .
+
+# 前端类型检查
+cd frontend && npx vue-tsc --noEmit
 ```
 
 ## 项目结构
@@ -91,6 +102,17 @@ group1-base/
 ├── docs/
 │   ├── design/v2/         # 架构设计文档（9 份）
 │   └── require-spec/      # 需求规格 + 验证矩阵
+├── frontend/              # Vue 3 管理后台（端口 5173）
+│   ├── src/
+│   │   ├── api/           # Axios 客户端 + API 模块
+│   │   ├── components/    # 共享组件
+│   │   ├── directives/    # 自定义指令（v-permission）
+│   │   ├── layouts/       # 布局（AdminLayout）
+│   │   ├── router/        # 路由 + 导航守卫
+│   │   ├── stores/        # Pinia Store（auth）
+│   │   └── views/         # 12 个管理页面（占位）
+│   ├── package.json
+│   └── vite.config.ts     # Vite + API 代理
 ├── data/                  # SQLite 数据库文件（运行时生成）
 ├── logs/                  # 日志文件
 ├── uploads/               # 上传文件存储（运行时生成）
@@ -101,12 +123,13 @@ group1-base/
 └── TEAM_GUIDE.md          # 团队协作指南
 ```
 
-## API 概览
+## 服务概览
 
-| 服务 | 端口 | Swagger 文档 | 端点数量 |
-|------|------|-------------|---------|
+| 服务 | 端口 | 入口 | 说明 |
+|------|------|------|------|
 | Auth Service | 8001 | `/docs` | 认证（login/logout/refresh/change-password）+ 系统登录 + 内部验证 |
 | Info Service | 8002 | `/docs` | 用户/课程/排课/日历/培养方案/基础信息/回收站/文件/审计/数据供给 |
+| Frontend | 5173 | `/` | Vue 3 管理后台，9 个模块管理界面 |
 
 ## 开发指南
 
@@ -115,6 +138,7 @@ group1-base/
 | [CLAUDE.md](CLAUDE.md) | Agent 编码入口，含架构约束、代码规范 |
 | [TEAM_GUIDE.md](TEAM_GUIDE.md) | 团队协作流程，含分支策略、PR 模板、任务分工 |
 | [docs/BRANCH_STRATEGY.md](docs/BRANCH_STRATEGY.md) | 分支管理详细规范 |
+| [docs/frontend/README.md](docs/frontend/README.md) | 前端开发说明 + 开发指南 |
 | [docs/design/v2/README.md](docs/design/v2/README.md) | 架构设计文档索引 |
 | [docs/require-spec/](docs/require-spec/) | 需求规格 + 验证矩阵 |
 
