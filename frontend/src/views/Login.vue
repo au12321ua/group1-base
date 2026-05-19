@@ -12,7 +12,7 @@
           <el-input v-model="password" type="password" placeholder="请输入密码" show-password />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" native-type="submit" class="login-btn">
+          <el-button type="primary" native-type="submit" class="login-btn" :loading="loading">
             登录
           </el-button>
         </el-form-item>
@@ -24,16 +24,26 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
 import { useAuthStore } from "@/stores/auth";
 
 const username = ref("");
 const password = ref("");
+const loading = ref(false);
 const authStore = useAuthStore();
 const router = useRouter();
 
 async function handleLogin() {
-  await authStore.login(username.value, password.value);
-  router.push("/");
+  loading.value = true;
+  try {
+    await authStore.login(username.value, password.value);
+    router.push("/");
+  } catch (e: unknown) {
+    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+    ElMessage.error(msg ?? "登录失败，请重试");
+  } finally {
+    loading.value = false;
+  }
 }
 </script>
 

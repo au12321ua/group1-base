@@ -12,7 +12,6 @@ app.use(ElementPlus);
 app.use(createPinia());
 app.use(router);
 
-// 注册全局指令
 app.directive("permission", vPermission);
 
 app.mount("#app");

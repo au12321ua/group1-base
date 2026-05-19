@@ -6,9 +6,6 @@
   </div>
 </template>
 
-<script setup lang="ts">
-// 403 禁止访问页面
-</script>
 
 <style scoped>
 .forbidden-page {

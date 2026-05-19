@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
+import router from "@/router";
 import axios from "axios";
 
 /** 用户简要信息 */
@@ -14,7 +14,9 @@ export const useAuthStore = defineStore("auth", () => {
   const token = ref<string | null>(localStorage.getItem("token"));
   const refreshToken = ref<string | null>(localStorage.getItem("refreshToken"));
   const user = ref<UserInfo | null>(null);
-  const permissions = ref<string[]>([]);
+  const permissions = ref<string[]>(
+    JSON.parse(localStorage.getItem("permissions") ?? "[]")
+  );
 
   /** 是否已认证 */
   const isAuthenticated = computed(() => token.value !== null);
@@ -35,6 +37,7 @@ export const useAuthStore = defineStore("auth", () => {
 
     if (token.value) localStorage.setItem("token", token.value);
     if (refreshToken.value) localStorage.setItem("refreshToken", refreshToken.value);
+    if (permissions.value.length) localStorage.setItem("permissions", JSON.stringify(permissions.value));
   }
 
   /** 退出登录 */
@@ -50,8 +53,8 @@ export const useAuthStore = defineStore("auth", () => {
     permissions.value = [];
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
+    localStorage.removeItem("permissions");
 
-    const router = useRouter();
     router.push("/login");
   }
 

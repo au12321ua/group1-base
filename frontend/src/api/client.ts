@@ -1,7 +1,6 @@
 import axios from "axios";
 import { ElMessage } from "element-plus";
 import { useAuthStore } from "@/stores/auth";
-import router from "@/router";
 
 /** 统一 Axios 实例 */
 const apiClient = axios.create({
@@ -23,9 +22,8 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config as { _retry?: boolean } & typeof error.config;
 
-    // 401 且未重试过 → 尝试刷新 Token
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       const authStore = useAuthStore();
@@ -35,7 +33,6 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch {
         authStore.logout();
-        router.push("/login");
         return Promise.reject(error);
       }
     }
