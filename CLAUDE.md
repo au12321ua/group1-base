@@ -2,7 +2,7 @@
 
 > **一句话**：教务信息管理系统（Auth Service + Info Service），作为 STSS 大组的 P2-A 子系统，负责认证授权和基础数据管理。
 >
-> **本仓库范围**：仅 Auth Service（8001）和 Info Service（8002）。Gateway/Bus 由其他组负责。
+> **本仓库范围**：Auth Service（8001）、Info Service（8002）、前端管理界面（Vite 5173）。Gateway/Bus 由其他组负责。
 
 ## 技术栈
 
@@ -18,6 +18,7 @@
 | Lint | ruff | — |
 | 测试 | pytest + pytest-asyncio + pytest-cov | — |
 | 容器 | Docker + Compose | — |
+| 前端 | Vue 3 + TS + Element Plus + Pinia | Node 18+, npm |
 
 ## 目录结构
 
@@ -49,6 +50,19 @@ group1-base/
 │   ├── auth_service/           # Auth Service 测试
 │   ├── info_service/           # Info Service 测试
 │   └── shared/                 # 共用库测试（数据库、错误处理、应用 wiring）
+├── frontend/                   ← Vue 3 管理后台（端口 5173）
+│   ├── src/
+│   │   ├── api/client.ts       # Axios 实例（拦截器、Token 续期）
+│   │   ├── components/         # 共享组件（StatusTag 等）
+│   │   ├── directives/         # 自定义指令（v-permission）
+│   │   ├── layouts/            # 布局组件（AdminLayout）
+│   │   ├── router/             # 路由表 + beforeEach 导航守卫
+│   │   ├── stores/auth.ts      # Pinia 认证 Store
+│   │   └── views/              # 页面组件（12 个占位页 — 无业务逻辑）
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts          # Vite 配置（@ 别名、API 代理）
 ├── .github/
 │   └── workflows/
 │       └── ci.yml              # CI：ruff check + pytest（PR / push to main）
@@ -117,10 +131,11 @@ Gateway → Auth Service /internal/verify → X-User-Id, X-User-Role, X-User-Per
 2. 让 Agent 先阅读 `docs/design/v2/` 下对应设计文档
 3. 编写实现（Agent 生成或手写）
 4. 本地验证：
-   - 完整检查：`uv run ruff check . && uv run pytest`
+   - 后端完整检查：`uv run ruff check . && uv run pytest`
    - 快速检查（跳过集成测试）：`uv run pytest -m "not integration"`
    - 按标记运行：`uv run pytest -m smoke`、`uv run pytest -m unit`
    - 覆盖率报告：`uv run pytest --cov=. --cov-report=term-missing`
+   - 前端类型检查：`cd frontend && npx vue-tsc --noEmit`
 5. 提交 PR（`gh pr create`）
 6. CI 自动 lint + test，至少 1 人 Review
 7. Squash Merge 到 main
@@ -132,6 +147,11 @@ git clone <repo-url> && cd group1-base
 uv sync --group dev
 cp .env.example .env   # 填入开发用密钥
 docker-compose up -d    # 或手动 uvicorn auth_service.main:app --port 8001 & info_service...
+
+# 前端
+cd frontend && npm install && npm run dev   # http://localhost:5173
+
+# 测试
 uv run pytest
 ```
 
@@ -145,6 +165,7 @@ uv run pytest
 | CRUD 接口 | `docs/design/v2/05-api-architecture.md`、`03-data-architecture.md` |
 | 业务流程 | `docs/design/v2/06-business-flows.md` |
 | 部署/环境 | `docs/design/v2/08-deployment.md` |
+| 前端开发 | `docs/frontend/README.md`、`docs/frontend/development-guide.md` |
 | 全部 | `docs/design/v2/README.md`（索引入口） |
 
 完整需求规格在 `docs/require-spec/`，测试矩阵在 `docs/require-spec/validation_matrices/`。
