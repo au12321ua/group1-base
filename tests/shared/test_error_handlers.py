@@ -67,6 +67,7 @@ async def client():
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+@pytest.mark.unit
 class TestErrorHandlerRegistration:
     def test_import_exists(self):
         """register_error_handlers is importable from shared.error_handlers."""
@@ -74,6 +75,7 @@ class TestErrorHandlerRegistration:
         assert callable(register)
 
 
+@pytest.mark.unit
 class TestAppExceptionToApiResponse:
     @pytest.mark.parametrize(
         "exc_type, exc_instance, expected_status",
