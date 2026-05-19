@@ -1,5 +1,6 @@
 """Auth Service — FastAPI application entry point."""
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -35,7 +36,8 @@ _AUTH_TABLES = frozenset(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create Auth DB tables on startup, dispose engine on shutdown."""
+    """Create Auth DB tables and runtime dirs on startup, dispose engine on shutdown."""
+    os.makedirs("data", exist_ok=True)
     async with engine.begin() as conn:
         tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _AUTH_TABLES]
         await conn.run_sync(SQLModel.metadata.create_all, tables=tables)
@@ -50,9 +52,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+origins = settings.cors_origins.split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

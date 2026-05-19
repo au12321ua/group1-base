@@ -1,5 +1,6 @@
 """Info Service — FastAPI application entry point."""
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -52,7 +53,9 @@ def _create_tables(conn, table_names: frozenset[str]) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create Info + Audit DB tables on startup, dispose engines on shutdown."""
+    """Create Info + Audit DB tables and runtime dirs on startup, dispose engines on shutdown."""
+    os.makedirs(settings.upload_dir, exist_ok=True)
+    os.makedirs("data", exist_ok=True)
     async with info_engine.begin() as conn:
         await conn.run_sync(_create_tables, _INFO_TABLES)
     async with audit_engine.begin() as conn:
@@ -69,9 +72,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+origins = settings.cors_origins.split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

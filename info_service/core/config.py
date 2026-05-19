@@ -30,6 +30,9 @@ class InfoSettings(BaseSettings):
     max_upload_size_mb: int = 10
     allowed_upload_types: str = "jpg,jpeg,png,pdf,csv"
 
+    # CORS
+    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+
     # Logging
     log_level: str = "DEBUG"
 

@@ -35,6 +35,9 @@ class AuthSettings(BaseSettings):
     # Password hashing
     bcrypt_cost_factor: int = 12
 
+    # CORS
+    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+
     # Logging
     log_level: str = "DEBUG"
 
