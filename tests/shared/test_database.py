@@ -17,6 +17,7 @@ def get_db():
     return create_get_db
 
 
+@pytest.mark.unit
 class TestCreateGetDb:
     """Tests for the create_get_db factory function."""
 

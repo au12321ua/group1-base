@@ -1,12 +1,13 @@
 """Smoke tests to verify test infrastructure is correctly wired up."""
 
-
+import pytest
 
 # ---------------------------------------------------------------------------
 # HTTP client fixtures
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 class TestAuthClient:
     """Verify auth_service async client can connect."""
 
@@ -24,6 +25,7 @@ class TestAuthClient:
         assert body["info"]["title"] == "STSS Auth Service"
 
 
+@pytest.mark.smoke
 class TestInfoClient:
     """Verify info_service async client can connect."""
 
@@ -46,6 +48,7 @@ class TestInfoClient:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 class TestAuthDB:
     """Verify Auth DB session can perform basic CRUD."""
 
@@ -81,6 +84,7 @@ class TestAuthDB:
         assert cred.id is not None
 
 
+@pytest.mark.smoke
 class TestInfoDB:
     """Verify Info DB session can perform basic CRUD."""
 
@@ -115,6 +119,7 @@ class TestInfoDB:
         assert course.course_code == "CS101"
 
 
+@pytest.mark.smoke
 class TestAuditDB:
     """Verify Audit DB session can perform basic CRUD."""
 
@@ -143,6 +148,7 @@ class TestAuditDB:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 class TestUtils:
     """Verify shared test utilities work correctly."""
 

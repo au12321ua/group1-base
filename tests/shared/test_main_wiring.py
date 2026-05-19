@@ -1,9 +1,12 @@
 """Tests for main.py wiring — router registration, DB lifespan, error handlers."""
 
+import pytest
+
 
 # ---------------------------------------------------------------------------
 # Auth Service — router registration
 # ---------------------------------------------------------------------------
+@pytest.mark.unit
 class TestAuthRouterRegistration:
     """Verify Auth Service v1 router is included and sub-routers are wired."""
 
@@ -29,6 +32,7 @@ class TestAuthRouterRegistration:
 # ---------------------------------------------------------------------------
 # Info Service — router registration
 # ---------------------------------------------------------------------------
+@pytest.mark.unit
 class TestInfoRouterRegistration:
     """Verify Info Service v1 router is included and sub-routers are wired."""
 
@@ -57,6 +61,7 @@ class TestInfoRouterRegistration:
 # ---------------------------------------------------------------------------
 # Lifespan check
 # ---------------------------------------------------------------------------
+@pytest.mark.unit
 class TestLifespan:
     """Verify lifespan is attached to both apps."""
 
@@ -78,6 +83,7 @@ class TestLifespan:
 # ---------------------------------------------------------------------------
 # Error handler registration
 # ---------------------------------------------------------------------------
+@pytest.mark.unit
 class TestErrorHandlerRegistration:
     """Verify error handlers are registered in both apps."""
 

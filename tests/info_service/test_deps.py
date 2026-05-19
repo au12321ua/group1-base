@@ -5,6 +5,7 @@ import pytest
 from shared.exceptions import AuthenticationError
 
 
+@pytest.mark.unit
 class TestGetCurrentUser:
     """Tests for get_current_user dependency — resolves IdentityContext from Gateway headers."""
 
