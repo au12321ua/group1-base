@@ -16,7 +16,7 @@
 | 认证 | JWT HS256 | 预留 RS256 扩展 |
 | 包管理 | uv | — |
 | Lint | ruff | — |
-| 测试 | pytest + pytest-asyncio | — |
+| 测试 | pytest + pytest-asyncio + pytest-cov | — |
 | 容器 | Docker + Compose | — |
 
 ## 目录结构
@@ -24,8 +24,11 @@
 ```
 group1-base/
 ├── docs/
-│   ├── design/v2/              ← 架构设计（9 份，Agent 编码前必读）
-│   └── require-spec/           ← 需求规格（验收标准来源）
+│   ├── design/v2/              ← 架构设计（9 份编号文档 + README，Agent 编码前必读）
+│   ├── require-spec/           ← 需求规格（验收标准来源）
+│   ├── tests/                  ← 测试文档：README 概览 + 完整编写指南
+│   ├── BRANCH_STRATEGY.md      ← 分支管理策略（GitHub Flow）
+│   └── TASK_BREAKDOWN.md       ← 任务分工建议（4 Dev + 1 QA）
 ├── shared/                     ← 共用库（异常、响应、安全工具、日志）
 ├── auth_service/               ← 认证授权服务（端口 8001）
 │   ├── api/v1/                 # 端点：auth.py、internal.py
@@ -39,6 +42,16 @@ group1-base/
 │   ├── crud/                   # 12 个 CRUD + base
 │   ├── models/                 # 13 个 SQLModel 实体
 │   └── schemas/                # 12 个 Schema 模块
+├── tests/                      ← 自动化测试（smoke / unit / integration / regression）
+│   ├── conftest.py             # 根级 fixture：DB 引擎、HTTP 客户端
+│   ├── utils.py                # 测试工具：身份 Header 构建、数据工厂
+│   ├── test_infra.py           # 冒烟测试
+│   ├── auth_service/           # Auth Service 测试
+│   ├── info_service/           # Info Service 测试
+│   └── shared/                 # 共用库测试（数据库、错误处理、应用 wiring）
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # CI：ruff check + pytest（PR / push to main）
 ├── pyproject.toml
 ├── docker-compose.yml
 └── .env.example
@@ -85,12 +98,29 @@ Gateway → Auth Service /internal/verify → X-User-Id, X-User-Role, X-User-Per
 - **异常**：使用 `shared/exceptions.py` 中的异常类，不要直接 `raise HTTPException`
 - **ruff 配置**在 `pyproject.toml` 中，提交前必须 `ruff check .` 通过
 
+## 测试
+
+测试按服务组织（`auth_service/`、`info_service/`、`shared/`），按范围标记分类。4 个 pytest 标记定义在 `pyproject.toml` 中：
+
+| 标记 | 用途 | 典型耗时 | 建议频率 |
+|------|------|----------|----------|
+| `smoke` | 验证测试基础设施（app 可达、DB 可读写） | < 2s | 每次提交 |
+| `unit` | 隔离测试单个组件 | < 10s | 每次提交 |
+| `integration` | 完整 Router → Service → CRUD → Model 链路 | < 60s | 合并前 |
+| `regression` | 已修复 bug 的回归防护 | 不定 | CI 常驻 |
+
+覆盖率目标：总体 >= 90%，P0 功能 100%。通过 `pytest-cov` 收集，配置项在 `pyproject.toml` 的 `[tool.coverage.*]` 中。详细指导见 `docs/tests/README.md` 和 `docs/tests/test-guide.md`。
+
 ## 开发工作流
 
 1. 从 `main` 创建分支：`feat/xxx`、`fix/xxx`、`chore/xxx`
 2. 让 Agent 先阅读 `docs/design/v2/` 下对应设计文档
 3. 编写实现（Agent 生成或手写）
-4. 本地验证：`uv run ruff check . && uv run pytest`
+4. 本地验证：
+   - 完整检查：`uv run ruff check . && uv run pytest`
+   - 快速检查（跳过集成测试）：`uv run pytest -m "not integration"`
+   - 按标记运行：`uv run pytest -m smoke`、`uv run pytest -m unit`
+   - 覆盖率报告：`uv run pytest --cov=. --cov-report=term-missing`
 5. 提交 PR（`gh pr create`）
 6. CI 自动 lint + test，至少 1 人 Review
 7. Squash Merge 到 main
@@ -124,5 +154,6 @@ uv run pytest
 - 环境变量模板：`.env.example`
 - Docker 编排：`docker-compose.yml`
 - 包配置：`pyproject.toml`
+- CI 工作流：`.github/workflows/ci.yml`
 - 团队协作指南：`TEAM_GUIDE.md`
 - 分支管理策略：`docs/BRANCH_STRATEGY.md`
