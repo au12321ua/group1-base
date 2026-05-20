@@ -151,5 +151,4 @@ group1-base/
 
 ## 已知限制
 
-- **Alembic 迁移未配置**：当前使用 `SQLModel.metadata.create_all()` 自动建表，仅适用于原型开发。生产环境前需完成 Alembic 初始化（`alembic.ini` + 迁移脚本）。
 - **Auth Service 安全模块未实现**：`auth_service/core/security.py` 中 JWT 签发/验证、bcrypt 密码哈希目前为桩代码（`raise NotImplementedError`），正在开发中。
