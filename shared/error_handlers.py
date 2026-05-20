@@ -44,7 +44,7 @@ def app_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Convert an AppError into an APIResponse JSON body."""
     if not isinstance(exc, AppError):
         body = APIResponse(
-            code=1008,
+            code=4444,
             message="Unknown error",
         )
         return JSONResponse(

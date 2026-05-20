@@ -231,3 +231,4 @@
 | 1005 | 旧密码错误 |
 | 1006 | 新密码不符合策略 |
 | 1007 | Service 凭据无效 |
+| 1008 | 网关身份头缺失（X-User-Id/X-User-Role/X-User-Permissions）|

@@ -66,3 +66,10 @@ class ServiceCredentialInvalidError(AuthenticationError):
 
     def __init__(self, message: str = "Service credential invalid") -> None:
         super().__init__(message=message, code=1007)
+
+class MissingIdentityHeaderError(AuthenticationError):
+    """Identity head missing(X-User-Id, X-User-Role etc.)"""
+
+    def __init__(self, header_name: str = "X-User-Id") -> None:
+        message = f"Missing required header: {header_name}"
+        super().__init__(message=message, code=1008)
