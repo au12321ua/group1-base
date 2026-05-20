@@ -11,11 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Set database URLs for testing
       AUTH_DATABASE_URL: sqlite+aiosqlite:///./data/auth.db
       INFO_DATABASE_URL: sqlite+aiosqlite:///./data/info.db
       AUDIT_DATABASE_URL: sqlite+aiosqlite:///./data/audit.db
-      TOKEN_SECRET_KEY: ci-test-key-do-not-use-in-production
+      TOKEN_SECRET_KEY: ${{ secrets.TOKEN_SECRET_KEY }}
     
     steps:
       - name: Checkout code
