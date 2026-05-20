@@ -36,13 +36,17 @@ group1-base/
 │   ├── services/               # 业务：auth、key、identity
 │   ├── crud/                   # 数据访问：credential、token、session、role、permission
 │   ├── models/                 # SQLModel：user、credential、token、session、role、permission
-│   └── schemas/                # Pydantic：auth_schema、user_schema
+│   ├── schemas/                # Pydantic：auth_schema、user_schema
+│   └── migrations/             # Alembic 迁移链 → auth.db（8 表）
 ├── info_service/               ← 信息管理服务（端口 8002）
 │   ├── api/v1/                 # 12 个端点模块（user、course、offering、schedule、calendar、training_program、base_info、recycle_bin、files、audit_logs、data_provision）
 │   ├── services/               # 7 个服务
 │   ├── crud/                   # 12 个 CRUD + base
 │   ├── models/                 # 13 个 SQLModel 实体
-│   └── schemas/                # 12 个 Schema 模块
+│   ├── schemas/                # 12 个 Schema 模块
+│   └── migrations/             # Alembic 迁移链
+│       ├── info/               #   → info.db（12 表）
+│       └── audit/              #   → audit.db（3 表）
 ├── tests/                      ← 自动化测试（smoke / unit / integration / regression）
 │   ├── conftest.py             # 根级 fixture：DB 引擎、HTTP 客户端
 │   ├── utils.py                # 测试工具：身份 Header 构建、数据工厂
@@ -97,6 +101,15 @@ Gateway → Auth Service /internal/verify → X-User-Id, X-User-Role, X-User-Per
 - 3 个独立数据库：`auth.db`（Auth Service）、`info.db`（Info Service）、`audit.db`（审计日志）
 - 跨库操作需**补偿机制**：主写成功 → 跨服务调用 → 失败则补偿回滚
 
+### 数据库迁移（Alembic）
+- **3 条独立迁移链**，每条链有独立的 `alembic.ini`、`env.py`、`versions/`
+- **Alembic 使用同步驱动**（`sqlite:///`），与运行时异步驱动（`sqlite+aiosqlite:///`）不同但指向同一数据库文件
+- **info_service 有两条链**：info 链和 audit 链。因为所有表共用一个 `SQLModel.metadata`，env.py 通过 `table.tometadata()` 将目标表复制到独立 `MetaData` 实例来隔离 autogenerate
+- **`alembic.ini` 中 `script_location = %(here)s`**：确保从任意工作目录通过 `-c` 指定配置文件时都能正确找到 env.py
+- **所有迁移命令从项目根目录运行**，使用 `-c` 指定配置文件路径
+- 迁移文件纳入版本控制，ruff 对 versions 目录豁免 E501（行长度）
+- 完整指南见 `docs/alembic-guide.md`
+
 ### 权限模型
 - 权限码格式：`resource:action`（如 `user:read`、`course:create`）
 - 四种角色：STUDENT、TEACHER、ACADEMIC_ADMIN、SYS_ADMIN
@@ -136,6 +149,7 @@ Gateway → Auth Service /internal/verify → X-User-Id, X-User-Role, X-User-Per
    - 按标记运行：`uv run pytest -m smoke`、`uv run pytest -m unit`
    - 覆盖率报告：`uv run pytest --cov=. --cov-report=term-missing`
    - 前端类型检查：`cd frontend && npx vue-tsc --noEmit`
+   - 数据库迁移（如需）：`uv run python -m alembic -c <service>/migrations/<chain>/alembic.ini upgrade head`
 5. 提交 PR（`gh pr create`）
 6. CI 自动 lint + test，至少 1 人 Review
 7. Squash Merge 到 main
@@ -165,6 +179,7 @@ uv run pytest
 | CRUD 接口 | `docs/design/v2/05-api-architecture.md`、`03-data-architecture.md` |
 | 业务流程 | `docs/design/v2/06-business-flows.md` |
 | 部署/环境 | `docs/design/v2/08-deployment.md` |
+| 数据库迁移 | `docs/alembic-guide.md` |
 | 前端开发 | `docs/frontend/README.md`、`docs/frontend/development-guide.md` |
 | 全部 | `docs/design/v2/README.md`（索引入口） |
 
@@ -178,3 +193,4 @@ uv run pytest
 - CI 工作流：`.github/workflows/ci.yml`
 - 团队协作指南：`TEAM_GUIDE.md`
 - 分支管理策略：`docs/BRANCH_STRATEGY.md`
+- Alembic 迁移指南：`docs/alembic-guide.md`
