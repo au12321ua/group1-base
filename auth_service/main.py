@@ -13,6 +13,7 @@ from auth_service.api.v1.router import router as v1_router
 from auth_service.core.config import get_auth_settings
 from shared.database import create_get_db
 from shared.error_handlers import register_error_handlers
+from shared.logging import RequestIDMiddleware, RequestLoggingMiddleware, get_logger
 
 settings = get_auth_settings()
 engine = create_async_engine(settings.auth_database_url, echo=False)
@@ -59,6 +60,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(
+    RequestLoggingMiddleware,
+    logger=get_logger("auth_service.request", service_name="auth_service"),
 )
 
 register_error_handlers(app)
