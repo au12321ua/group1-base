@@ -1,9 +1,11 @@
 """Auth Service internal endpoints (/internal/*) — only reachable within internal network."""
 
-import warnings
+from datetime import UTC, datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Response
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from auth_service.api.deps import get_auth_db_session
 from auth_service.schemas.auth_schema import (
     InternalCreateUserRequest,
     InternalRoleSyncResponse,
@@ -12,52 +14,80 @@ from auth_service.schemas.auth_schema import (
     InternalVerifyRequest,
     InternalVerifyResponse,
 )
+from auth_service.services.auth_service import auth_service
+from auth_service.services.identity_service import identity_service
 from shared.response import APIResponse
 
 router = APIRouter(tags=["internal"])
 
 
 @router.post("/verify", response_model=APIResponse[InternalVerifyResponse])
-async def verify_token(request: InternalVerifyRequest) -> APIResponse[InternalVerifyResponse]:
+async def verify_token(
+    request: InternalVerifyRequest,
+    db: AsyncSession = Depends(get_auth_db_session),
+) -> APIResponse[InternalVerifyResponse]:
     """Verify JWT and return identity info (called by Gateway)."""
-    warnings.warn("TODO: implement POST /internal/verify")
-    raise NotImplementedError("POST /internal/verify not implemented")
+    data = await identity_service.verify_token(db, request)
+    return APIResponse(data=data)
 
 
-@router.post("/users", response_model=APIResponse[InternalUserResponse])
+@router.post(
+    "/users",
+    status_code=201,
+    response_model=APIResponse[InternalUserResponse],
+)
 async def create_internal_user(
     request: InternalCreateUserRequest,
+    db: AsyncSession = Depends(get_auth_db_session),
 ) -> APIResponse[InternalUserResponse]:
     """Create minimal auth user + credential (called by Info Service on user creation)."""
-    warnings.warn("TODO: implement POST /internal/users")
-    raise NotImplementedError("POST /internal/users not implemented")
+    data = await auth_service.create_internal_user(
+        db, request.user_id, request.username, request.role_ids
+    )
+    return APIResponse(data=data)
 
 
 @router.post("/users/{user_id}/disable", response_model=APIResponse[None])
-async def disable_user(user_id: str) -> APIResponse[None]:
+async def disable_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_auth_db_session),
+) -> APIResponse[None]:
     """Disable a user account (called by Info Service on logical delete)."""
-    warnings.warn("TODO: implement POST /internal/users/{id}/disable")
-    raise NotImplementedError("POST /internal/users/{id}/disable not implemented")
+    await auth_service.disable_user(db, user_id)
+    return APIResponse(data=None)
 
 
 @router.post("/users/{user_id}/enable", response_model=APIResponse[None])
-async def enable_user(user_id: str) -> APIResponse[None]:
+async def enable_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_auth_db_session),
+) -> APIResponse[None]:
     """Enable a user account (called by Info Service on restore)."""
-    warnings.warn("TODO: implement POST /internal/users/{id}/enable")
-    raise NotImplementedError("POST /internal/users/{id}/enable not implemented")
+    await auth_service.enable_user(db, user_id)
+    return APIResponse(data=None)
 
 
 @router.post("/users/{user_id}/roles", response_model=APIResponse[InternalRoleSyncResponse])
 async def sync_user_roles(
-    user_id: str, request: InternalSyncRolesRequest
+    user_id: str,
+    request: InternalSyncRolesRequest,
+    db: AsyncSession = Depends(get_auth_db_session),
 ) -> APIResponse[InternalRoleSyncResponse]:
     """Sync user role assignments (called by Info Service on role change)."""
-    warnings.warn("TODO: implement POST /internal/users/{id}/roles")
-    raise NotImplementedError("POST /internal/users/{id}/roles not implemented")
+    role_ids = await auth_service.sync_user_roles(db, user_id, request.role_ids)
+    data = InternalRoleSyncResponse(
+        user_id=user_id,
+        role_ids=role_ids,
+        synced_at=datetime.now(UTC).replace(tzinfo=None),
+    )
+    return APIResponse(data=data)
 
 
-@router.delete("/users/{user_id}", response_model=APIResponse[None])
-async def delete_user(user_id: str) -> APIResponse[None]:
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_auth_db_session),
+) -> Response:
     """Physically delete all auth data for a user (called by Info Service on permanent delete)."""
-    warnings.warn("TODO: implement DELETE /internal/users/{id}")
-    raise NotImplementedError("DELETE /internal/users/{id} not implemented")
+    await auth_service.delete_user(db, user_id)
+    return Response(status_code=204)

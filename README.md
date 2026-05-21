@@ -10,7 +10,7 @@ STSS 大组 P2-A 子系统 — 教务信息管理系统，负责认证授权（A
 | 框架 | FastAPI | async |
 | ORM | SQLModel | Pydantic v2 + SQLAlchemy |
 | 数据库 | SQLite → PostgreSQL | 原型 → 生产 |
-| 迁移 | Alembic | 尚未配置（见已知限制） |
+| 迁移 | Alembic | 三条独立迁移链（见 `docs/alembic-guide.md`） |
 | 认证 | JWT HS256 | 预留 RS256 扩展 |
 | 包管理 | uv | — |
 | Lint | ruff | — |
@@ -39,7 +39,13 @@ uv sync --group dev
 cp .env.example .env
 # 编辑 .env，将 TOKEN_SECRET_KEY 改为随机字符串
 
-# 4. 启动服务
+# 4. 初始化 Auth 数据库（角色/权限种子 + 初始管理员）
+mkdir -p data
+uv run alembic -c auth_service/migrations/alembic.ini upgrade head
+# 种子管理员：用户名 admin，初始密码见 .env 中 DEFAULT_INITIAL_PASSWORD（默认 ChangeMe123）
+# 稳定 role_id：1=STUDENT, 2=TEACHER, 3=ACADEMIC_ADMIN, 4=SYS_ADMIN（供 Info 联调传 role_ids）
+
+# 5. 启动服务
 # 方式一：本地运行
 uv run uvicorn auth_service.main:app --port 8001 --reload &
 uv run uvicorn info_service.main:app --port 8002 --reload &
@@ -47,12 +53,12 @@ uv run uvicorn info_service.main:app --port 8002 --reload &
 # 方式二：Docker Compose
 docker-compose up -d
 
-# 5. 启动前端
+# 6. 启动前端
 cd frontend
 npm install
 npm run dev          # http://localhost:5173
 
-# 6. 验证
+# 7. 验证
 # 浏览器访问 Swagger 文档
 # http://localhost:8001/docs  (Auth Service)
 # http://localhost:8002/docs  (Info Service)
@@ -149,6 +155,14 @@ group1-base/
 - **身份传递**：Gateway → `/internal/verify` → Header（`X-User-Id`、`X-User-Role`、`X-User-Permissions`）→ 下游服务
 - **统一响应**：所有端点使用 `APIResponse[T]` 格式
 
-## 已知限制
+## Auth 开发与联调
 
-- **Auth Service 安全模块未实现**：`auth_service/core/security.py` 中 JWT 签发/验证、bcrypt 密码哈希目前为桩代码（`raise NotImplementedError`），正在开发中。
+| 项 | 说明 |
+|----|------|
+| 迁移 | `uv run alembic -c auth_service/migrations/alembic.ini upgrade head` |
+| 种子数据 | `002_seed_roles_permissions_admin`：4 角色、RBAC 权限映射、管理员 `admin` |
+| 初始密码 | `.env` → `DEFAULT_INITIAL_PASSWORD`（默认 `ChangeMe123`） |
+| 内部 API | `POST /api/v1/internal/users` 返回 **201**；`DELETE .../users/{id}` 返回 **204** |
+| 服务登录 | `POST /api/v1/auth/sys/login`，凭据见 `SERVICE_CLIENT_ID` / `SERVICE_CLIENT_SECRET` |
+
+更多约束见 [CLAUDE.md](CLAUDE.md) 与 [docs/design/v2/04-security-architecture.md](docs/design/v2/04-security-architecture.md)。

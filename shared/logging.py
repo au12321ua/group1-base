@@ -132,8 +132,9 @@ class AppLogger:
         extra: dict[str, Any] = {}
         if self._service_name:
             extra["service"] = self._service_name
+        exc_info = context.pop("exc_info", False)
         extra.update(context)
-        self._logger.log(level, message, extra=extra)
+        self._logger.log(level, message, extra=extra or None, exc_info=exc_info)
 
     def debug(self, message: str, **context: Any) -> None:
         self._log(logging.DEBUG, message, **context)
