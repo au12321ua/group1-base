@@ -11,9 +11,6 @@ permissions:
 
 env:
   ENV: test
-  AUTH_DATABASE_URL: sqlite+aiosqlite:///./data/auth-ci.db
-  INFO_DATABASE_URL: sqlite+aiosqlite:///./data/info-ci.db
-  AUDIT_DATABASE_URL: sqlite+aiosqlite:///./data/audit-ci.db
   UPLOAD_DIR: /tmp/stss-uploads
   TOKEN_SECRET_KEY: ${{ secrets.TOKEN_SECRET_KEY }}
 
