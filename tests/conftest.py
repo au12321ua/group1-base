@@ -1,9 +1,21 @@
 """Top-level test configuration — shared fixtures for both services."""
 
+import os
+
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+# ---------------------------------------------------------------------------
+# Test env defaults
+# Force async SQLite URLs so importing main.py never creates sync drivers.
+# ---------------------------------------------------------------------------
+os.environ.setdefault("ENV", "test")
+os.environ.setdefault("AUTH_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("INFO_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("AUDIT_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("UPLOAD_DIR", "/tmp/stss-test-uploads")
 
 # ---------------------------------------------------------------------------
 # Import all models so their tables are registered in SQLModel.metadata.

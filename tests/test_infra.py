@@ -188,12 +188,13 @@ class TestUtils:
         payload = make_user_payload()
         assert payload["username"] == "testuser"
         assert payload["user_no"] == "S2026001"
-        assert payload["role_ids"] == "1"
+        assert payload["role_ids"] == [1]
 
     def test_make_user_payload_custom(self):
         """make_user_payload accepts custom values."""
         from tests.utils import make_user_payload
 
-        payload = make_user_payload(user_no="T001", username="teacher1")
+        payload = make_user_payload(user_no="T001", username="teacher1", role_ids=[2, 3])
         assert payload["user_no"] == "T001"
         assert payload["username"] == "teacher1"
+        assert payload["role_ids"] == [2, 3]

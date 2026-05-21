@@ -49,9 +49,11 @@ def make_user_payload(
     user_no: str = "S2026001",
     username: str = "testuser",
     full_name: str = "测试用户",
-    role_ids: str = "1",
-) -> dict:
+    role_ids: list[int] | None = None,
+) -> dict[str, object]:
     """Create a minimal user creation payload."""
+    if role_ids is None:
+        role_ids = [1]
     return {
         "user_no": user_no,
         "username": username,
