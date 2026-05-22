@@ -41,6 +41,16 @@ class AuthSettings(BaseSettings):
     # Logging
     log_level: str = "DEBUG"
 
+    # Internal user provisioning (Info Service → POST /internal/users)
+    default_initial_password: str = "ChangeMe123"
+
+    # Service-to-service login (/auth/sys/login)
+    service_client_id: str = "info_service"
+    service_client_secret: str = "change-me-service-secret"
+    service_token_scope: str = "user:read course:read calendar:read"
+    service_token_audience: str = "info_service"
+    jwt_key_id: str = "auth-hs256-key-1"
+
 
 @lru_cache
 def get_auth_settings() -> AuthSettings:
