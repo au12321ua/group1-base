@@ -23,7 +23,8 @@ class BaseCRUD[ModelType]:
         self, db: AsyncSession, *, skip: int = 0, limit: int = 100
     ) -> list[ModelType]:
         """Get multiple records with offset/limit."""
-        result = await db.exec(select(self.model).offset(skip).limit(limit))
+        stmt = select(self.model).order_by(self.model.id).offset(skip).limit(limit)
+        result = await db.exec(stmt)
         return list(result.all())
 
     async def create(self, db: AsyncSession, obj: ModelType) -> ModelType:

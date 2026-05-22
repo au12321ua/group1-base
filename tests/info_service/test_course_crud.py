@@ -25,6 +25,42 @@ class TestCourseCrud:
         assert found.id == created.id
         assert found.course_name == "Intro to CS"
 
+    async def test_get_by_course_code_excludes_deleted_course_by_default(self, info_db_session):
+        """Default lookup should hide logically deleted courses."""
+        created = await course_crud.create(
+            info_db_session,
+            Course(course_code="CS102", course_name="Soft Deleted Course"),
+        )
+        await info_db_session.commit()
+
+        await course_crud.logical_delete(info_db_session, created.id)
+        await info_db_session.commit()
+
+        found = await course_crud.get_by_course_code(info_db_session, "CS102")
+
+        assert found is None
+
+    async def test_get_by_course_code_can_include_deleted_course(self, info_db_session):
+        """Deleted courses remain accessible only when explicitly requested."""
+        created = await course_crud.create(
+            info_db_session,
+            Course(course_code="CS103", course_name="Recoverable Course"),
+        )
+        await info_db_session.commit()
+
+        await course_crud.logical_delete(info_db_session, created.id)
+        await info_db_session.commit()
+
+        found = await course_crud.get_by_course_code(
+            info_db_session,
+            "CS103",
+            include_deleted=True,
+        )
+
+        assert found is not None
+        assert found.id == created.id
+        assert found.is_deleted is True
+
     async def test_get_multi_filters_keyword_and_excludes_deleted_by_default(self, info_db_session):
         """Default listing hides logically deleted courses and supports keyword search."""
         course_1 = await course_crud.create(

@@ -18,9 +18,14 @@ class CourseCRUD(BaseCRUD[Course]):
     def __init__(self) -> None:
         super().__init__(Course)
 
-    async def get_by_course_code(self, db: AsyncSession, code: str) -> Course | None:
+    async def get_by_course_code(
+        self, db: AsyncSession, code: str, *, include_deleted: bool = False
+    ) -> Course | None:
         """Get course by course_code (unique)."""
-        result = await db.exec(select(Course).where(Course.course_code == code))
+        stmt = select(Course).where(Course.course_code == code)
+        if not include_deleted:
+            stmt = stmt.where(Course.is_deleted.is_(False))
+        result = await db.exec(stmt)
         return result.first()
 
     async def get_multi(
