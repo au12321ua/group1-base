@@ -44,28 +44,30 @@ class SessionCRUD:
         return result.first()
 
     async def end_session(self, db: AsyncSession, session_id: int) -> None:
-        """End a session (status=ENDED, set ended_at)."""
+        """End an ACTIVE session (status=ENDED, set ended_at once)."""
         result = await db.exec(
             select(AuthenticationSession).where(AuthenticationSession.id == session_id)
         )
         session = result.first()
-        if session is None:
+        if session is None or session.status != SessionStatus.ACTIVE:
             return
         session.status = SessionStatus.ENDED
-        session.ended_at = datetime.now(UTC)
+        if session.ended_at is None:
+            session.ended_at = datetime.now(UTC)
         db.add(session)
         await db.flush()
 
     async def expire_session(self, db: AsyncSession, session_id: int) -> None:
-        """Mark a session as expired."""
+        """Mark an ACTIVE session as expired (set ended_at once)."""
         result = await db.exec(
             select(AuthenticationSession).where(AuthenticationSession.id == session_id)
         )
         session = result.first()
-        if session is None:
+        if session is None or session.status != SessionStatus.ACTIVE:
             return
         session.status = SessionStatus.EXPIRED
-        session.ended_at = datetime.now(UTC)
+        if session.ended_at is None:
+            session.ended_at = datetime.now(UTC)
         db.add(session)
         await db.flush()
 
