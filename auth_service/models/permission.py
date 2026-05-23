@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -22,6 +23,11 @@ class RolePermission(SQLModel, table=True):
     """Many-to-many association between roles and permissions."""
 
     __tablename__: str = "role_permissions"
+    __table_args__ = (
+        UniqueConstraint(
+            "role_id", "permission_id", name="uq_role_permissions_role_id_permission_id"
+        ),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     role_id: int = Field(foreign_key="roles.id")

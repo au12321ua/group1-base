@@ -1,45 +1,53 @@
 """Role CRUD — role management and user-role assignments."""
 
-import warnings
-
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from auth_service.models.role import Role
+from auth_service.models.role import Role, UserRole
 
 
 class RoleCRUD:
     """Data access for Role and UserRole models."""
 
-    def __init__(self) -> None:
-        warnings.warn("TODO: RoleCRUD — implement all methods")
+    async def get_by_id(self, db: AsyncSession, role_id: int) -> Role | None:
+        """Get role by primary key."""
+        result = await db.exec(select(Role).where(Role.id == role_id))
+        return result.first()
 
     async def get_by_code(self, db: AsyncSession, code: str) -> Role | None:
         """Get role by its code."""
-        warnings.warn("TODO: implement get_by_code")
         result = await db.exec(select(Role).where(Role.code == code))
         return result.first()
 
     async def get_user_roles(self, db: AsyncSession, user_id: str) -> list[Role]:
         """Get all roles assigned to a user."""
-        warnings.warn("TODO: implement get_user_roles — join query")
-        raise NotImplementedError("get_user_roles not implemented")
+        stmt = (
+            select(Role)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
+        )
+        result = await db.exec(stmt)
+        return list(result.all())
 
     async def assign_roles(self, db: AsyncSession, user_id: str, role_ids: list[int]) -> None:
         """Replace all role assignments for a user (delete old, insert new)."""
-        warnings.warn("TODO: implement assign_roles — transactional replace")
-        raise NotImplementedError("assign_roles not implemented")
+        existing = await db.exec(select(UserRole).where(UserRole.user_id == user_id))
+        for user_role in existing.all():
+            await db.delete(user_role)
+        for role_id in role_ids:
+            db.add(UserRole(user_id=user_id, role_id=role_id))
+        await db.flush()
 
     async def remove_all_roles(self, db: AsyncSession, user_id: str) -> None:
         """Remove all role assignments for a user."""
-        warnings.warn("TODO: implement remove_all_roles")
-        raise NotImplementedError("remove_all_roles not implemented")
+        result = await db.exec(select(UserRole).where(UserRole.user_id == user_id))
+        for user_role in result.all():
+            await db.delete(user_role)
+        await db.flush()
 
     async def list_all(self, db: AsyncSession) -> list[Role]:
         """List all active roles."""
-        warnings.warn("TODO: implement list_all")
-        result = await db.exec(select(Role).where(Role.is_active))
-        # result.all() returns a Sequence[Role]; convert to list for the declared return type
+        result = await db.exec(select(Role).where(Role.is_active.is_(True)))
         return list(result.all())
 
 
