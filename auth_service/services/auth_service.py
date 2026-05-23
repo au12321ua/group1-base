@@ -1,5 +1,6 @@
 """AuthService — login, token issuance/refresh/revocation, password management."""
 
+import hmac
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -173,9 +174,15 @@ class AuthService:
     ) -> ServiceLoginResponse:
         """Authenticate a service client and issue a Service Token."""
         settings = get_auth_settings()
-        valid_id = client_id == settings.service_client_id
-        valid_secret = client_secret == settings.service_client_secret
-        if not (valid_id and valid_secret):
+        id_ok = hmac.compare_digest(
+            client_id.encode("utf-8"),
+            settings.service_client_id.encode("utf-8"),
+        )
+        secret_ok = hmac.compare_digest(
+            client_secret.encode("utf-8"),
+            settings.service_client_secret.encode("utf-8"),
+        )
+        if not (id_ok and secret_ok):
             raise ServiceCredentialInvalidError()
 
         token = create_service_token(
