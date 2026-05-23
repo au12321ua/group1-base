@@ -30,7 +30,9 @@ class BaseInfoCRUD(BaseCRUD[BaseInfoItem]):
         total_result = await db.exec(count_query)
         total = total_result.one()
 
-        items_result = await db.exec(base_query.offset(skip).limit(limit))
+        items_result = await db.exec(
+            base_query.order_by(BaseInfoItem.id).offset(skip).limit(limit)
+        )
         items = list(items_result.all())
 
         return items, total

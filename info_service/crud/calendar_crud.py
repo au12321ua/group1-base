@@ -22,12 +22,12 @@ class CalendarCRUD(BaseCRUD[AcademicCalendar]):
         )
         return result.first()
 
-    async def get_by_date(self, db: AsyncSession, d: date) -> AcademicCalendar | None:
+    async def get_by_date(self, db: AsyncSession, target_date: date) -> AcademicCalendar | None:
         """Get the calendar that covers a specific date."""
         result = await db.exec(
             select(AcademicCalendar).where(
-                AcademicCalendar.start_date <= d,
-                AcademicCalendar.end_date >= d,
+                AcademicCalendar.start_date <= target_date,
+                AcademicCalendar.end_date >= target_date,
             )
         )
         return result.first()
