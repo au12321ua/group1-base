@@ -41,7 +41,7 @@ class BaseCRUD[ModelType]:
                 setattr(obj, field, value)
 
         if hasattr(obj, "updated_at") and "updated_at" not in kwargs:
-            setattr(obj, "updated_at", datetime.now(UTC).replace(tzinfo=None))
+            setattr(obj, "updated_at", datetime.now(UTC))
 
         await db.flush()
         await db.refresh(obj)

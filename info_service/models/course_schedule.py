@@ -17,5 +17,5 @@ class CourseSchedule(SQLModel, table=True):
     start_period: int = Field(ge=1, le=12)
     end_period: int = Field(ge=1, le=12)
     week_range: str = Field(default="", max_length=64)  # e.g. "1-16" or "1,3,5,7-16"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

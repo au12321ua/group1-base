@@ -15,7 +15,7 @@ class Role(SQLModel, table=True):
     name: str = Field(max_length=128)
     description: str = Field(default="", max_length=512)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class UserRole(SQLModel, table=True):

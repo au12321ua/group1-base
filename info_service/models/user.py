@@ -20,5 +20,5 @@ class UserInfo(SQLModel, table=True):
     profile_id: int | None = Field(default=None)
     is_deleted: bool = Field(default=False)
     deleted_at: datetime | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
