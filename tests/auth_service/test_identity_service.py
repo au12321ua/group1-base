@@ -49,3 +49,19 @@ class TestIdentityService:
         assert response.role == "SERVICE"
         assert "teacher:read" in response.permissions
         assert "calendar:read" in response.permissions
+
+    async def test_verify_service_token_parses_space_separated_scope(
+        self, auth_db_session, auth_security_env
+    ) -> None:
+        """Service Token scope 应支持配置默认的空格分隔格式。"""
+        token = create_service_token(
+            client_id="info_service",
+            scope="user:read course:read calendar:read",
+            audience="info_service",
+        )
+        response = await identity_service.verify_token(
+            auth_db_session,
+            InternalVerifyRequest(token=token),
+        )
+
+        assert response.permissions == ["user:read", "course:read", "calendar:read"]

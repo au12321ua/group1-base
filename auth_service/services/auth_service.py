@@ -226,10 +226,10 @@ class AuthService:
         if user.status == UserStatus.DISABLED:
             raise AccountDisabledError()
 
+        await token_crud.revoke(db, row.id)
         session = await session_crud.get_by_refresh_token_id(db, row.id)
         if session is not None:
             await token_crud.revoke(db, session.access_token_id)
-            await token_crud.revoke(db, row.id)
             await session_crud.end_session(db, session.id)
 
         role_codes = await self._role_codes(db, user.user_id)

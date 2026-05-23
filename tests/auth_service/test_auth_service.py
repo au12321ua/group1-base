@@ -82,6 +82,33 @@ class TestAuthServiceLogin:
         with pytest.raises((AuthenticationError, TokenExpiredError)):
             await auth_service.refresh_token(auth_db_session, login2.refresh_token)
 
+    async def test_refresh_revokes_token_even_without_session(
+        self, auth_db_session, seeded_auth_user, auth_security_env
+    ) -> None:
+        """session 缺失时仍应 revoke 旧 refresh，避免重复刷新。"""
+        from auth_service.crud.session_crud import session_crud
+        from auth_service.crud.token_crud import token_crud
+        from shared.exceptions import TokenExpiredError
+
+        login = await auth_service.login(
+            auth_db_session,
+            seeded_auth_user["username"],
+            seeded_auth_user["password"],
+        )
+        row = await token_crud.get_by_value(auth_db_session, login.refresh_token)
+        assert row is not None
+        session = await session_crud.get_by_refresh_token_id(auth_db_session, row.id)
+        assert session is not None
+        await auth_db_session.delete(session)
+        await auth_db_session.flush()
+
+        refreshed = await auth_service.refresh_token(auth_db_session, login.refresh_token)
+        assert refreshed.access_token
+        assert refreshed.refresh_token != login.refresh_token
+
+        with pytest.raises(TokenExpiredError):
+            await auth_service.refresh_token(auth_db_session, login.refresh_token)
+
 
 @pytest.mark.unit
 class TestAuthServiceInternal:
