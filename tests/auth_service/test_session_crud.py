@@ -59,6 +59,73 @@ class TestSessionCRUD:
         await auth_db_session.refresh(session2)
         assert session2.status == SessionStatus.EXPIRED
 
+    async def test_end_session_idempotent(self, auth_db_session) -> None:
+        """重复结束或已终态会话时不应改写 status/ended_at。"""
+        access = await token_crud.create(
+            auth_db_session,
+            user_id="sess-u3",
+            token_type=TokenType.ACCESS,
+            token_value="access-s3",
+            expires_at=_expires_in_hours(1),
+        )
+        refresh = await token_crud.create(
+            auth_db_session,
+            user_id="sess-u3",
+            token_type=TokenType.REFRESH,
+            token_value="refresh-s3",
+            expires_at=_expires_in_hours(24),
+        )
+        session = await session_crud.create(
+            auth_db_session,
+            user_id="sess-u3",
+            access_token_id=access.id,
+            refresh_token_id=refresh.id,
+        )
+        await session_crud.end_session(auth_db_session, session.id)
+        await auth_db_session.refresh(session)
+        first_ended_at = session.ended_at
+
+        await session_crud.end_session(auth_db_session, session.id)
+        await auth_db_session.refresh(session)
+        assert session.status == SessionStatus.ENDED
+        assert session.ended_at == first_ended_at
+
+        await session_crud.expire_session(auth_db_session, session.id)
+        await auth_db_session.refresh(session)
+        assert session.status == SessionStatus.ENDED
+        assert session.ended_at == first_ended_at
+
+    async def test_expire_session_idempotent(self, auth_db_session) -> None:
+        """已 EXPIRED 的会话不应被 end_session 改为 ENDED。"""
+        access = await token_crud.create(
+            auth_db_session,
+            user_id="sess-u4",
+            token_type=TokenType.ACCESS,
+            token_value="access-s4",
+            expires_at=_expires_in_hours(1),
+        )
+        refresh = await token_crud.create(
+            auth_db_session,
+            user_id="sess-u4",
+            token_type=TokenType.REFRESH,
+            token_value="refresh-s4",
+            expires_at=_expires_in_hours(24),
+        )
+        session = await session_crud.create(
+            auth_db_session,
+            user_id="sess-u4",
+            access_token_id=access.id,
+            refresh_token_id=refresh.id,
+        )
+        await session_crud.expire_session(auth_db_session, session.id)
+        await auth_db_session.refresh(session)
+        first_ended_at = session.ended_at
+
+        await session_crud.end_session(auth_db_session, session.id)
+        await auth_db_session.refresh(session)
+        assert session.status == SessionStatus.EXPIRED
+        assert session.ended_at == first_ended_at
+
     async def test_delete_by_user(self, auth_db_session) -> None:
         """应能删除用户全部会话记录。"""
         access = await token_crud.create(
