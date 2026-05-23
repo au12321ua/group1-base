@@ -32,9 +32,10 @@ class PermissionCRUD:
             .join(RolePermission, RolePermission.permission_id == Permission.id)
             .join(UserRole, UserRole.role_id == RolePermission.role_id)
             .where(UserRole.user_id == user_id)
+            .distinct()
         )
         result = await db.exec(stmt)
-        return list(dict.fromkeys(result.all()))
+        return list(result.all())
 
 
 permission_crud = PermissionCRUD()

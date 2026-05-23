@@ -12,7 +12,8 @@ class Credential(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: str = Field(max_length=64, unique=True, index=True)
-    username: str = Field(max_length=128)
+    # 登录冗余字段，唯一性由 users.username 保证；仅加索引加速 lookup
+    username: str = Field(max_length=128, index=True)
     password_hash: str = Field(max_length=256)
     password_salt: str = Field(max_length=128)
     failed_login_count: int = Field(default=0)
