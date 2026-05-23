@@ -1,7 +1,6 @@
 """BaseInfoItem CRUD — generic lookup data operations."""
 
-import warnings
-
+from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.crud.base import BaseCRUD
@@ -13,7 +12,6 @@ class BaseInfoCRUD(BaseCRUD[BaseInfoItem]):
 
     def __init__(self) -> None:
         super().__init__(BaseInfoItem)
-        warnings.warn("TODO: BaseInfoCRUD — implement custom query methods")
 
     async def get_by_category(
         self,
@@ -24,8 +22,20 @@ class BaseInfoCRUD(BaseCRUD[BaseInfoItem]):
         limit: int = 100,
     ) -> tuple[list[BaseInfoItem], int]:
         """Get items by category. Returns (items, total)."""
-        warnings.warn("TODO: implement get_by_category")
-        raise NotImplementedError("get_by_category not implemented")
+        base_query = select(BaseInfoItem).where(BaseInfoItem.category == category)
+        count_query = select(func.count()).select_from(BaseInfoItem).where(
+            BaseInfoItem.category == category
+        )
+
+        total_result = await db.exec(count_query)
+        total = total_result.one()
+
+        items_result = await db.exec(
+            base_query.order_by(BaseInfoItem.id).offset(skip).limit(limit)
+        )
+        items = list(items_result.all())
+
+        return items, total
 
 
 base_info_crud = BaseInfoCRUD()
