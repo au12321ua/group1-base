@@ -17,5 +17,5 @@ class CourseOffering(SQLModel, table=True):
     teacher_ids: str = Field(default="", max_length=512)  # comma-separated teacher IDs
     capacity: int = Field(default=0)
     status: str = Field(default="ACTIVE", max_length=32)  # ACTIVE / CANCELLED / COMPLETED
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -18,5 +18,5 @@ class Course(SQLModel, table=True):
     assessment_method: str = Field(default="", max_length=128)
     is_active: bool = Field(default=True)
     is_deleted: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

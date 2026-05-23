@@ -16,6 +16,6 @@ class AcademicCalendar(SQLModel, table=True):
     start_date: date
     end_date: date
     version: str = Field(default="1.0", max_length=16)
-    snapshot_time: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    snapshot_time: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

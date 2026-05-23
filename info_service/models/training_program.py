@@ -16,6 +16,6 @@ class TrainingProgram(SQLModel, table=True):
     grade: str = Field(max_length=16)  # e.g. "2024"
     version: str = Field(default="1.0", max_length=16)
     required_course_ids: str = Field(default="", max_length=1024)  # comma-separated
-    snapshot_time: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    snapshot_time: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

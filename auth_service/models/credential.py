@@ -17,5 +17,5 @@ class Credential(SQLModel, table=True):
     password_salt: str = Field(max_length=128)
     failed_login_count: int = Field(default=0)
     locked_until: datetime | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

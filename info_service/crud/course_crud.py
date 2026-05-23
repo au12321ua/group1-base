@@ -65,7 +65,7 @@ class CourseCRUD(BaseCRUD[Course]):
 
         course.is_deleted = True
         course.is_active = False
-        course.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        course.updated_at = datetime.now(UTC)
         await db.flush()
         await db.refresh(course)
 

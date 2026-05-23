@@ -18,5 +18,5 @@ class UserProfile(SQLModel, table=True):
     phone: str = Field(default="", max_length=32)
     status: str = Field(default="ACTIVE", max_length=32)  # ACTIVE / DISABLED / DELETED
     avatar_file_id: int | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

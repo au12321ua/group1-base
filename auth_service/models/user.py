@@ -23,4 +23,4 @@ class User(SQLModel, table=True):
     user_id: str = Field(max_length=64, unique=True, index=True)
     username: str = Field(max_length=128, unique=True, index=True)
     status: UserStatus = Field(default=UserStatus.ACTIVE)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -15,5 +15,5 @@ class Classroom(SQLModel, table=True):
     building: str = Field(default="", max_length=128)
     capacity: int = Field(default=0)
     type: str = Field(default="standard", max_length=64)  # standard / lab / lecture_hall
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
