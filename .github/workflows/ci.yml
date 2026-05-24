@@ -129,16 +129,7 @@ jobs:
         run: mkdir -p data logs "$UPLOAD_DIR"
 
       - name: Run integration tests
-        shell: bash
-        run: |
-          set +e
-          uv run pytest -m integration
-          code=$?
-          if [ "$code" -eq 5 ]; then
-            echo "No integration tests collected, skip this stage for now."
-            exit 0
-          fi
-          exit "$code"
+        run: uv run pytest -m integration
 
   coverage:
     name: Coverage Gate
@@ -167,4 +158,4 @@ jobs:
         run: mkdir -p data logs "$UPLOAD_DIR"
 
       - name: Run coverage
-        run: uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=55
+        run: uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=75
