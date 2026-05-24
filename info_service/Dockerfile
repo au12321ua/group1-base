@@ -12,6 +12,8 @@ COPY info_service/ ./info_service/
 
 ENV PYTHONPATH=/app
 
+RUN chmod +x /app/info_service/start.sh
+
 WORKDIR /app/info_service
 EXPOSE 8002
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
+CMD ["bash", "/app/info_service/start.sh"]
