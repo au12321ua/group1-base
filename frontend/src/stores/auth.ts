@@ -14,9 +14,7 @@ export const useAuthStore = defineStore("auth", () => {
   const token = ref<string | null>(localStorage.getItem("token"));
   const refreshToken = ref<string | null>(localStorage.getItem("refreshToken"));
   const user = ref<UserInfo | null>(null);
-  const permissions = ref<string[]>(
-    JSON.parse(localStorage.getItem("permissions") ?? "[]")
-  );
+  const permissions = ref<string[]>([]);
 
   /** 是否已认证 */
   const isAuthenticated = computed(() => token.value !== null);
@@ -32,18 +30,22 @@ export const useAuthStore = defineStore("auth", () => {
     const data = res.data?.data ?? res.data;
     token.value = data.access_token ?? data.token;
     refreshToken.value = data.refresh_token ?? data.refreshToken;
-    user.value = data.user ?? null;
-    permissions.value = data.permissions ?? [];
+    user.value = {
+      userId: data.user_id,
+      username: data.username,
+      role: data.role,
+    };
 
     if (token.value) localStorage.setItem("token", token.value);
     if (refreshToken.value) localStorage.setItem("refreshToken", refreshToken.value);
-    if (permissions.value.length) localStorage.setItem("permissions", JSON.stringify(permissions.value));
   }
 
   /** 退出登录 */
   async function logout(): Promise<void> {
     try {
-      await axios.post("/auth/logout");
+      if (refreshToken.value) {
+        await axios.post("/auth/logout", { refresh_token: refreshToken.value });
+      }
     } catch {
       // 即使接口失败也清除本地状态
     }
@@ -53,7 +55,6 @@ export const useAuthStore = defineStore("auth", () => {
     permissions.value = [];
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
-    localStorage.removeItem("permissions");
 
     router.push("/login");
   }
@@ -66,12 +67,23 @@ export const useAuthStore = defineStore("auth", () => {
     });
     const data = res.data?.data ?? res.data;
     token.value = data.access_token ?? data.token;
+    if (data.refresh_token) {
+      refreshToken.value = data.refresh_token;
+      localStorage.setItem("refreshToken", data.refresh_token);
+    }
     if (token.value) localStorage.setItem("token", token.value);
   }
 
-  /** 获取当前用户信息（占位） */
+  /** 获取当前用户信息 */
   async function fetchCurrentUser(): Promise<void> {
-    // TODO: GET /auth/me 获取当前用户
+    const { default: apiClient } = await import("@/api/client");
+    const res = await apiClient.get("/auth/me");
+    const data = res.data?.data ?? res.data;
+    user.value = {
+      userId: data.user_id,
+      username: data.username,
+      role: data.role ?? user.value?.role ?? "",
+    };
   }
 
   return {
