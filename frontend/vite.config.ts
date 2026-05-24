@@ -3,6 +3,9 @@ import vue from "@vitejs/plugin-vue";
 import { resolve } from "path";
 import { randomUUID } from "node:crypto";
 
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL ?? "http://localhost:8001";
+const API_SERVICE_URL = process.env.API_SERVICE_URL ?? "http://localhost:8002";
+
 /** 开发网关插件 —— 为 Info Service 注入身份 Header */
 function devGatewayPlugin(): Plugin {
   return {
@@ -22,7 +25,7 @@ function devGatewayPlugin(): Plugin {
         const token = authHeader.slice(7);
 
         try {
-          const verifyUrl = "http://localhost:8001/api/v1/internal/verify";
+          const verifyUrl = `${AUTH_SERVICE_URL}/api/v1/internal/verify`;
           const response = await fetch(verifyUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -70,12 +73,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/auth": {
-        target: "http://localhost:8001",
+        target: AUTH_SERVICE_URL,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/auth/, "/api/v1/auth"),
       },
       "/api": {
-        target: "http://localhost:8002",
+        target: API_SERVICE_URL,
         changeOrigin: true,
       },
     },
