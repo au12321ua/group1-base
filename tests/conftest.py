@@ -10,11 +10,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 # ---------------------------------------------------------------------------
 # Test env defaults
 # Force async SQLite URLs so importing main.py never creates sync drivers.
+# Use assignment (not setdefault): shell may still export sync URLs from alembic.
 # ---------------------------------------------------------------------------
-os.environ.setdefault("ENV", "test")
-os.environ.setdefault("AUTH_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("INFO_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("AUDIT_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ["ENV"] = "test"
+os.environ["AUTH_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["INFO_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["AUDIT_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ.setdefault("UPLOAD_DIR", "/tmp/stss-test-uploads")
 
 # ---------------------------------------------------------------------------
@@ -171,8 +172,15 @@ async def audit_db_session(audit_db_engine):
 async def async_client_auth():
     """httpx AsyncClient connected directly to the Auth Service FastAPI app."""
     from httpx import ASGITransport, AsyncClient
+    from sqlmodel import SQLModel
 
-    from auth_service.main import app
+    from auth_service.main import _AUTH_TABLES, app, engine
+
+    async with engine.begin() as conn:
+        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _AUTH_TABLES]
+        await conn.run_sync(
+            lambda sync_conn: SQLModel.metadata.create_all(sync_conn, tables=tables)
+        )
 
     transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as client:
