@@ -93,3 +93,97 @@ class TestAuthAPI:
             json={"refresh_token": new_refresh},
         )
         assert logout_resp.status_code == 200
+
+    async def test_change_password_flow(self, async_client_auth, auth_security_env) -> None:
+        """创建用户后应支持改密，且新密码可登录旧密码失效。"""
+        settings = get_auth_settings()
+        user_id = "api-pwd-u1"
+        username = "apipwduser"
+
+        create_resp = await async_client_auth.post(
+            "/api/v1/internal/users",
+            json={"user_id": user_id, "username": username, "role_ids": []},
+        )
+        assert create_resp.status_code == 201
+
+        login_resp = await async_client_auth.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": settings.default_initial_password},
+        )
+        assert login_resp.status_code == 200
+        access = login_resp.json()["data"]["access_token"]
+
+        change_resp = await async_client_auth.post(
+            "/api/v1/auth/change-password",
+            json={
+                "old_password": settings.default_initial_password,
+                "new_password": "NewPass123",
+            },
+            headers={"Authorization": f"Bearer {access}"},
+        )
+        assert change_resp.status_code == 200
+
+        old_login_resp = await async_client_auth.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": settings.default_initial_password},
+        )
+        assert old_login_resp.status_code == 401
+        assert old_login_resp.json()["code"] == 1001
+
+        new_login_resp = await async_client_auth.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": "NewPass123"},
+        )
+        assert new_login_resp.status_code == 200
+        assert new_login_resp.json()["data"]["user_id"] == user_id
+
+    async def test_internal_user_lifecycle(self, async_client_auth, auth_security_env) -> None:
+        """内部用户接口应支持禁用/启用/角色同步/删除全生命周期。"""
+        settings = get_auth_settings()
+        user_id = "api-life-u1"
+        username = "apilifeuser"
+
+        create_resp = await async_client_auth.post(
+            "/api/v1/internal/users",
+            json={"user_id": user_id, "username": username, "role_ids": []},
+        )
+        assert create_resp.status_code == 201
+
+        disable_resp = await async_client_auth.post(f"/api/v1/internal/users/{user_id}/disable")
+        assert disable_resp.status_code == 200
+
+        disabled_login_resp = await async_client_auth.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": settings.default_initial_password},
+        )
+        assert disabled_login_resp.status_code == 423
+        assert disabled_login_resp.json()["code"] == 1003
+
+        enable_resp = await async_client_auth.post(f"/api/v1/internal/users/{user_id}/enable")
+        assert enable_resp.status_code == 200
+
+        enabled_login_resp = await async_client_auth.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": settings.default_initial_password},
+        )
+        assert enabled_login_resp.status_code == 200
+        assert enabled_login_resp.json()["data"]["user_id"] == user_id
+        refresh_token = enabled_login_resp.json()["data"]["refresh_token"]
+
+        sync_resp = await async_client_auth.post(
+            f"/api/v1/internal/users/{user_id}/roles",
+            json={"role_ids": []},
+        )
+        assert sync_resp.status_code == 200
+        assert sync_resp.json()["data"]["user_id"] == user_id
+        assert sync_resp.json()["data"]["role_ids"] == []
+
+        verify_refresh_resp = await async_client_auth.post(
+            "/api/v1/internal/verify",
+            json={"token": refresh_token},
+        )
+        assert verify_refresh_resp.status_code == 401
+        assert verify_refresh_resp.json()["code"] == 1001
+
+        delete_resp = await async_client_auth.delete(f"/api/v1/internal/users/{user_id}")
+        assert delete_resp.status_code == 204
