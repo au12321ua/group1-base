@@ -195,7 +195,7 @@ def upgrade() -> None:
         "users",
         sa.column("user_id", sa.String),
         sa.column("username", sa.String),
-        sa.column("status", sa.String),
+        sa.column("status", sa.Enum("ACTIVE", "DISABLED", name="userstatus")),
         sa.column("created_at", sa.DateTime),
     )
     op.bulk_insert(
