@@ -4,67 +4,229 @@ import warnings
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from info_service.crud.course_crud import course_crud
+from info_service.crud.offering_crud import offering_crud
+from info_service.crud.training_program_crud import training_program_crud
+from info_service.models.course import Course
+from info_service.models.course_offering import CourseOffering
+from info_service.models.training_program import TrainingProgram
+from info_service.schemas.course_schema import (
+    CourseCreateRequest,
+    CoursePatchRequest,
+    CourseUpdateRequest,
+)
+from info_service.schemas.offering_schema import (
+    OfferingCreateRequest,
+    OfferingPatchRequest,
+    OfferingUpdateRequest,
+)
+from info_service.schemas.training_program_schema import (
+    TrainingProgramCreateRequest,
+    TrainingProgramPatchRequest,
+    TrainingProgramUpdateRequest,
+)
+from shared.exceptions import BusinessRuleError, ResourceNotFoundError
+
 
 class CourseManagementService:
     """Business logic for courses, offerings, schedules, classrooms, calendars,
     training programs, and base info items."""
 
-    def __init__(self) -> None:
-        warnings.warn("TODO: CourseManagementService — implement all methods")
+    @staticmethod
+    def _serialize_string_list(values: list[str]) -> str:
+        """Store list-like fields as stable comma-separated text."""
+        items: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            normalized = value.strip()
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                items.append(normalized)
+        return ",".join(items)
+
+    @staticmethod
+    def _serialize_int_list(values: list[int]) -> str:
+        """Store integer list fields as comma-separated text."""
+        items: list[str] = []
+        seen: set[int] = set()
+        for value in values:
+            if value not in seen:
+                seen.add(value)
+                items.append(str(value))
+        return ",".join(items)
+
+    async def _ensure_course_exists(self, db: AsyncSession, course_id: int) -> Course:
+        """Resolve a visible course or raise not found."""
+        course = await course_crud.get(db, course_id)
+        if course is None or course.is_deleted:
+            raise ResourceNotFoundError("Course", str(course_id))
+        return course
+
+    async def _ensure_required_courses_exist(
+        self, db: AsyncSession, course_ids: list[int]
+    ) -> None:
+        """Validate every referenced course exists before storing the snapshot."""
+        for course_id in course_ids:
+            await self._ensure_course_exists(db, course_id)
+
+    async def _ensure_unique_course_code(
+        self,
+        db: AsyncSession,
+        course_code: str,
+        *,
+        exclude_id: int | None = None,
+    ) -> None:
+        """Reject duplicate course codes among non-deleted courses."""
+        existing = await course_crud.get_by_course_code(
+            db, course_code, include_deleted=True
+        )
+        if existing is None:
+            return
+        if exclude_id is not None and existing.id == exclude_id:
+            return
+        raise BusinessRuleError(f"Course code already exists: {course_code}")
+
+    async def _ensure_unique_offering_identity(
+        self,
+        db: AsyncSession,
+        *,
+        course_id: int,
+        term_code: str,
+        class_no: str,
+        exclude_id: int | None = None,
+    ) -> None:
+        """Reject duplicate offerings for the same course, term, and class number."""
+        existing = await offering_crud.get_by_course_and_term(db, course_id, term_code)
+        for offering in existing:
+            if exclude_id is not None and offering.id == exclude_id:
+                continue
+            if offering.class_no == class_no:
+                raise BusinessRuleError(
+                    "Offering already exists for course "
+                    f"{course_id} in {term_code} class {class_no}"
+                )
+
+    async def _ensure_unique_program_code(
+        self,
+        db: AsyncSession,
+        program_code: str,
+        *,
+        exclude_id: int | None = None,
+    ) -> None:
+        """Reject duplicate training program codes."""
+        existing = await training_program_crud.get_by_program_code(db, program_code)
+        if existing is None:
+            return
+        if exclude_id is not None and existing.id == exclude_id:
+            return
+        raise BusinessRuleError(f"Training program code already exists: {program_code}")
 
     # ---- Courses ----
 
-    async def create_course(self, db: AsyncSession, data) -> dict:
+    async def create_course(
+        self, db: AsyncSession, data: CourseCreateRequest
+    ) -> Course:
         """Create a course."""
-        warnings.warn("TODO: implement create_course")
-        raise NotImplementedError("create_course not implemented")
+        await self._ensure_unique_course_code(db, data.course_code)
+        course = Course(**data.model_dump())
+        return await course_crud.create(db, course)
 
-    async def update_course(self, db: AsyncSession, course_id: int, data) -> dict:
+    async def update_course(
+        self,
+        db: AsyncSession,
+        course_id: int,
+        data: CourseUpdateRequest | CoursePatchRequest,
+    ) -> Course:
         """Update a course."""
-        warnings.warn("TODO: implement update_course")
-        raise NotImplementedError("update_course not implemented")
+        course = await self._ensure_course_exists(db, course_id)
+        payload = data.model_dump(exclude_unset=True)
+        course_code = payload.get("course_code")
+        if course_code:
+            await self._ensure_unique_course_code(db, course_code, exclude_id=course_id)
+        return await course_crud.update(db, course, **payload)
 
     async def delete_course(self, db: AsyncSession, course_id: int) -> None:
         """Soft delete a course."""
-        warnings.warn("TODO: implement delete_course")
-        raise NotImplementedError("delete_course not implemented")
+        await course_crud.logical_delete(db, course_id)
 
-    async def list_courses(self, db: AsyncSession, **filters) -> tuple[list, int]:
+    async def list_courses(self, db: AsyncSession, **filters) -> tuple[list[Course], int]:
         """List courses with filters."""
-        warnings.warn("TODO: implement list_courses")
-        raise NotImplementedError("list_courses not implemented")
+        return await course_crud.get_multi(db, **filters)
 
-    async def get_course(self, db: AsyncSession, course_id: int) -> dict:
+    async def get_course(self, db: AsyncSession, course_id: int) -> Course:
         """Get course detail."""
-        warnings.warn("TODO: implement get_course")
-        raise NotImplementedError("get_course not implemented")
+        return await self._ensure_course_exists(db, course_id)
 
     # ---- Offerings ----
 
-    async def create_offering(self, db: AsyncSession, data) -> dict:
+    async def create_offering(
+        self, db: AsyncSession, data: OfferingCreateRequest
+    ) -> CourseOffering:
         """Create a course offering."""
-        warnings.warn("TODO: implement create_offering")
-        raise NotImplementedError("create_offering not implemented")
+        await self._ensure_course_exists(db, data.course_id)
+        await self._ensure_unique_offering_identity(
+            db,
+            course_id=data.course_id,
+            term_code=data.term_code,
+            class_no=data.class_no,
+        )
+        offering = CourseOffering(
+            course_id=data.course_id,
+            term_code=data.term_code,
+            class_no=data.class_no,
+            teacher_ids=self._serialize_string_list(data.teacher_ids),
+            capacity=data.capacity,
+        )
+        return await offering_crud.create(db, offering)
 
-    async def update_offering(self, db: AsyncSession, offering_id: int, data) -> dict:
+    async def update_offering(
+        self,
+        db: AsyncSession,
+        offering_id: int,
+        data: OfferingUpdateRequest | OfferingPatchRequest,
+    ) -> CourseOffering:
         """Update a course offering."""
-        warnings.warn("TODO: implement update_offering")
-        raise NotImplementedError("update_offering not implemented")
+        offering = await offering_crud.get(db, offering_id)
+        if offering is None:
+            raise ResourceNotFoundError("Offering", str(offering_id))
+
+        payload = data.model_dump(exclude_unset=True)
+        target_course_id = payload.get("course_id", offering.course_id)
+        target_term_code = payload.get("term_code", offering.term_code)
+        target_class_no = payload.get("class_no", offering.class_no)
+
+        await self._ensure_course_exists(db, target_course_id)
+        await self._ensure_unique_offering_identity(
+            db,
+            course_id=target_course_id,
+            term_code=target_term_code,
+            class_no=target_class_no,
+            exclude_id=offering_id,
+        )
+
+        if "teacher_ids" in payload and payload["teacher_ids"] is not None:
+            payload["teacher_ids"] = self._serialize_string_list(payload["teacher_ids"])
+
+        return await offering_crud.update(db, offering, **payload)
 
     async def delete_offering(self, db: AsyncSession, offering_id: int) -> None:
         """Delete a course offering."""
-        warnings.warn("TODO: implement delete_offering")
-        raise NotImplementedError("delete_offering not implemented")
+        deleted = await offering_crud.delete(db, offering_id)
+        if not deleted:
+            raise ResourceNotFoundError("Offering", str(offering_id))
 
-    async def list_offerings(self, db: AsyncSession, **filters) -> tuple[list, int]:
+    async def list_offerings(
+        self, db: AsyncSession, **filters
+    ) -> tuple[list[CourseOffering], int]:
         """List offerings with filters."""
-        warnings.warn("TODO: implement list_offerings")
-        raise NotImplementedError("list_offerings not implemented")
+        return await offering_crud.get_multi(db, **filters)
 
-    async def get_offering(self, db: AsyncSession, offering_id: int) -> dict:
+    async def get_offering(self, db: AsyncSession, offering_id: int) -> CourseOffering:
         """Get offering detail."""
-        warnings.warn("TODO: implement get_offering")
-        raise NotImplementedError("get_offering not implemented")
+        offering = await offering_crud.get(db, offering_id)
+        if offering is None:
+            raise ResourceNotFoundError("Offering", str(offering_id))
+        return offering
 
     # ---- Schedules ----
 
@@ -160,30 +322,61 @@ class CourseManagementService:
 
     # ---- Training Programs ----
 
-    async def create_training_program(self, db: AsyncSession, data) -> dict:
+    async def create_training_program(
+        self, db: AsyncSession, data: TrainingProgramCreateRequest
+    ) -> TrainingProgram:
         """Create a training program."""
-        warnings.warn("TODO: implement create_training_program")
-        raise NotImplementedError("create_training_program not implemented")
+        await self._ensure_unique_program_code(db, data.program_code)
+        await self._ensure_required_courses_exist(db, data.required_course_ids)
+        program = TrainingProgram(
+            program_code=data.program_code,
+            major_code=data.major_code,
+            grade=data.grade,
+            version=data.version,
+            required_course_ids=self._serialize_int_list(data.required_course_ids),
+        )
+        return await training_program_crud.create(db, program)
 
-    async def update_training_program(self, db: AsyncSession, program_id: int, data) -> dict:
+    async def update_training_program(
+        self,
+        db: AsyncSession,
+        program_id: int,
+        data: TrainingProgramUpdateRequest | TrainingProgramPatchRequest,
+    ) -> TrainingProgram:
         """Update a training program."""
-        warnings.warn("TODO: implement update_training_program")
-        raise NotImplementedError("update_training_program not implemented")
+        program = await training_program_crud.get(db, program_id)
+        if program is None:
+            raise ResourceNotFoundError("TrainingProgram", str(program_id))
+
+        payload = data.model_dump(exclude_unset=True)
+        program_code = payload.get("program_code")
+        if program_code:
+            await self._ensure_unique_program_code(db, program_code, exclude_id=program_id)
+        if "required_course_ids" in payload and payload["required_course_ids"] is not None:
+            await self._ensure_required_courses_exist(db, payload["required_course_ids"])
+            payload["required_course_ids"] = self._serialize_int_list(
+                payload["required_course_ids"]
+            )
+        return await training_program_crud.update(db, program, **payload)
 
     async def delete_training_program(self, db: AsyncSession, program_id: int) -> None:
         """Delete a training program."""
-        warnings.warn("TODO: implement delete_training_program")
-        raise NotImplementedError("delete_training_program not implemented")
+        deleted = await training_program_crud.delete(db, program_id)
+        if not deleted:
+            raise ResourceNotFoundError("TrainingProgram", str(program_id))
 
-    async def list_training_programs(self, db: AsyncSession, **filters) -> tuple[list, int]:
+    async def list_training_programs(
+        self, db: AsyncSession, **filters
+    ) -> tuple[list[TrainingProgram], int]:
         """List training programs with filters."""
-        warnings.warn("TODO: implement list_training_programs")
-        raise NotImplementedError("list_training_programs not implemented")
+        return await training_program_crud.get_multi(db, **filters)
 
-    async def get_training_program(self, db: AsyncSession, program_id: int) -> dict:
+    async def get_training_program(self, db: AsyncSession, program_id: int) -> TrainingProgram:
         """Get training program detail."""
-        warnings.warn("TODO: implement get_training_program")
-        raise NotImplementedError("get_training_program not implemented")
+        program = await training_program_crud.get(db, program_id)
+        if program is None:
+            raise ResourceNotFoundError("TrainingProgram", str(program_id))
+        return program
 
     # ---- Base Info ----
 
