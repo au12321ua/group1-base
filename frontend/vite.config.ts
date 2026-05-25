@@ -17,6 +17,12 @@ function devGatewayPlugin(): Plugin {
           return next();
         }
 
+        // 防止客户端伪造身份 Header：先清理潜在的 x-user-* / x-request-id
+        delete req.headers["x-user-id"];
+        delete req.headers["x-user-role"];
+        delete req.headers["x-user-permissions"];
+        delete req.headers["x-request-id"];
+
         const authHeader = req.headers["authorization"];
         if (!authHeader?.startsWith("Bearer ")) {
           return next(); // 无 Token，交由 Info Service 自行处理
