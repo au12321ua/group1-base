@@ -191,8 +191,21 @@ async def async_client_auth():
 async def async_client_info():
     """httpx AsyncClient connected directly to the Info Service FastAPI app."""
     from httpx import ASGITransport, AsyncClient
+    from sqlmodel import SQLModel
 
-    from info_service.main import app
+    from info_service.main import _AUDIT_TABLES, _INFO_TABLES, app, audit_engine, info_engine
+
+    async with info_engine.begin() as conn:
+        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _INFO_TABLES]
+        await conn.run_sync(
+            lambda sync_conn: SQLModel.metadata.create_all(sync_conn, tables=tables)
+        )
+
+    async with audit_engine.begin() as conn:
+        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _AUDIT_TABLES]
+        await conn.run_sync(
+            lambda sync_conn: SQLModel.metadata.create_all(sync_conn, tables=tables)
+        )
 
     transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as client:
