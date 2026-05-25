@@ -12,6 +12,8 @@ COPY auth_service/ ./auth_service/
 
 ENV PYTHONPATH=/app
 
+RUN chmod +x /app/auth_service/start.sh
+
 WORKDIR /app/auth_service
 EXPOSE 8001
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["bash", "/app/auth_service/start.sh"]

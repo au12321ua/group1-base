@@ -9,7 +9,6 @@ services:
       - .env
     volumes:
       - auth_data:/app/auth_service/data
-    command: uv run uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 
   info_service:
     build:
@@ -19,11 +18,25 @@ services:
       - "8002:8002"
     env_file:
       - .env
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:8001
     volumes:
       - info_data:/app/info_service/data
       - uploads:/app/info_service/uploads
       - logs:/app/info_service/logs
-    command: uv run uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:8001
+      - API_SERVICE_URL=http://info_service:8002
+    depends_on:
+      - auth_service
+      - info_service
 
 volumes:
   auth_data:

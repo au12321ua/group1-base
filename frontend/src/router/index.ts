@@ -6,6 +6,7 @@ import { PERM } from "@/constants/permissions";
 const LoginPage = () => import("@/views/Login.vue");
 const ForbiddenPage = () => import("@/views/Forbidden.vue");
 const AdminLayout = () => import("@/layouts/AdminLayout.vue");
+const ChangePasswordPage = () => import("@/views/ChangePassword.vue");
 
 const UserListPage = () => import("@/views/users/UserList.vue");
 const UserCreatePage = () => import("@/views/users/UserCreate.vue");
@@ -34,6 +35,7 @@ const routes: RouteRecordRaw[] = [
     component: AdminLayout,
     meta: { requiresAuth: true },
     children: [
+      { path: "change-password", name: "ChangePassword", component: ChangePasswordPage, meta: { requiresAuth: true } },
       { path: "users", name: "UserList", component: UserListPage, meta: { permission: PERM.USER_READ } },
       { path: "users/create", name: "UserCreate", component: UserCreatePage, meta: { permission: PERM.USER_CREATE } },
       { path: "users/:id", name: "UserDetail", component: UserDetailPage, meta: { permission: PERM.USER_READ } },
@@ -70,8 +72,8 @@ router.beforeEach((to, _from, next) => {
     return next("/");
   }
 
-  // 权限校验
-  if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
+  // 权限校验 —— 仅当权限数据已加载时才校验（空列表时放行，后端 API 层负责最终鉴权）
+  if (to.meta.permission && authStore.permissions.length > 0 && !authStore.hasPermission(to.meta.permission)) {
     return next("/403");
   }
 

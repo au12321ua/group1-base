@@ -37,12 +37,14 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // 统一错误提示
-    const message =
-      error.response?.data?.message ??
-      error.response?.data?.detail ??
-      "请求失败";
-    ElMessage.error(message);
+    // 统一错误提示（Token 刷新中的 401 不提示，由 logout 处理跳转）
+    if (!originalRequest._retry || error.response?.status !== 401) {
+      const message =
+        error.response?.data?.message ??
+        error.response?.data?.detail ??
+        "请求失败";
+      ElMessage.error(message);
+    }
     return Promise.reject(error);
   }
 );

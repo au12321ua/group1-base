@@ -55,6 +55,7 @@
       <el-header class="admin-header">
         <div class="header-right">
           <span class="username">{{ authStore.user?.username ?? "未登录" }}</span>
+          <el-button text @click="router.push('/change-password')">修改密码</el-button>
           <el-button type="danger" text @click="handleLogout">退出</el-button>
         </div>
       </el-header>
@@ -69,7 +70,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   User,
   Reading,
@@ -84,6 +85,7 @@ import {
 import { useAuthStore } from "@/stores/auth";
 
 const route = useRoute();
+const router = useRouter();
 const authStore = useAuthStore();
 
 /** 当前激活菜单项 */
