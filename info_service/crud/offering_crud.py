@@ -1,7 +1,6 @@
 """CourseOffering CRUD — offering instance operations."""
 
-import warnings
-
+from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.crud.base import BaseCRUD
@@ -13,14 +12,21 @@ class OfferingCRUD(BaseCRUD[CourseOffering]):
 
     def __init__(self) -> None:
         super().__init__(CourseOffering)
-        warnings.warn("TODO: OfferingCRUD — implement custom query methods")
 
     async def get_by_course_and_term(
         self, db: AsyncSession, course_id: int, term_code: str
     ) -> list[CourseOffering]:
         """Get all offerings for a course in a term."""
-        warnings.warn("TODO: implement get_by_course_and_term")
-        raise NotImplementedError("get_by_course_and_term not implemented")
+        stmt = (
+            select(CourseOffering)
+            .where(
+                CourseOffering.course_id == course_id,
+                CourseOffering.term_code == term_code,
+            )
+            .order_by(CourseOffering.id)
+        )
+        result = await db.exec(stmt)
+        return list(result.all())
 
     async def get_multi(
         self,
@@ -33,8 +39,26 @@ class OfferingCRUD(BaseCRUD[CourseOffering]):
         status: str | None = None,
     ) -> tuple[list[CourseOffering], int]:
         """Get paginated offering list. Returns (items, total)."""
-        warnings.warn("TODO: implement get_multi")
-        raise NotImplementedError("get_multi not implemented")
+        conditions = []
+        if course_id is not None:
+            conditions.append(CourseOffering.course_id == course_id)
+        if term_code:
+            conditions.append(CourseOffering.term_code == term_code)
+        if status:
+            conditions.append(CourseOffering.status == status)
+
+        stmt = (
+            select(CourseOffering)
+            .where(*conditions)
+            .offset(skip)
+            .limit(limit)
+            .order_by(CourseOffering.id)
+        )
+        count_stmt = select(func.count(CourseOffering.id)).where(*conditions)
+
+        items = list((await db.exec(stmt)).all())
+        total = (await db.exec(count_stmt)).one()
+        return items, total
 
 
 offering_crud = OfferingCRUD()
