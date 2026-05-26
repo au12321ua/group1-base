@@ -76,7 +76,12 @@ class CourseManagementService:
         *,
         exclude_id: int | None = None,
     ) -> None:
-        """Reject duplicate course codes among non-deleted courses."""
+        """Reject duplicate course codes, including logically deleted rows.
+
+        SQLite in this project does not support a partial unique index for
+        ``course_code`` scoped to active rows only, so a soft-deleted course
+        still reserves its original code.
+        """
         existing = await course_crud.get_by_course_code(
             db, course_code, include_deleted=True
         )
