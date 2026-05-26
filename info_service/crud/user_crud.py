@@ -45,6 +45,7 @@ class UserCRUD:
             conditions.append(UserInfo.is_deleted == False)  # noqa: E712
 
         if keyword:
+            # Search in user_no, username, and via profile full_name
             profile_match = (
                 select(UserProfile.user_id)
                 .where(UserProfile.full_name.contains(keyword))
@@ -58,6 +59,7 @@ class UserCRUD:
             )
 
         if status:
+            # status is stored in UserProfile
             profile_status_match = (
                 select(UserProfile.user_id)
                 .where(UserProfile.status == status)
