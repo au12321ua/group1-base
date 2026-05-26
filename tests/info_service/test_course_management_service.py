@@ -10,11 +10,12 @@ from info_service.models.course import Course
 from info_service.models.course_offering import CourseOffering
 from info_service.schemas.offering_schema import OfferingPatchRequest
 from info_service.services.course_management_service import course_management_service
+from shared.exceptions import ResourceNotFoundError
 
 
 @pytest.mark.unit
 class TestCourseManagementService:
-    """Verify service-layer orchestration for offering updates."""
+    """Verify service-layer orchestration for course domain updates."""
 
     async def test_update_offering_skips_identity_check_when_identity_unchanged(
         self, info_db_session, monkeypatch: pytest.MonkeyPatch
@@ -52,3 +53,18 @@ class TestCourseManagementService:
         identity_check.assert_not_awaited()
         assert updated.teacher_ids == "t-2,t-3"
         assert updated.status == "COMPLETED"
+
+    async def test_ensure_required_courses_exist_uses_bulk_lookup(
+        self, info_db_session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Required course validation should use one bulk lookup and preserve errors."""
+        existing_ids_lookup = AsyncMock(return_value={1, 3})
+        monkeypatch.setattr(course_crud, "get_existing_ids", existing_ids_lookup)
+
+        with pytest.raises(ResourceNotFoundError):
+            await course_management_service._ensure_required_courses_exist(
+                info_db_session,
+                [1, 2, 3],
+            )
+
+        existing_ids_lookup.assert_awaited_once_with(info_db_session, [1, 2, 3])

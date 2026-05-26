@@ -66,8 +66,13 @@ class CourseManagementService:
         self, db: AsyncSession, course_ids: list[int]
     ) -> None:
         """Validate every referenced course exists before storing the snapshot."""
+        if not course_ids:
+            return
+
+        existing_ids = await course_crud.get_existing_ids(db, course_ids)
         for course_id in course_ids:
-            await self._ensure_course_exists(db, course_id)
+            if course_id not in existing_ids:
+                raise ResourceNotFoundError("Course", str(course_id))
 
     async def _ensure_unique_course_code(
         self,
