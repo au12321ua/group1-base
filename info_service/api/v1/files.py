@@ -1,11 +1,14 @@
 """Info Service — /files/* endpoints."""
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import StreamingResponse
 
 from info_service.api.deps import InfoDbSession
+from info_service.crud.file_resource_crud import file_resource_crud
 from info_service.deps import get_current_user
 from info_service.schemas.file_schema import FileResponse, FileUploadResponse
 from info_service.services.file_storage_service import file_storage_service
+from shared.exceptions import ResourceNotFoundError
 from shared.response import APIResponse
 from shared.security import IdentityContext
 
@@ -20,7 +23,6 @@ async def upload_file(
 ) -> APIResponse[FileUploadResponse]:
     """Upload a file (requires authentication)."""
     content = await file.read()
-    # Determine file type from extension
     parts = file.filename.rsplit(".", 1) if file.filename else []
     file_type = parts[-1].lower() if len(parts) == 2 else "bin"
 
@@ -37,12 +39,11 @@ async def upload_file(
 
 @router.get("/{file_id}", response_model=APIResponse[FileResponse])
 async def get_file_metadata(
-    file_id: int, db: InfoDbSession
+    file_id: int,
+    db: InfoDbSession,
+    current_user: IdentityContext = Depends(get_current_user),
 ) -> APIResponse[FileResponse]:
-    """Get file metadata."""
-    from info_service.crud.file_resource_crud import file_resource_crud
-    from shared.exceptions import ResourceNotFoundError
-
+    """Get file metadata (requires authentication)."""
     resource = await file_resource_crud.get(db, file_id)
     if not resource:
         raise ResourceNotFoundError("File", str(file_id))
@@ -59,6 +60,23 @@ async def get_file_metadata(
     )
 
 
+@router.get("/{file_id}/download")
+async def download_file(
+    file_id: int,
+    db: InfoDbSession,
+    current_user: IdentityContext = Depends(get_current_user),
+):
+    """Download file content (requires authentication)."""
+    content, mime_type = await file_storage_service.get_file(db, file_id)
+    resource = await file_resource_crud.get(db, file_id)
+    filename = resource.file_name if resource else f"file-{file_id}"
+    return StreamingResponse(
+        iter([content]),
+        media_type=mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.delete("/{file_id}", response_model=APIResponse[None])
 async def delete_file(
     file_id: int,
@@ -66,5 +84,7 @@ async def delete_file(
     current_user: IdentityContext = Depends(get_current_user),
 ) -> APIResponse[None]:
     """Delete a file (owner or admin only)."""
-    await file_storage_service.delete_file(db, file_id, current_user.user_id)
+    await file_storage_service.delete_file(
+        db, file_id, current_user.user_id, current_user.role
+    )
     return APIResponse(data=None)
