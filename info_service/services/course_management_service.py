@@ -200,7 +200,10 @@ class CourseManagementService:
         if offering is None:
             raise ResourceNotFoundError("Offering", str(offering_id))
 
-        payload = data.model_dump(exclude_unset=True)
+        if isinstance(data, OfferingUpdateRequest):
+            payload = data.model_dump(exclude_unset=False)
+        else:
+            payload = data.model_dump(exclude_unset=True)
         target_course_id = payload.get("course_id", offering.course_id)
         target_term_code = payload.get("term_code", offering.term_code)
         target_class_no = payload.get("class_no", offering.class_no)

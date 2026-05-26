@@ -104,3 +104,43 @@ class TestOfferingAPI:
         )
 
         assert duplicate_resp.status_code == 409
+
+    async def test_put_offering_applies_full_replacement_defaults(self, async_client_info) -> None:
+        """PUT should overwrite omitted optional fields with schema defaults."""
+        course_resp = await async_client_info.post(
+            "/api/v1/courses/",
+            json=make_course_payload(
+                course_code="CS512",
+                course_name="Software Testing",
+            ),
+        )
+        assert course_resp.status_code == 200
+        course_id = course_resp.json()["data"]["id"]
+
+        create_resp = await async_client_info.post(
+            "/api/v1/offerings/",
+            json={
+                "course_id": course_id,
+                "term_code": "2026-FALL",
+                "class_no": "02",
+                "teacher_ids": ["t-9"],
+                "capacity": 88,
+            },
+        )
+        assert create_resp.status_code == 200
+        offering_id = create_resp.json()["data"]["id"]
+
+        put_resp = await async_client_info.put(
+            f"/api/v1/offerings/{offering_id}",
+            json={
+                "course_id": course_id,
+                "term_code": "2026-FALL",
+                "class_no": "02",
+            },
+        )
+
+        assert put_resp.status_code == 200
+        updated = put_resp.json()["data"]
+        assert updated["teacher_ids"] == ""
+        assert updated["capacity"] == 0
+        assert updated["status"] == "ACTIVE"
