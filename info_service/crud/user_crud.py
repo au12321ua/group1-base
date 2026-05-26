@@ -28,6 +28,15 @@ class UserCRUD:
         result = await db.exec(select(UserInfo).where(UserInfo.username == username))
         return result.first()
 
+    # Whitelist of allowed sort columns
+    _SORT_FIELDS: dict[str, str] = {
+        "id": "id",
+        "user_no": "user_no",
+        "username": "username",
+        "created_at": "created_at",
+        "updated_at": "updated_at",
+    }
+
     async def get_multi(
         self,
         db: AsyncSession,
@@ -38,6 +47,8 @@ class UserCRUD:
         status: str | None = None,
         role: str | None = None,
         include_deleted: bool = False,
+        sort_by: str = "id",
+        sort_order: str = "asc",
     ) -> tuple[list[UserInfo], int]:
         """Get paginated user list with optional filters. Returns (items, total)."""
         conditions = []
@@ -83,9 +94,15 @@ class UserCRUD:
         total_result = await db.exec(count_query)
         total = total_result.one()
 
-        items_result = await db.exec(
-            base_query.order_by(UserInfo.id).offset(skip).limit(limit)
-        )
+        # Dynamic sorting with whitelist validation
+        col_name = self._SORT_FIELDS.get(sort_by, "id")
+        sort_col = getattr(UserInfo, col_name)
+        if sort_order == "desc":
+            base_query = base_query.order_by(sort_col.desc())
+        else:
+            base_query = base_query.order_by(sort_col.asc())
+
+        items_result = await db.exec(base_query.offset(skip).limit(limit))
         return list(items_result.all()), total
 
     async def create(self, db: AsyncSession, user: UserInfo) -> UserInfo:

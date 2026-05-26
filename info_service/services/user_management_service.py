@@ -220,6 +220,8 @@ class UserManagementService:
             status=status,
             role=role,
             include_deleted=False,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
 
         items = [await self._build_response(db, u) for u in users]
