@@ -45,10 +45,12 @@ class TestTrainingProgramAPI:
 
         by_major_resp = await async_client_info.get(
             "/api/v1/training-programs/by-major",
-            params={"major_code": "CS", "grade": "2026"},
+            params={"major_code": "CS", "grade": "2026", "page": 1, "page_size": 5},
         )
         assert by_major_resp.status_code == 200
-        assert by_major_resp.json()["data"]["items"][0]["id"] == program_id
+        by_major_data = by_major_resp.json()["data"]
+        assert by_major_data["items"][0]["id"] == program_id
+        assert by_major_data["pagination"] == {"total": 1, "page": 1, "page_size": 5}
 
         get_resp = await async_client_info.get(f"/api/v1/training-programs/{program_id}")
         assert get_resp.status_code == 200

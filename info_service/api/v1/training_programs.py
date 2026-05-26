@@ -55,21 +55,24 @@ async def create_training_program(
 @router.get("/by-major", response_model=ListResponse[TrainingProgramResponse])
 async def get_by_major(
     db: InfoDbSession,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
     major_code: str = Query(...),
     grade: str | None = Query(default=None),
 ) -> ListResponse[TrainingProgramResponse]:
     """Get training programs by major code and optionally grade."""
+    skip = (page - 1) * page_size
     items, total = await course_management_service.list_training_programs(
         db,
-        skip=0,
-        limit=100,
+        skip=skip,
+        limit=page_size,
         major_code=major_code,
         grade=grade,
     )
     return ListResponse(
         data=PaginatedData(
             items=[TrainingProgramResponse.model_validate(item) for item in items],
-            pagination=PaginationMeta(total=total, page=1, page_size=100),
+            pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
 
