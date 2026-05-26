@@ -39,7 +39,7 @@ class UserManagementService:
         return f"{self._settings.auth_service_url}/api/v1/internal{path}"
 
     async def _sync_create_to_auth(
-        self, user_id: int, username: str, role_ids: str
+        self, user_id: int, username: str, role_ids: list[int]
     ) -> bool:
         """POST /internal/users — create auth user. Returns True on success."""
         settings = self._settings
@@ -58,21 +58,38 @@ class UserManagementService:
             logger.exception("Failed to sync create user %s to Auth", user_id)
             return False
 
-    async def _sync_disable_to_auth(self, user_id: int) -> bool:
-        """POST /internal/users/{id}/disable. Returns True on success."""
+    async def _sync_disable_to_auth(self, user_id: int) -> None:
+        """POST /internal/users/{id}/disable. Raises on failure for compensation."""
         settings = self._settings
         try:
             async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
                 resp = await client.post(
                     self._auth_url(f"/users/{user_id}/disable")
                 )
-                return resp.status_code == 200
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Auth disable returned {resp.status_code}")
         except Exception:
             logger.exception("Failed to sync disable user %s to Auth", user_id)
-            return False
+            raise
 
-    async def _sync_roles_to_auth(self, user_id: int, role_ids: str) -> bool:
-        """POST /internal/users/{id}/roles. Returns True on success."""
+    async def _sync_enable_to_auth(self, user_id: int) -> None:
+        """POST /internal/users/{id}/enable. Raises on failure."""
+        settings = self._settings
+        try:
+            async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
+                resp = await client.post(
+                    self._auth_url(f"/users/{user_id}/enable")
+                )
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Auth enable returned {resp.status_code}")
+        except Exception:
+            logger.exception("Failed to sync enable user %s to Auth", user_id)
+            raise
+
+    async def _sync_roles_to_auth(
+        self, user_id: int, role_ids: list[int]
+    ) -> None:
+        """POST /internal/users/{id}/roles. Raises on failure."""
         settings = self._settings
         try:
             async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
@@ -80,10 +97,11 @@ class UserManagementService:
                     self._auth_url(f"/users/{user_id}/roles"),
                     json={"role_ids": role_ids},
                 )
-                return resp.status_code == 200
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Auth role sync returned {resp.status_code}")
         except Exception:
             logger.exception("Failed to sync roles for user %s to Auth", user_id)
-            return False
+            raise
 
     # ------------------------------------------------------------------
     # Response assembly
@@ -120,11 +138,14 @@ class UserManagementService:
     # ------------------------------------------------------------------
 
     async def create_user(
-        self, db: AsyncSession, request: UserCreateRequest
+        self,
+        db: AsyncSession,
+        request: UserCreateRequest,
+        current_user: object = None,
     ) -> UserResponse:
         """Create a user: write Info DB → HTTP call Auth /internal/users
         → compensate on failure."""
-        role_ids_str = ",".join(str(r) for r in request.role_ids)
+        role_ids = request.role_ids  # list[int]
 
         # Check uniqueness
         existing = await user_crud.get_by_user_no(db, request.user_no)
@@ -140,7 +161,7 @@ class UserManagementService:
             UserInfo(
                 user_no=request.user_no,
                 username=request.username,
-                role_ids=role_ids_str,
+                role_ids=",".join(str(r) for r in role_ids),
             ),
         )
         profile = await user_profile_crud.create(
@@ -158,9 +179,7 @@ class UserManagementService:
         await db.flush()
 
         # Cross-service sync — Auth
-        success = await self._sync_create_to_auth(
-            str(user.id), request.username, role_ids_str
-        )
+        success = await self._sync_create_to_auth(user.id, request.username, role_ids)
         if not success:
             # Compensate: delete Info DB records
             await user_profile_crud.delete(db, user.id)
@@ -207,23 +226,39 @@ class UserManagementService:
         return items, total
 
     async def update_user(
-        self, db: AsyncSession, user_id: int, request: UserUpdateRequest
+        self,
+        db: AsyncSession,
+        user_id: int,
+        request: UserUpdateRequest,
+        current_user: object = None,
     ) -> UserResponse:
-        """Full update user info and profile."""
+        """Full update user info and profile. Compensates on Auth sync failure."""
         user = await user_crud.get_by_id(db, user_id)
         if not user:
             raise ResourceNotFoundError("User", str(user_id))
 
-        new_role_ids = ",".join(str(r) for r in request.role_ids)
-        old_role_ids = user.role_ids
+        new_role_ids = request.role_ids  # list[int]
+        old_role_ids_str = user.role_ids
+        old_role_ids = [int(r) for r in old_role_ids_str.split(",") if r.strip()]
+
+        # Check uniqueness if changing user_no or username
+        if request.user_no != user.user_no:
+            existing = await user_crud.get_by_user_no(db, request.user_no)
+            if existing and existing.id != user_id:
+                raise BusinessRuleError(f"User with user_no {request.user_no} already exists")
+        if request.username != user.username:
+            existing = await user_crud.get_by_username(db, request.username)
+            if existing and existing.id != user_id:
+                raise BusinessRuleError(f"User with username {request.username} already exists")
 
         # Update UserInfo
+        new_role_ids_str = ",".join(str(r) for r in new_role_ids)
         await user_crud.update(
             db,
             user,
             user_no=request.user_no,
             username=request.username,
-            role_ids=new_role_ids,
+            role_ids=new_role_ids_str,
         )
 
         # Update / create UserProfile
@@ -251,33 +286,55 @@ class UserManagementService:
                 ),
             )
 
-        # Sync roles if changed
+        # Sync roles if changed — with compensation
         if new_role_ids != old_role_ids:
-            await self._sync_roles_to_auth(user_id, new_role_ids)
+            try:
+                await self._sync_roles_to_auth(user_id, new_role_ids)
+            except Exception:
+                # Compensate: restore old role_ids in Info DB
+                await user_crud.update(db, user, role_ids=old_role_ids_str)
+                await db.flush()
+                raise BusinessRuleError(
+                    "Failed to sync roles to Auth Service; Info DB rolled back"
+                )
 
         return await self._build_response(db, user)
 
     async def patch_user(
-        self, db: AsyncSession, user_id: int, request: UserPatchRequest
+        self,
+        db: AsyncSession,
+        user_id: int,
+        request: UserPatchRequest,
+        current_user: object = None,
     ) -> UserResponse:
-        """Partial update user info and profile — only provided fields."""
+        """Partial update user info and profile. Compensates on Auth sync failure."""
         user = await user_crud.get_by_id(db, user_id)
         if not user:
             raise ResourceNotFoundError("User", str(user_id))
 
         patch_data = request.model_dump(exclude_unset=True)
         role_ids_changed = False
-        new_role_ids = user.role_ids
+        new_role_ids = None
+        old_role_ids_str = user.role_ids
 
         # Split fields between UserInfo and UserProfile
         user_fields = {}
         profile_fields = {}
         for field, value in patch_data.items():
             if field == "role_ids" and value is not None:
-                new_role_ids = ",".join(str(r) for r in value)
-                user_fields["role_ids"] = new_role_ids
+                new_role_ids = value  # list[int]
+                user_fields["role_ids"] = ",".join(str(r) for r in value)
                 role_ids_changed = True
             elif field in ("user_no", "username"):
+                # Check uniqueness
+                if field == "user_no" and value != user.user_no:
+                    existing = await user_crud.get_by_user_no(db, value)
+                    if existing and existing.id != user_id:
+                        raise BusinessRuleError(f"User with user_no {value} already exists")
+                if field == "username" and value != user.username:
+                    existing = await user_crud.get_by_username(db, value)
+                    if existing and existing.id != user_id:
+                        raise BusinessRuleError(f"User with username {value} already exists")
                 user_fields[field] = value
             elif field in ("full_name", "gender", "email", "phone", "status"):
                 profile_fields[field] = value
@@ -295,12 +352,26 @@ class UserManagementService:
                     UserProfile(user_id=user.id, **profile_fields),
                 )
 
-        if role_ids_changed:
-            await self._sync_roles_to_auth(user_id, new_role_ids)
+        # Sync roles if changed — with compensation
+        if role_ids_changed and new_role_ids is not None:
+            try:
+                await self._sync_roles_to_auth(user_id, new_role_ids)
+            except Exception:
+                # Compensate: restore old role_ids
+                await user_crud.update(db, user, role_ids=old_role_ids_str)
+                await db.flush()
+                raise BusinessRuleError(
+                    "Failed to sync roles to Auth Service; Info DB rolled back"
+                )
 
         return await self._build_response(db, user)
 
-    async def logical_delete_user(self, db: AsyncSession, user_id: int) -> None:
+    async def logical_delete_user(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        current_user: object = None,
+    ) -> None:
         """Logical delete: mark isDeleted=true → HTTP disable Auth account."""
         user = await user_crud.get_by_id(db, user_id)
         if not user:
@@ -310,8 +381,16 @@ class UserManagementService:
 
         await user_crud.logical_delete(db, user_id)
 
-        # Sync to Auth — best effort
-        await self._sync_disable_to_auth(user_id)
+        # Sync to Auth — with compensation
+        try:
+            await self._sync_disable_to_auth(user_id)
+        except Exception:
+            # Compensate: restore user in Info DB
+            await user_crud.restore(db, user_id)
+            await db.flush()
+            raise BusinessRuleError(
+                "Failed to disable user in Auth Service; Info DB rolled back"
+            )
 
     async def disable_user(self, db: AsyncSession, user_id: int) -> None:
         """Disable a user account."""
@@ -345,7 +424,7 @@ class UserManagementService:
 
         for row_index, row in enumerate(reader):
             total += 1
-            row_num = row_index + 2  # 1-indexed, header is row 1
+            row_num = str(row_index + 2)  # 1-indexed, header is row 1
 
             user_no = (row.get("user_no") or "").strip()
             username = (row.get("username") or "").strip()
@@ -354,7 +433,7 @@ class UserManagementService:
             if not user_no or not username or not full_name:
                 failed_count += 1
                 errors.append({
-                    "row": str(row_num),
+                    "row": row_num,
                     "error": "Missing required field: user_no, username, or full_name",
                 })
                 continue
@@ -363,38 +442,41 @@ class UserManagementService:
             existing = await user_crud.get_by_user_no(db, user_no)
             if existing:
                 failed_count += 1
-                errors.append({"row": str(row_num), "error": f"User {user_no} already exists"})
+                errors.append({"row": row_num, "error": f"User {user_no} already exists"})
                 continue
 
             existing = await user_crud.get_by_username(db, username)
             if existing:
                 failed_count += 1
-                errors.append({"row": str(row_num), "error": f"Username {username} already exists"})
+                errors.append({"row": row_num, "error": f"Username {username} already exists"})
                 continue
 
+            # Use nested transaction for each row
             try:
-                await self.create_user(
-                    db,
-                    UserCreateRequest(
-                        user_no=user_no,
-                        username=username,
-                        role_ids=[],
-                        full_name=full_name,
-                        gender=row.get("gender", ""),
-                        email=row.get("email", ""),
-                        phone=row.get("phone", ""),
-                    ),
-                )
+                async with db.begin_nested():
+                    await self.create_user(
+                        db,
+                        UserCreateRequest(
+                            user_no=user_no,
+                            username=username,
+                            role_ids=[],
+                            full_name=full_name,
+                            gender=row.get("gender", ""),
+                            email=row.get("email", ""),
+                            phone=row.get("phone", ""),
+                        ),
+                    )
                 success_count += 1
             except Exception as e:
                 failed_count += 1
-                errors.append({"row": str(row_num), "error": str(e)})
+                errors.append({"row": row_num, "error": str(e)})
+                # Nested transaction already rolled back
 
         return UserImportResult(
             total=total,
             success_count=success_count,
             failed_count=failed_count,
-            errors=errors[:100],  # cap error list
+            errors=errors[:100],
         )
 
 

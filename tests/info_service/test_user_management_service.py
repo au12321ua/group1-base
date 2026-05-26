@@ -1,9 +1,9 @@
 """Unit tests for UserManagementService — Info DB operations.
 
-Note: create_user and Auth-syncing methods require a running Auth Service
-and are tested in integration tests (QA responsibility).
-These unit tests cover Info DB operations that don't require Auth.
+Auth-syncing methods are mocked to avoid requiring a running Auth Service.
 """
+
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -33,14 +33,13 @@ async def _setup_user(db, user_no="S001", username="alice", full_name="测试用
             status="ACTIVE",
         ),
     )
-    user.profile_id = user.id  # approximate
     await db.flush()
     return user
 
 
 @pytest.mark.unit
 class TestUserManagementService:
-    """User management service unit tests (Info DB only, Auth not required)."""
+    """User management service unit tests (Info DB only, Auth mocked)."""
 
     async def test_get_user(self, info_db_session):
         user = await _setup_user(info_db_session)
@@ -84,9 +83,12 @@ class TestUserManagementService:
             phone="13800000000",
             status="ACTIVE",
         )
-        result = await user_management_service.update_user(
-            info_db_session, user.id, req
-        )
+        with patch.object(
+            user_management_service, "_sync_roles_to_auth", new_callable=AsyncMock
+        ):
+            result = await user_management_service.update_user(
+                info_db_session, user.id, req
+            )
         assert result.user_no == "S001-NEW"
         assert result.username == "alice_new"
         assert result.role_ids == "1,2"
@@ -100,7 +102,7 @@ class TestUserManagementService:
         )
         assert result.profile.full_name == "补丁名称"
         assert result.profile.phone == "13911111111"
-        assert result.user_no == "S001"  # unchanged
+        assert result.user_no == "S001"
 
     async def test_disable_user(self, info_db_session):
         user = await _setup_user(info_db_session)

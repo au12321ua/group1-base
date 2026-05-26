@@ -67,7 +67,15 @@ class UserCRUD:
             conditions.append(UserInfo.id.in_(profile_status_match))
 
         if role:
-            conditions.append(UserInfo.role_ids.contains(role))
+            # Exact token match to avoid false positives (e.g. "1" matching "10")
+            conditions.append(
+                or_(
+                    UserInfo.role_ids == role,
+                    UserInfo.role_ids.like(f"{role},%"),
+                    UserInfo.role_ids.like(f"%,{role},%"),
+                    UserInfo.role_ids.like(f"%,{role}"),
+                )
+            )
 
         base_query = select(UserInfo).where(*conditions)
         count_query = select(func.count()).select_from(UserInfo).where(*conditions)
@@ -92,6 +100,7 @@ class UserCRUD:
         for field, value in kwargs.items():
             if hasattr(user, field):
                 setattr(user, field, value)
+        user.updated_at = datetime.now(UTC)
         await db.flush()
         await db.refresh(user)
         return user

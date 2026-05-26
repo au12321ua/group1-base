@@ -3,12 +3,11 @@
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession
-from info_service.deps import get_current_user
+from info_service.deps import require_permission
 from info_service.schemas.audit_log_schema import AuditLogResponse
 from info_service.services.audit_service import audit_service
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
-from shared.security import require_permission as _rp
 
 router = APIRouter(tags=["audit-logs"])
 
@@ -16,8 +15,7 @@ router = APIRouter(tags=["audit-logs"])
 @router.get("/", response_model=APIResponse[PaginatedData[AuditLogResponse]])
 async def search_audit_logs(
     db: AuditDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("audit:read")),
+    current_user: IdentityContext = Depends(require_permission("audit:read")),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     operator_user_id: str | None = Query(default=None),
@@ -50,8 +48,7 @@ async def search_audit_logs(
 @router.get("/export", response_model=APIResponse[str])
 async def export_audit_logs(
     db: AuditDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("audit:read")),
+    current_user: IdentityContext = Depends(require_permission("audit:read")),
     operator_user_id: str | None = Query(default=None),
     target_type: str | None = Query(default=None),
     action: str | None = Query(default=None),

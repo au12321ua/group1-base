@@ -1,5 +1,7 @@
 """UserProfile CRUD — profile table operations."""
 
+from datetime import UTC, datetime
+
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -30,6 +32,7 @@ class UserProfileCRUD:
         for field, value in kwargs.items():
             if hasattr(profile, field):
                 setattr(profile, field, value)
+        profile.updated_at = datetime.now(UTC)
         await db.flush()
         await db.refresh(profile)
         return profile

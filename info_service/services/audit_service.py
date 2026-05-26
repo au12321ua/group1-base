@@ -80,6 +80,7 @@ class AuditService:
             operator_user_id=filters.get("operator_user_id"),
             target_type=filters.get("target_type"),
             action=filters.get("action"),
+            result=filters.get("result"),
             start_date=(
                 datetime.fromisoformat(filters["start_date"])
                 if filters.get("start_date")

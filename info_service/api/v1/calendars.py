@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
-from info_service.deps import get_current_user
+from info_service.deps import require_permission
 from info_service.schemas.calendar_schema import (
     CalendarCreateRequest,
     CalendarPatchRequest,
@@ -14,7 +14,6 @@ from info_service.services.course_management_service import course_management_se
 from shared.exceptions import ResourceNotFoundError
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
-from shared.security import require_permission as _rp
 
 router = APIRouter(tags=["calendars"])
 
@@ -22,8 +21,7 @@ router = APIRouter(tags=["calendars"])
 @router.get("/", response_model=APIResponse[PaginatedData[CalendarResponse]])
 async def list_calendars(
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("calendar:read")),
+    current_user: IdentityContext = Depends(require_permission("calendar:read")),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> APIResponse[PaginatedData[CalendarResponse]]:
@@ -41,8 +39,7 @@ async def list_calendars(
 async def create_calendar(
     request: CalendarCreateRequest,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("calendar:create")),
+    current_user: IdentityContext = Depends(require_permission("calendar:create")),
 ) -> APIResponse[CalendarResponse]:
     """Create a calendar entry."""
     cal = await course_management_service.create_calendar(db, request)
@@ -52,8 +49,7 @@ async def create_calendar(
 @router.get("/by-term", response_model=APIResponse[CalendarResponse])
 async def get_calendar_by_term(
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("calendar:read")),
+    current_user: IdentityContext = Depends(require_permission("calendar:read")),
     term_code: str = Query(...),
 ) -> APIResponse[CalendarResponse]:
     """Get calendar by term code."""
@@ -67,8 +63,7 @@ async def get_calendar_by_term(
 async def get_calendar(
     calendar_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("calendar:read")),
+    current_user: IdentityContext = Depends(require_permission("calendar:read")),
 ) -> APIResponse[CalendarResponse]:
     """Get calendar detail."""
     cal = await course_management_service.get_calendar(db, calendar_id)
@@ -80,8 +75,7 @@ async def update_calendar(
     calendar_id: int,
     request: CalendarUpdateRequest,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("calendar:update")),
+    current_user: IdentityContext = Depends(require_permission("calendar:update")),
 ) -> APIResponse[CalendarResponse]:
     """Full update calendar."""
     cal = await course_management_service.update_calendar(db, calendar_id, request)
@@ -93,8 +87,7 @@ async def patch_calendar(
     calendar_id: int,
     request: CalendarPatchRequest,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("calendar:update")),
+    current_user: IdentityContext = Depends(require_permission("calendar:update")),
 ) -> APIResponse[CalendarResponse]:
     """Partial update calendar."""
     cal = await course_management_service.patch_calendar(db, calendar_id, request)
@@ -105,8 +98,7 @@ async def patch_calendar(
 async def delete_calendar(
     calendar_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("calendar:delete")),
+    current_user: IdentityContext = Depends(require_permission("calendar:delete")),
 ) -> APIResponse[None]:
     """Delete calendar."""
     await course_management_service.delete_calendar(db, calendar_id)

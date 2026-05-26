@@ -1,5 +1,7 @@
 """Unit tests for RecycleBinService."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from info_service.crud.user_crud import user_crud
@@ -29,20 +31,22 @@ class TestRecycleBinService:
     async def test_list_deleted_users(self, info_db_session):
         await _setup_deleted_user(info_db_session, user_no="S001", username="alice")
         await _setup_deleted_user(info_db_session, user_no="S002", username="bob")
-        # Create a non-deleted user
         await user_crud.create(
             info_db_session, UserInfo(user_no="S003", username="charlie")
         )
 
         items, total = await recycle_bin_service.list_deleted_users(info_db_session)
-        # Only deleted users should be returned
         assert len(items) == 2
-        assert all(u.is_deleted for u in items)
+        assert total == 2
 
     async def test_restore_user(self, info_db_session):
         user = await _setup_deleted_user(info_db_session)
 
-        await recycle_bin_service.restore_user(info_db_session, user.id)
+        with patch.object(
+            recycle_bin_service, "_call_auth_enable", new_callable=AsyncMock
+        ) as mock_enable:
+            await recycle_bin_service.restore_user(info_db_session, user.id)
+            mock_enable.assert_called_once_with(user.id)
 
         fetched = await user_crud.get_by_id(info_db_session, user.id)
         assert fetched.is_deleted is False
@@ -62,20 +66,34 @@ class TestRecycleBinService:
     async def test_physical_delete_user(self, info_db_session):
         user = await _setup_deleted_user(info_db_session)
 
-        await recycle_bin_service.physical_delete_user(info_db_session, user.id)
+        with patch.object(
+            recycle_bin_service, "_call_auth_delete", new_callable=AsyncMock
+        ) as mock_delete:
+            await recycle_bin_service.physical_delete_user(info_db_session, user.id)
+            mock_delete.assert_called_once_with(user.id)
 
         fetched = await user_crud.get_by_id(info_db_session, user.id)
         assert fetched is None
         profile = await user_profile_crud.get_by_user_id(info_db_session, user.id)
         assert profile is None
 
+    async def test_physical_delete_user_not_deleted(self, info_db_session):
+        user = await user_crud.create(
+            info_db_session, UserInfo(user_no="S001", username="active_user")
+        )
+        with pytest.raises(BusinessRuleError, match="soft-deleted"):
+            await recycle_bin_service.physical_delete_user(info_db_session, user.id)
+
     async def test_batch_physical_delete(self, info_db_session):
         user1 = await _setup_deleted_user(info_db_session, user_no="S001", username="alice")
         user2 = await _setup_deleted_user(info_db_session, user_no="S002", username="bob")
 
-        await recycle_bin_service.batch_physical_delete(
-            info_db_session, [user1.id, user2.id]
-        )
+        with patch.object(
+            recycle_bin_service, "_call_auth_delete", new_callable=AsyncMock
+        ):
+            await recycle_bin_service.batch_physical_delete(
+                info_db_session, [user1.id, user2.id]
+            )
 
         assert await user_crud.get_by_id(info_db_session, user1.id) is None
         assert await user_crud.get_by_id(info_db_session, user2.id) is None

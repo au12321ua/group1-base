@@ -3,13 +3,14 @@
 import warnings
 
 from pydantic import BaseModel
+from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.crud.base_info_crud import base_info_crud
 from info_service.crud.calendar_crud import calendar_crud
 from info_service.models.academic_calendar import AcademicCalendar
 from info_service.models.base_info_item import BaseInfoItem
-from shared.exceptions import ResourceNotFoundError
+from shared.exceptions import BusinessRuleError, ResourceNotFoundError
 
 
 class CourseManagementService:
@@ -134,7 +135,12 @@ class CourseManagementService:
 
     async def create_calendar(self, db: AsyncSession, data: BaseModel) -> AcademicCalendar:
         """Create a calendar entry from a Pydantic schema."""
-        cal = AcademicCalendar(**data.model_dump())
+        dump = data.model_dump()
+        # Check for duplicate term_code
+        existing = await calendar_crud.get_by_term_code(db, dump["term_code"])
+        if existing:
+            raise BusinessRuleError(f"Calendar with term_code {dump['term_code']} already exists")
+        cal = AcademicCalendar(**dump)
         return await calendar_crud.create(db, cal)
 
     async def update_calendar(
@@ -144,7 +150,15 @@ class CourseManagementService:
         cal = await calendar_crud.get(db, calendar_id)
         if not cal:
             raise ResourceNotFoundError("Calendar", str(calendar_id))
-        for field, value in data.model_dump().items():
+        dump = data.model_dump()
+        # Check term_code uniqueness if changed
+        if dump.get("term_code") != cal.term_code:
+            existing = await calendar_crud.get_by_term_code(db, dump["term_code"])
+            if existing and existing.id != calendar_id:
+                raise BusinessRuleError(
+                f"Calendar with term_code {dump['term_code']} already exists"
+            )
+        for field, value in dump.items():
             setattr(cal, field, value)
         return await calendar_crud.update(db, cal)
 
@@ -155,8 +169,17 @@ class CourseManagementService:
         cal = await calendar_crud.get(db, calendar_id)
         if not cal:
             raise ResourceNotFoundError("Calendar", str(calendar_id))
-        for field, value in data.model_dump(exclude_unset=True).items():
-            setattr(cal, field, value)
+        dump = data.model_dump(exclude_unset=True)
+        # Check term_code uniqueness if changed
+        if "term_code" in dump and dump["term_code"] != cal.term_code:
+            existing = await calendar_crud.get_by_term_code(db, dump["term_code"])
+            if existing and existing.id != calendar_id:
+                raise BusinessRuleError(
+                    f"Calendar with term_code {dump['term_code']} already exists"
+                )
+        for field, value in dump.items():
+            if value is not None:  # filter out explicit nulls
+                setattr(cal, field, value)
         return await calendar_crud.update(db, cal)
 
     async def delete_calendar(self, db: AsyncSession, calendar_id: int) -> None:
@@ -172,8 +195,12 @@ class CourseManagementService:
         """List calendars with pagination."""
         skip = (page - 1) * page_size
         items = await calendar_crud.get_multi(db, skip=skip, limit=page_size)
-        # TODO: get total count properly — for now return length as estimate
-        return items, len(items)
+        # Get total count
+        count_result = await db.exec(
+            select(func.count()).select_from(AcademicCalendar)
+        )
+        total = count_result.one()
+        return items, total
 
     async def get_calendar(self, db: AsyncSession, calendar_id: int) -> AcademicCalendar:
         """Get calendar detail."""
@@ -265,7 +292,11 @@ class CourseManagementService:
                 db, category, skip=skip, limit=page_size
             )
         items = await base_info_crud.get_multi(db, skip=skip, limit=page_size)
-        return items, len(items)
+        count_result = await db.exec(
+            select(func.count()).select_from(BaseInfoItem)
+        )
+        total = count_result.one()
+        return items, total
 
     async def get_base_info(self, db: AsyncSession, item_id: int) -> BaseInfoItem:
         """Get base info item detail."""

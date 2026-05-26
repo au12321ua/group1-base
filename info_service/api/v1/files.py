@@ -21,7 +21,7 @@ async def upload_file(
     current_user: IdentityContext = Depends(get_current_user),
     file: UploadFile = File(...),
 ) -> APIResponse[FileUploadResponse]:
-    """Upload a file (requires authentication)."""
+    """Upload a file (requires authentication, any role)."""
     content = await file.read()
     parts = file.filename.rsplit(".", 1) if file.filename else []
     file_type = parts[-1].lower() if len(parts) == 2 else "bin"

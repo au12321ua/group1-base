@@ -23,6 +23,11 @@ class FileStorageService:
 
     def _validate_file(self, file_type: str, file_size: int) -> None:
         """Validate file type and size against allowed limits."""
+        # Path traversal defense: only allow alphanumeric characters
+        if not file_type.isalnum():
+            raise BusinessRuleError(
+                f"File type '{file_type}' contains invalid characters"
+            )
         allowed = set(
             t.strip().lower()
             for t in self._settings.allowed_upload_types.split(",")
@@ -41,7 +46,12 @@ class FileStorageService:
     def _storage_path(self, file_id: int, file_type: str) -> str:
         """Build the on-disk storage path for a file."""
         ext = file_type.lower()
-        return os.path.join(self._settings.upload_dir, f"{file_id}.{ext}")
+        filename = f"{file_id}.{ext}"
+        # os.path.join handles parent dir traversal by ignoring previous path
+        # when the second argument starts with /, so sanitize first
+        if filename.startswith("/") or ".." in filename:
+            raise BusinessRuleError(f"Invalid file name generated: {filename}")
+        return os.path.join(self._settings.upload_dir, filename)
 
     # ------------------------------------------------------------------
     # Public API
@@ -57,7 +67,7 @@ class FileStorageService:
         file_size: int,
         content: bytes,
     ) -> dict:
-        """Validate file type/size → write to disk → save metadata → return access info."""
+        """Validate file type/size → save metadata → commit DB → write to disk."""
         self._validate_file(file_type, file_size)
 
         checksum = hashlib.sha256(content).hexdigest()
@@ -70,27 +80,32 @@ class FileStorageService:
                 file_name=file_name,
                 file_type=file_type.lower(),
                 file_size=file_size,
-                storage_path="",  # will fill after DB commit gives us the id
+                storage_path="",
                 checksum=checksum,
             ),
         )
 
-        # Now we have the ID, write to disk
+        # Update storage_path in DB and flush
         storage_path = self._storage_path(resource.id, file_type)
-        os.makedirs(self._settings.upload_dir, exist_ok=True)
-        with open(storage_path, "wb") as f:
-            f.write(content)
-
-        # Update storage_path in DB
         resource.storage_path = storage_path
         await db.flush()
+
+        # Write file to disk AFTER DB is committed
+        try:
+            os.makedirs(self._settings.upload_dir, exist_ok=True)
+            with open(storage_path, "wb") as f:
+                f.write(content)
+        except Exception:
+            # Clean up DB record on disk write failure
+            await file_resource_crud.delete(db, resource.id)
+            raise BusinessRuleError("Failed to write file to disk; metadata rolled back")
 
         return {
             "id": resource.id,
             "file_name": file_name,
             "file_type": file_type,
             "file_size": file_size,
-            "access_url": f"/api/v1/files/{resource.id}",
+            "access_url": f"/api/v1/files/{resource.id}/download",
         }
 
     async def get_file(self, db: AsyncSession, file_id: int) -> tuple[bytes, str]:
@@ -117,15 +132,16 @@ class FileStorageService:
         return content, mime_type
 
     async def delete_file(
-        self, db: AsyncSession, file_id: int, owner_user_id: str
+        self, db: AsyncSession, file_id: int, owner_user_id: str, user_role: str = ""
     ) -> None:
         """Delete file — owner or admin only."""
         resource = await file_resource_crud.get(db, file_id)
         if not resource:
             raise ResourceNotFoundError("File", str(file_id))
 
-        if resource.owner_user_id != owner_user_id:
-            raise BusinessRuleError("Only the file owner can delete this file")
+        is_admin = user_role in ("SYS_ADMIN", "ACADEMIC_ADMIN")
+        if resource.owner_user_id != owner_user_id and not is_admin:
+            raise BusinessRuleError("Only the file owner or admin can delete this file")
 
         # Remove from disk
         if resource.storage_path and os.path.exists(resource.storage_path):

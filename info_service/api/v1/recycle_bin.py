@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
-from info_service.deps import get_current_user
+from info_service.deps import require_permission
 from info_service.schemas.recycle_bin_schema import (
     BatchDeleteRequest,
     RecycleBinItemResponse,
@@ -11,7 +11,6 @@ from info_service.schemas.recycle_bin_schema import (
 from info_service.services.recycle_bin_service import recycle_bin_service
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
-from shared.security import require_permission as _rp
 
 router = APIRouter(tags=["recycle-bin"])
 
@@ -19,8 +18,7 @@ router = APIRouter(tags=["recycle-bin"])
 @router.get("/", response_model=APIResponse[PaginatedData[RecycleBinItemResponse]])
 async def list_deleted_users(
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("recycle:read")),
+    current_user: IdentityContext = Depends(require_permission("recycle:read")),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     keyword: str | None = Query(default=None),
@@ -41,8 +39,7 @@ async def list_deleted_users(
 async def restore_user(
     user_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("recycle:restore")),
+    current_user: IdentityContext = Depends(require_permission("recycle:restore")),
 ) -> APIResponse[None]:
     """Restore a user from recycle bin (cross-service enable Auth account)."""
     await recycle_bin_service.restore_user(db, user_id)
@@ -53,8 +50,7 @@ async def restore_user(
 async def physical_delete_user(
     user_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("recycle:delete")),
+    current_user: IdentityContext = Depends(require_permission("recycle:delete")),
 ) -> APIResponse[None]:
     """Permanently delete user (requires confirmation)."""
     await recycle_bin_service.physical_delete_user(db, user_id)
@@ -65,8 +61,7 @@ async def physical_delete_user(
 async def batch_physical_delete(
     request: BatchDeleteRequest,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
-    _perm: None = Depends(_rp("recycle:delete")),
+    current_user: IdentityContext = Depends(require_permission("recycle:delete")),
 ) -> APIResponse[None]:
     """Batch permanent delete users."""
     await recycle_bin_service.batch_physical_delete(db, request.user_ids)

@@ -3,18 +3,14 @@
 Dependencies in this module are injected into route handlers via Depends().
 """
 
-from fastapi import Header
+from fastapi import Depends, Header
 
-from shared.exceptions import AuthenticationError
+from shared.exceptions import AuthenticationError, AuthorizationError
 from shared.security import IdentityContext
 
 
 def _is_missing(value: object) -> bool:
-    """True when a dependency value was not provided.
-
-    When called via FastAPI DI, missing headers resolve to None.
-    When called directly, the Header(...) default object is passed as-is.
-    """
+    """True when a dependency value was not provided."""
     return value is None or not isinstance(value, str)
 
 
@@ -46,3 +42,33 @@ async def get_current_user(
         permissions=permissions,
         request_id=request_id,
     )
+
+
+class _PermissionChecker:
+    """Callable dependency that checks a specific permission on the current user."""
+
+    def __init__(self, permission_code: str) -> None:
+        self._code = permission_code
+
+    def __call__(
+        self, current_user: IdentityContext = Depends(get_current_user)
+    ) -> IdentityContext:
+        if not current_user.has_permission(self._code):
+            raise AuthorizationError(
+                f"Permission '{self._code}' required"
+            )
+        return current_user
+
+
+def require_permission(code: str) -> Depends:
+    """Create a dependency that requires a specific permission.
+
+    Usage:
+        @router.get("/users")
+        async def list_users(
+            db: InfoDbSession,
+            current_user: IdentityContext = Depends(require_permission("user:read")),
+        ):
+            ...
+    """
+    return Depends(_PermissionChecker(code))
