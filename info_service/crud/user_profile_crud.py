@@ -1,7 +1,6 @@
 """UserProfile CRUD — profile table operations."""
 
-import warnings
-
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.models.user_profile import UserProfile
@@ -10,28 +9,37 @@ from info_service.models.user_profile import UserProfile
 class UserProfileCRUD:
     """Data access for UserProfile model."""
 
-    def __init__(self) -> None:
-        warnings.warn("TODO: UserProfileCRUD — implement all methods")
-
     async def get_by_user_id(self, db: AsyncSession, user_id: int) -> UserProfile | None:
         """Get profile by user_id."""
-        warnings.warn("TODO: implement get_by_user_id")
-        raise NotImplementedError("get_by_user_id not implemented")
+        result = await db.exec(
+            select(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        return result.first()
 
     async def create(self, db: AsyncSession, profile: UserProfile) -> UserProfile:
         """Create a new user profile."""
-        warnings.warn("TODO: implement create")
-        raise NotImplementedError("create not implemented")
+        db.add(profile)
+        await db.flush()
+        await db.refresh(profile)
+        return profile
 
-    async def update(self, db: AsyncSession, profile: UserProfile, **kwargs) -> UserProfile:
+    async def update(
+        self, db: AsyncSession, profile: UserProfile, **kwargs
+    ) -> UserProfile:
         """Update profile fields."""
-        warnings.warn("TODO: implement update")
-        raise NotImplementedError("update not implemented")
+        for field, value in kwargs.items():
+            if hasattr(profile, field):
+                setattr(profile, field, value)
+        await db.flush()
+        await db.refresh(profile)
+        return profile
 
     async def delete(self, db: AsyncSession, user_id: int) -> None:
         """Delete profile by user_id."""
-        warnings.warn("TODO: implement delete")
-        raise NotImplementedError("delete not implemented")
+        profile = await self.get_by_user_id(db, user_id)
+        if profile:
+            await db.delete(profile)
+            await db.flush()
 
 
 user_profile_crud = UserProfileCRUD()

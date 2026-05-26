@@ -1,34 +1,30 @@
 """UserInfo CRUD — main user table operations."""
 
-import warnings
+from datetime import UTC, datetime
 
-from sqlmodel import select
+from sqlalchemy import or_
+from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.models.user import UserInfo
+from info_service.models.user_profile import UserProfile
 
 
 class UserCRUD:
     """Data access for UserInfo model."""
 
-    def __init__(self) -> None:
-        warnings.warn("TODO: UserCRUD — implement all methods")
-
     async def get_by_id(self, db: AsyncSession, user_id: int) -> UserInfo | None:
         """Get user by primary key."""
-        warnings.warn("TODO: implement get_by_id")
         result = await db.exec(select(UserInfo).where(UserInfo.id == user_id))
         return result.first()
 
     async def get_by_user_no(self, db: AsyncSession, user_no: str) -> UserInfo | None:
         """Get user by user_no (unique)."""
-        warnings.warn("TODO: implement get_by_user_no")
         result = await db.exec(select(UserInfo).where(UserInfo.user_no == user_no))
         return result.first()
 
     async def get_by_username(self, db: AsyncSession, username: str) -> UserInfo | None:
         """Get user by username (unique)."""
-        warnings.warn("TODO: implement get_by_username")
         result = await db.exec(select(UserInfo).where(UserInfo.username == username))
         return result.first()
 
@@ -44,12 +40,46 @@ class UserCRUD:
         include_deleted: bool = False,
     ) -> tuple[list[UserInfo], int]:
         """Get paginated user list with optional filters. Returns (items, total)."""
-        warnings.warn("TODO: implement get_multi — build dynamic query")
-        raise NotImplementedError("get_multi not implemented")
+        conditions = []
+        if not include_deleted:
+            conditions.append(UserInfo.is_deleted == False)  # noqa: E712
+
+        if keyword:
+            profile_match = (
+                select(UserProfile.user_id)
+                .where(UserProfile.full_name.contains(keyword))
+            )
+            conditions.append(
+                or_(
+                    UserInfo.user_no.contains(keyword),
+                    UserInfo.username.contains(keyword),
+                    UserInfo.id.in_(profile_match),
+                )
+            )
+
+        if status:
+            profile_status_match = (
+                select(UserProfile.user_id)
+                .where(UserProfile.status == status)
+            )
+            conditions.append(UserInfo.id.in_(profile_status_match))
+
+        if role:
+            conditions.append(UserInfo.role_ids.contains(role))
+
+        base_query = select(UserInfo).where(*conditions)
+        count_query = select(func.count()).select_from(UserInfo).where(*conditions)
+
+        total_result = await db.exec(count_query)
+        total = total_result.one()
+
+        items_result = await db.exec(
+            base_query.order_by(UserInfo.id).offset(skip).limit(limit)
+        )
+        return list(items_result.all()), total
 
     async def create(self, db: AsyncSession, user: UserInfo) -> UserInfo:
         """Create a new user record."""
-        warnings.warn("TODO: implement create")
         db.add(user)
         await db.flush()
         await db.refresh(user)
@@ -57,23 +87,35 @@ class UserCRUD:
 
     async def update(self, db: AsyncSession, user: UserInfo, **kwargs) -> UserInfo:
         """Update user fields."""
-        warnings.warn("TODO: implement update")
-        raise NotImplementedError("update not implemented")
+        for field, value in kwargs.items():
+            if hasattr(user, field):
+                setattr(user, field, value)
+        await db.flush()
+        await db.refresh(user)
+        return user
 
     async def logical_delete(self, db: AsyncSession, user_id: int) -> None:
         """Mark user as deleted (is_deleted=True, set deleted_at)."""
-        warnings.warn("TODO: implement logical_delete")
-        raise NotImplementedError("logical_delete not implemented")
+        user = await self.get_by_id(db, user_id)
+        if user:
+            user.is_deleted = True
+            user.deleted_at = datetime.now(UTC)
+            await db.flush()
 
     async def restore(self, db: AsyncSession, user_id: int) -> None:
         """Clear isDeleted flag and deleted_at."""
-        warnings.warn("TODO: implement restore")
-        raise NotImplementedError("restore not implemented")
+        user = await self.get_by_id(db, user_id)
+        if user:
+            user.is_deleted = False
+            user.deleted_at = None
+            await db.flush()
 
     async def physical_delete(self, db: AsyncSession, user_id: int) -> None:
         """Permanently delete user record."""
-        warnings.warn("TODO: implement physical_delete")
-        raise NotImplementedError("physical_delete not implemented")
+        user = await self.get_by_id(db, user_id)
+        if user:
+            await db.delete(user)
+            await db.flush()
 
 
 user_crud = UserCRUD()
