@@ -60,7 +60,7 @@ class _PermissionChecker:
         return current_user
 
 
-def require_permission(code: str) -> Depends:
+def require_permission(code: str) -> _PermissionChecker:
     """Create a dependency that requires a specific permission.
 
     Usage:
@@ -71,4 +71,4 @@ def require_permission(code: str) -> Depends:
         ):
             ...
     """
-    return Depends(_PermissionChecker(code))
+    return _PermissionChecker(code)
