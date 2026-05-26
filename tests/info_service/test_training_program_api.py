@@ -2,6 +2,8 @@
 
 import pytest
 
+from tests.utils import make_course_payload
+
 
 @pytest.mark.integration
 class TestTrainingProgramAPI:
@@ -11,12 +13,11 @@ class TestTrainingProgramAPI:
         """Should create, query, update, and delete a training program."""
         course_resp = await async_client_info.post(
             "/api/v1/courses/",
-            json={
-                "course_code": "CS610",
-                "course_name": "Machine Learning Systems",
-                "credit": 4,
-                "capacity": 80,
-            },
+            json=make_course_payload(
+                course_code="CS610",
+                course_name="Machine Learning Systems",
+                credit=4,
+            ),
         )
         assert course_resp.status_code == 200
         course_id = course_resp.json()["data"]["id"]

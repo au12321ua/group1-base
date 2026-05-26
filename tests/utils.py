@@ -63,3 +63,20 @@ def make_user_payload(
         "phone": "13800000000",
         "role_ids": role_ids,
     }
+
+
+def make_course_payload(
+    course_code: str = "CS101",
+    course_name: str = "Introduction to Computer Science",
+    credit: int = 3,
+    capacity: int = 80,
+    assessment_method: str = "",
+) -> dict[str, object]:
+    """Create a minimal course creation payload."""
+    return {
+        "course_code": course_code,
+        "course_name": course_name,
+        "credit": credit,
+        "capacity": capacity,
+        "assessment_method": assessment_method,
+    }

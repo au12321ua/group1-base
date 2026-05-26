@@ -2,6 +2,8 @@
 
 import pytest
 
+from tests.utils import make_course_payload
+
 
 @pytest.mark.integration
 class TestOfferingAPI:
@@ -11,12 +13,11 @@ class TestOfferingAPI:
         """Should create, read, list, patch, and delete an offering."""
         course_resp = await async_client_info.post(
             "/api/v1/courses/",
-            json={
-                "course_code": "CS510",
-                "course_name": "Distributed Systems",
-                "credit": 3,
-                "capacity": 120,
-            },
+            json=make_course_payload(
+                course_code="CS510",
+                course_name="Distributed Systems",
+                capacity=120,
+            ),
         )
         assert course_resp.status_code == 200
         course_id = course_resp.json()["data"]["id"]
@@ -71,12 +72,11 @@ class TestOfferingAPI:
         """Should reject duplicate course + term + class combinations."""
         course_resp = await async_client_info.post(
             "/api/v1/courses/",
-            json={
-                "course_code": "CS511",
-                "course_name": "Parallel Computing",
-                "credit": 3,
-                "capacity": 100,
-            },
+            json=make_course_payload(
+                course_code="CS511",
+                course_name="Parallel Computing",
+                capacity=100,
+            ),
         )
         course_id = course_resp.json()["data"]["id"]
 

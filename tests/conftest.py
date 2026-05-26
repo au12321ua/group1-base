@@ -193,7 +193,7 @@ async def async_client_info():
     from httpx import ASGITransport, AsyncClient
     from sqlmodel import SQLModel
 
-    from info_service.main import _AUDIT_TABLES, _INFO_TABLES, app, audit_engine, info_engine
+    from info_service.main import app, audit_engine, info_engine
 
     async with info_engine.begin() as conn:
         tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _INFO_TABLES]

@@ -198,3 +198,30 @@ class TestUtils:
         assert payload["user_no"] == "T001"
         assert payload["username"] == "teacher1"
         assert payload["role_ids"] == [2, 3]
+
+    def test_make_course_payload_defaults(self):
+        """make_course_payload returns plausible default payload."""
+        from tests.utils import make_course_payload
+
+        payload = make_course_payload()
+        assert payload["course_code"] == "CS101"
+        assert payload["course_name"] == "Introduction to Computer Science"
+        assert payload["credit"] == 3
+        assert payload["capacity"] == 80
+
+    def test_make_course_payload_custom(self):
+        """make_course_payload accepts custom values."""
+        from tests.utils import make_course_payload
+
+        payload = make_course_payload(
+            course_code="CS610",
+            course_name="Machine Learning Systems",
+            credit=4,
+            capacity=120,
+            assessment_method="EXAM",
+        )
+        assert payload["course_code"] == "CS610"
+        assert payload["course_name"] == "Machine Learning Systems"
+        assert payload["credit"] == 4
+        assert payload["capacity"] == 120
+        assert payload["assessment_method"] == "EXAM"
