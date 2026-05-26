@@ -1,10 +1,9 @@
 """Unit tests for CourseManagementService — Calendar methods."""
 
-from datetime import date, datetime
+from datetime import date
 
 import pytest
 
-from info_service.models.academic_calendar import AcademicCalendar
 from info_service.schemas.calendar_schema import (
     CalendarCreateRequest,
     CalendarPatchRequest,
