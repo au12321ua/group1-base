@@ -1,5 +1,6 @@
 """FileStorageService — file upload, download, and management."""
 
+import asyncio
 import hashlib
 import os
 
@@ -90,13 +91,11 @@ class FileStorageService:
         resource.storage_path = storage_path
         await db.flush()
 
-        # Write file to disk AFTER DB is committed
+        # Write file to disk AFTER DB is committed (offloaded to thread)
         try:
-            os.makedirs(self._settings.upload_dir, exist_ok=True)
-            with open(storage_path, "wb") as f:
-                f.write(content)
+            await asyncio.to_thread(os.makedirs, self._settings.upload_dir, exist_ok=True)
+            await asyncio.to_thread(self._write_file_sync, storage_path, content)
         except Exception:
-            # Clean up DB record on disk write failure
             await file_resource_crud.delete(db, resource.id)
             raise BusinessRuleError("Failed to write file to disk; metadata rolled back")
 
@@ -115,11 +114,11 @@ class FileStorageService:
             raise ResourceNotFoundError("File", str(file_id))
 
         path = resource.storage_path
-        if not os.path.exists(path):
+        exists = await asyncio.to_thread(os.path.exists, path)
+        if not exists:
             raise ResourceNotFoundError("File content", str(file_id))
 
-        with open(path, "rb") as f:
-            content = f.read()
+        content = await asyncio.to_thread(self._read_file_sync, path)
 
         mime_map = {
             "jpg": "image/jpeg",
@@ -143,9 +142,11 @@ class FileStorageService:
         if resource.owner_user_id != owner_user_id and not is_admin:
             raise BusinessRuleError("Only the file owner or admin can delete this file")
 
-        # Remove from disk
-        if resource.storage_path and os.path.exists(resource.storage_path):
-            os.remove(resource.storage_path)
+        # Remove from disk (offloaded to thread)
+        if resource.storage_path:
+            exists = await asyncio.to_thread(os.path.exists, resource.storage_path)
+            if exists:
+                await asyncio.to_thread(os.remove, resource.storage_path)
 
         # Remove metadata
         await file_resource_crud.delete(db, file_id)
@@ -156,6 +157,20 @@ class FileStorageService:
         if not resource:
             raise ResourceNotFoundError("File", str(file_id))
         return f"/api/v1/files/{file_id}/download"
+
+    # ------------------------------------------------------------------
+    # Synchronous I/O helpers (called via asyncio.to_thread)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _write_file_sync(path: str, content: bytes) -> None:
+        with open(path, "wb") as f:
+            f.write(content)
+
+    @staticmethod
+    def _read_file_sync(path: str) -> bytes:
+        with open(path, "rb") as f:
+            return f.read()
 
 
 file_storage_service = FileStorageService()
