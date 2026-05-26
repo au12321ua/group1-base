@@ -1,66 +1,98 @@
 """Info Service — /courses/* endpoints."""
 
-import warnings
-
 from fastapi import APIRouter, Query
 
+from info_service.api.deps import InfoDbSession
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
     CoursePatchRequest,
     CourseResponse,
     CourseUpdateRequest,
 )
-from shared.response import APIResponse, ListResponse, SingleResponse
+from info_service.services.course_management_service import course_management_service
+from shared.response import (
+    APIResponse,
+    ListResponse,
+    PaginatedData,
+    PaginationMeta,
+    SingleResponse,
+)
 
 router = APIRouter(tags=["courses"])
 
 
 @router.get("/", response_model=ListResponse[CourseResponse])
 async def list_courses(
+    db: InfoDbSession,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     keyword: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
 ) -> ListResponse[CourseResponse]:
     """Get paginated course list."""
-    warnings.warn("TODO: implement GET /courses")
-    raise NotImplementedError("GET /courses not implemented")
+    skip = (page - 1) * page_size
+    items, total = await course_management_service.list_courses(
+        db,
+        skip=skip,
+        limit=page_size,
+        keyword=keyword,
+        is_active=is_active,
+    )
+    return ListResponse(
+        data=PaginatedData(
+            items=[CourseResponse.model_validate(item) for item in items],
+            pagination=PaginationMeta(total=total, page=page, page_size=page_size),
+        )
+    )
 
 
 @router.post("/", response_model=SingleResponse[CourseResponse])
-async def create_course(request: CourseCreateRequest) -> SingleResponse[CourseResponse]:
+async def create_course(
+    db: InfoDbSession,
+    request: CourseCreateRequest,
+) -> SingleResponse[CourseResponse]:
     """Create a new course."""
-    warnings.warn("TODO: implement POST /courses")
-    raise NotImplementedError("POST /courses not implemented")
+    course = await course_management_service.create_course(db, request)
+    return SingleResponse(data=CourseResponse.model_validate(course))
 
 
 @router.get("/{course_id}", response_model=SingleResponse[CourseResponse])
-async def get_course(course_id: int) -> SingleResponse[CourseResponse]:
+async def get_course(
+    db: InfoDbSession,
+    course_id: int,
+) -> SingleResponse[CourseResponse]:
     """Get course detail."""
-    warnings.warn("TODO: implement GET /courses/{id}")
-    raise NotImplementedError("GET /courses/{id} not implemented")
+    course = await course_management_service.get_course(db, course_id)
+    return SingleResponse(data=CourseResponse.model_validate(course))
 
 
 @router.put("/{course_id}", response_model=SingleResponse[CourseResponse])
 async def update_course(
-    course_id: int, request: CourseUpdateRequest
+    db: InfoDbSession,
+    course_id: int,
+    request: CourseUpdateRequest,
 ) -> SingleResponse[CourseResponse]:
     """Full update course."""
-    warnings.warn("TODO: implement PUT /courses/{id}")
-    raise NotImplementedError("PUT /courses/{id} not implemented")
+    course = await course_management_service.update_course(db, course_id, request)
+    return SingleResponse(data=CourseResponse.model_validate(course))
 
 
 @router.patch("/{course_id}", response_model=SingleResponse[CourseResponse])
 async def patch_course(
-    course_id: int, request: CoursePatchRequest
+    db: InfoDbSession,
+    course_id: int,
+    request: CoursePatchRequest,
 ) -> SingleResponse[CourseResponse]:
     """Partial update course."""
-    warnings.warn("TODO: implement PATCH /courses/{id}")
-    raise NotImplementedError("PATCH /courses/{id} not implemented")
+    course = await course_management_service.update_course(db, course_id, request)
+    return SingleResponse(data=CourseResponse.model_validate(course))
 
 
 @router.delete("/{course_id}", response_model=APIResponse[None])
-async def delete_course(course_id: int) -> APIResponse[None]:
+async def delete_course(
+    db: InfoDbSession,
+    course_id: int,
+) -> APIResponse[None]:
     """Delete course."""
-    warnings.warn("TODO: implement DELETE /courses/{id}")
-    raise NotImplementedError("DELETE /courses/{id} not implemented")
+    await course_management_service.delete_course(db, course_id)
+    return APIResponse(data=None)

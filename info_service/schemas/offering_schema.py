@@ -2,10 +2,12 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class OfferingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     course_id: int
     term_code: str

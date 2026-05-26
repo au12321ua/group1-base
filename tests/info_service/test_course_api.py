@@ -23,3 +23,34 @@ class TestCourseAPI:
             },
         )
         assert resp.status_code == 422
+
+    async def test_create_course_rejects_code_reuse_after_soft_delete(
+        self, async_client_info
+    ) -> None:
+        """逻辑删除后，原 course_code 仍然不可复用。"""
+        create_resp = await async_client_info.post(
+            "/api/v1/courses/",
+            json={
+                "course_code": "CS200",
+                "course_name": "Reusable Code Check",
+                "credit": 3,
+                "capacity": 80,
+            },
+        )
+        assert create_resp.status_code == 200
+        course_id = create_resp.json()["data"]["id"]
+
+        delete_resp = await async_client_info.delete(f"/api/v1/courses/{course_id}")
+        assert delete_resp.status_code == 200
+
+        recreate_resp = await async_client_info.post(
+            "/api/v1/courses/",
+            json={
+                "course_code": "CS200",
+                "course_name": "Another Course",
+                "credit": 2,
+                "capacity": 60,
+            },
+        )
+
+        assert recreate_resp.status_code == 409

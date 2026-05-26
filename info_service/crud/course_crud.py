@@ -57,6 +57,20 @@ class CourseCRUD(BaseCRUD[Course]):
         total = (await db.exec(count_stmt)).one()
         return items, total
 
+    async def get_existing_ids(
+        self, db: AsyncSession, course_ids: list[int], *, include_deleted: bool = False
+    ) -> set[int]:
+        """Return the subset of course ids that currently exist."""
+        if not course_ids:
+            return set()
+
+        stmt = select(Course.id).where(Course.id.in_(set(course_ids)))
+        if not include_deleted:
+            stmt = stmt.where(Course.is_deleted.is_(False))
+
+        result = await db.exec(stmt)
+        return set(result.all())
+
     async def logical_delete(self, db: AsyncSession, course_id: int) -> None:
         """Soft delete a course."""
         course = await self.get(db, course_id)
