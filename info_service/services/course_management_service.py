@@ -199,15 +199,21 @@ class CourseManagementService:
         target_course_id = payload.get("course_id", offering.course_id)
         target_term_code = payload.get("term_code", offering.term_code)
         target_class_no = payload.get("class_no", offering.class_no)
-
-        await self._ensure_course_exists(db, target_course_id)
-        await self._ensure_unique_offering_identity(
-            db,
-            course_id=target_course_id,
-            term_code=target_term_code,
-            class_no=target_class_no,
-            exclude_id=offering_id,
+        identity_changed = (
+            target_course_id != offering.course_id
+            or target_term_code != offering.term_code
+            or target_class_no != offering.class_no
         )
+
+        if identity_changed:
+            await self._ensure_course_exists(db, target_course_id)
+            await self._ensure_unique_offering_identity(
+                db,
+                course_id=target_course_id,
+                term_code=target_term_code,
+                class_no=target_class_no,
+                exclude_id=offering_id,
+            )
 
         if "teacher_ids" in payload and payload["teacher_ids"] is not None:
             payload["teacher_ids"] = self._serialize_string_list(payload["teacher_ids"])
