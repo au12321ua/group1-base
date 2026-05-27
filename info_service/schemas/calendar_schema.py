@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CalendarResponse(BaseModel):
@@ -24,6 +24,12 @@ class CalendarCreateRequest(BaseModel):
     end_date: date
     version: str = Field(default="1.0", max_length=16)
 
+    @model_validator(mode="after")
+    def check_dates(self) -> "CalendarCreateRequest":
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
+
 
 class CalendarUpdateRequest(BaseModel):
     term_code: str = Field(..., min_length=1, max_length=32)
@@ -31,6 +37,12 @@ class CalendarUpdateRequest(BaseModel):
     start_date: date
     end_date: date
     version: str = Field(default="1.0", max_length=16)
+
+    @model_validator(mode="after")
+    def check_dates(self) -> "CalendarUpdateRequest":
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
 
 
 class CalendarPatchRequest(BaseModel):

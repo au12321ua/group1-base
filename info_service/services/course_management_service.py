@@ -2,11 +2,17 @@
 
 import warnings
 
+from pydantic import BaseModel
+from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from info_service.crud.base_info_crud import base_info_crud
+from info_service.crud.calendar_crud import calendar_crud
 from info_service.crud.course_crud import course_crud
 from info_service.crud.offering_crud import offering_crud
 from info_service.crud.training_program_crud import training_program_crud
+from info_service.models.academic_calendar import AcademicCalendar
+from info_service.models.base_info_item import BaseInfoItem
 from info_service.models.course import Course
 from info_service.models.course_offering import CourseOffering
 from info_service.models.training_program import TrainingProgram
@@ -309,35 +315,85 @@ class CourseManagementService:
 
     # ---- Calendars ----
 
-    async def create_calendar(self, db: AsyncSession, data) -> dict:
-        """Create a calendar entry."""
-        warnings.warn("TODO: implement create_calendar")
-        raise NotImplementedError("create_calendar not implemented")
+    async def create_calendar(self, db: AsyncSession, data: BaseModel) -> AcademicCalendar:
+        """Create a calendar entry from a Pydantic schema."""
+        dump = data.model_dump()
+        existing = await calendar_crud.get_by_term_code(db, dump["term_code"])
+        if existing:
+            raise BusinessRuleError(
+                f"Calendar with term_code {dump['term_code']} already exists"
+            )
+        cal = AcademicCalendar(**dump)
+        return await calendar_crud.create(db, cal)
 
-    async def update_calendar(self, db: AsyncSession, calendar_id: int, data) -> dict:
-        """Update a calendar entry."""
-        warnings.warn("TODO: implement update_calendar")
-        raise NotImplementedError("update_calendar not implemented")
+    async def update_calendar(
+        self, db: AsyncSession, calendar_id: int, data: BaseModel
+    ) -> AcademicCalendar:
+        """Full update an existing calendar entry."""
+        cal = await calendar_crud.get(db, calendar_id)
+        if not cal:
+            raise ResourceNotFoundError("Calendar", str(calendar_id))
+        dump = data.model_dump()
+        if dump.get("term_code") != cal.term_code:
+            existing = await calendar_crud.get_by_term_code(db, dump["term_code"])
+            if existing and existing.id != calendar_id:
+                raise BusinessRuleError(
+                    f"Calendar with term_code {dump['term_code']} already exists"
+                )
+        for field, value in dump.items():
+            setattr(cal, field, value)
+        return await calendar_crud.update(db, cal)
+
+    async def patch_calendar(
+        self, db: AsyncSession, calendar_id: int, data: BaseModel
+    ) -> AcademicCalendar:
+        """Partial update a calendar entry — only provided (non-None) fields."""
+        cal = await calendar_crud.get(db, calendar_id)
+        if not cal:
+            raise ResourceNotFoundError("Calendar", str(calendar_id))
+        dump = data.model_dump(exclude_unset=True)
+        if "term_code" in dump and dump["term_code"] != cal.term_code:
+            existing = await calendar_crud.get_by_term_code(db, dump["term_code"])
+            if existing and existing.id != calendar_id:
+                raise BusinessRuleError(
+                    f"Calendar with term_code {dump['term_code']} already exists"
+                )
+        for field, value in dump.items():
+            if value is not None:
+                setattr(cal, field, value)
+        return await calendar_crud.update(db, cal)
 
     async def delete_calendar(self, db: AsyncSession, calendar_id: int) -> None:
         """Delete a calendar entry."""
-        warnings.warn("TODO: implement delete_calendar")
-        raise NotImplementedError("delete_calendar not implemented")
+        cal = await calendar_crud.get(db, calendar_id)
+        if not cal:
+            raise ResourceNotFoundError("Calendar", str(calendar_id))
+        await calendar_crud.delete(db, calendar_id)
 
-    async def list_calendars(self, db: AsyncSession, **filters) -> tuple[list, int]:
-        """List calendars with filters."""
-        warnings.warn("TODO: implement list_calendars")
-        raise NotImplementedError("list_calendars not implemented")
+    async def list_calendars(
+        self, db: AsyncSession, page: int = 1, page_size: int = 20
+    ) -> tuple[list[AcademicCalendar], int]:
+        """List calendars with pagination."""
+        skip = (page - 1) * page_size
+        items = await calendar_crud.get_multi(db, skip=skip, limit=page_size)
+        count_result = await db.exec(
+            select(func.count()).select_from(AcademicCalendar)
+        )
+        total = count_result.one()
+        return items, total
 
-    async def get_calendar(self, db: AsyncSession, calendar_id: int) -> dict:
+    async def get_calendar(self, db: AsyncSession, calendar_id: int) -> AcademicCalendar:
         """Get calendar detail."""
-        warnings.warn("TODO: implement get_calendar")
-        raise NotImplementedError("get_calendar not implemented")
+        cal = await calendar_crud.get(db, calendar_id)
+        if not cal:
+            raise ResourceNotFoundError("Calendar", str(calendar_id))
+        return cal
 
-    async def get_calendar_by_term(self, db: AsyncSession, term_code: str) -> dict | None:
+    async def get_calendar_by_term(
+        self, db: AsyncSession, term_code: str
+    ) -> AcademicCalendar | None:
         """Get calendar by term code."""
-        warnings.warn("TODO: implement get_calendar_by_term")
-        raise NotImplementedError("get_calendar_by_term not implemented")
+        return await calendar_crud.get_by_term_code(db, term_code)
 
     # ---- Training Programs ----
 
@@ -399,30 +455,66 @@ class CourseManagementService:
 
     # ---- Base Info ----
 
-    async def create_base_info(self, db: AsyncSession, data) -> dict:
-        """Create a base info item."""
-        warnings.warn("TODO: implement create_base_info")
-        raise NotImplementedError("create_base_info not implemented")
+    async def create_base_info(self, db: AsyncSession, data: BaseModel) -> BaseInfoItem:
+        """Create a base info item from a Pydantic schema."""
+        item = BaseInfoItem(**data.model_dump())
+        return await base_info_crud.create(db, item)
 
-    async def update_base_info(self, db: AsyncSession, item_id: int, data) -> dict:
-        """Update a base info item."""
-        warnings.warn("TODO: implement update_base_info")
-        raise NotImplementedError("update_base_info not implemented")
+    async def update_base_info(
+        self, db: AsyncSession, item_id: int, data: BaseModel
+    ) -> BaseInfoItem:
+        """Full update a base info item."""
+        item = await base_info_crud.get(db, item_id)
+        if not item:
+            raise ResourceNotFoundError("BaseInfoItem", str(item_id))
+        for field, value in data.model_dump().items():
+            setattr(item, field, value)
+        return await base_info_crud.update(db, item)
+
+    async def patch_base_info(
+        self, db: AsyncSession, item_id: int, data: BaseModel
+    ) -> BaseInfoItem:
+        """Partial update a base info item — only provided (non-None) fields."""
+        item = await base_info_crud.get(db, item_id)
+        if not item:
+            raise ResourceNotFoundError("BaseInfoItem", str(item_id))
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(item, field, value)
+        return await base_info_crud.update(db, item)
 
     async def delete_base_info(self, db: AsyncSession, item_id: int) -> None:
         """Delete a base info item."""
-        warnings.warn("TODO: implement delete_base_info")
-        raise NotImplementedError("delete_base_info not implemented")
+        item = await base_info_crud.get(db, item_id)
+        if not item:
+            raise ResourceNotFoundError("BaseInfoItem", str(item_id))
+        await base_info_crud.delete(db, item_id)
 
-    async def list_base_info(self, db: AsyncSession, **filters) -> tuple[list, int]:
-        """List base info items with filters."""
-        warnings.warn("TODO: implement list_base_info")
-        raise NotImplementedError("list_base_info not implemented")
+    async def list_base_info(
+        self,
+        db: AsyncSession,
+        page: int = 1,
+        page_size: int = 20,
+        category: str | None = None,
+    ) -> tuple[list[BaseInfoItem], int]:
+        """List base info items, optionally filtered by category."""
+        skip = (page - 1) * page_size
+        if category:
+            return await base_info_crud.get_by_category(
+                db, category, skip=skip, limit=page_size
+            )
+        items = await base_info_crud.get_multi(db, skip=skip, limit=page_size)
+        count_result = await db.exec(
+            select(func.count()).select_from(BaseInfoItem)
+        )
+        total = count_result.one()
+        return items, total
 
-    async def get_base_info(self, db: AsyncSession, item_id: int) -> dict:
+    async def get_base_info(self, db: AsyncSession, item_id: int) -> BaseInfoItem:
         """Get base info item detail."""
-        warnings.warn("TODO: implement get_base_info")
-        raise NotImplementedError("get_base_info not implemented")
+        item = await base_info_crud.get(db, item_id)
+        if not item:
+            raise ResourceNotFoundError("BaseInfoItem", str(item_id))
+        return item
 
 
 course_management_service = CourseManagementService()
