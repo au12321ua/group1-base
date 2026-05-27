@@ -47,12 +47,15 @@ class UserCRUD:
         status: str | None = None,
         role: str | None = None,
         include_deleted: bool = False,
+        only_deleted: bool = False,
         sort_by: str = "id",
         sort_order: str = "asc",
     ) -> tuple[list[UserInfo], int]:
         """Get paginated user list with optional filters. Returns (items, total)."""
         conditions = []
-        if not include_deleted:
+        if only_deleted:
+            conditions.append(UserInfo.is_deleted == True)  # noqa: E712
+        elif not include_deleted:
             conditions.append(UserInfo.is_deleted == False)  # noqa: E712
 
         if keyword:

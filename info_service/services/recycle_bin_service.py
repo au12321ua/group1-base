@@ -66,19 +66,17 @@ class RecycleBinService:
     ) -> tuple[list, int]:
         """List users with is_deleted=True. Returns (items, total)."""
         skip = (page - 1) * page_size
-        items, _ = await user_crud.get_multi(
+        items, total = await user_crud.get_multi(
             db,
             skip=skip,
             limit=page_size,
             keyword=keyword,
-            include_deleted=True,
+            only_deleted=True,
         )
-        # Only return deleted users
-        deleted = [u for u in items if u.is_deleted]
 
         # Enrich with full_name from profile
         result = []
-        for u in deleted:
+        for u in items:
             profile = await user_profile_crud.get_by_user_id(db, u.id)
             full_name = profile.full_name if profile else ""
             result.append({
@@ -91,7 +89,7 @@ class RecycleBinService:
                 "deleted_at": u.deleted_at,
             })
 
-        return result, len(result)
+        return result, total
 
     async def restore_user(self, db: AsyncSession, user_id: int) -> None:
         """Restore a soft-deleted user: clear isDeleted → HTTP enable Auth account."""
