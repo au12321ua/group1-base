@@ -1,30 +1,69 @@
 """Info Service — /audit-logs/* endpoints."""
 
-import warnings
+from fastapi import APIRouter, Depends, Query
 
-from fastapi import APIRouter, Query
-
-from info_service.schemas.audit_log_schema import AuditLogQuery, AuditLogResponse
-from shared.response import ListResponse, SingleResponse
+from info_service.api.deps import AuditDbSession
+from info_service.deps import require_permission
+from info_service.schemas.audit_log_schema import AuditLogResponse
+from info_service.services.audit_service import audit_service
+from shared.response import APIResponse, PaginatedData, PaginationMeta
+from shared.security import IdentityContext
 
 router = APIRouter(tags=["audit-logs"])
 
 
-@router.get("/", response_model=ListResponse[AuditLogResponse])
-async def search_audit_logs(query: AuditLogQuery = Query()) -> ListResponse[AuditLogResponse]:
-    """Search audit logs with filters (requires audit:read permission)."""
-    warnings.warn("TODO: implement GET /audit-logs")
-    raise NotImplementedError("GET /audit-logs not implemented")
-
-
-@router.get("/export", response_model=SingleResponse[str])
-async def export_audit_logs(
+@router.get("/", response_model=APIResponse[PaginatedData[AuditLogResponse]])
+async def search_audit_logs(
+    db: AuditDbSession,
+    current_user: IdentityContext = Depends(require_permission("audit:read")),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
     operator_user_id: str | None = Query(default=None),
     target_type: str | None = Query(default=None),
     action: str | None = Query(default=None),
+    result: str | None = Query(default=None),
     start_date: str | None = Query(default=None),
     end_date: str | None = Query(default=None),
-) -> SingleResponse[str]:
-    """Export audit logs as CSV (requires audit:read permission)."""
-    warnings.warn("TODO: implement GET /audit-logs/export")
-    raise NotImplementedError("GET /audit-logs/export not implemented")
+) -> APIResponse[PaginatedData[AuditLogResponse]]:
+    """Search audit logs with filters."""
+    items, total = await audit_service.search_audit_logs(
+        db,
+        operator_user_id=operator_user_id,
+        target_type=target_type,
+        action=action,
+        result=result,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        page_size=page_size,
+    )
+    return APIResponse(
+        data=PaginatedData(
+            items=[AuditLogResponse.model_validate(a) for a in items],
+            pagination=PaginationMeta(total=total, page=page, page_size=page_size),
+        )
+    )
+
+
+@router.get("/export", response_model=APIResponse[str])
+async def export_audit_logs(
+    db: AuditDbSession,
+    current_user: IdentityContext = Depends(require_permission("audit:read")),
+    operator_user_id: str | None = Query(default=None),
+    target_type: str | None = Query(default=None),
+    action: str | None = Query(default=None),
+    result: str | None = Query(default=None),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
+) -> APIResponse[str]:
+    """Export audit logs as CSV."""
+    csv_content = await audit_service.export_audit_logs(
+        db,
+        operator_user_id=operator_user_id,
+        target_type=target_type,
+        action=action,
+        result=result,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return APIResponse(data=csv_content)
