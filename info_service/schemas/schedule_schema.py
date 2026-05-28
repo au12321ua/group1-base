@@ -2,10 +2,12 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScheduleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     offering_id: int
     classroom_id: int
@@ -36,6 +38,7 @@ class ScheduleUpdateRequest(BaseModel):
 
 
 class SchedulePatchRequest(BaseModel):
+    offering_id: int | None = None
     classroom_id: int | None = None
     day_of_week: int | None = Field(default=None, ge=1, le=7)
     start_period: int | None = Field(default=None, ge=1, le=12)
@@ -44,6 +47,8 @@ class SchedulePatchRequest(BaseModel):
 
 
 class TeacherAssignmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     teacher_id: str
     offering_id: int
