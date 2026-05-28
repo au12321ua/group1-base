@@ -1,8 +1,8 @@
 """AuditLog CRUD — audit trail write & query operations."""
 
-import warnings
 from datetime import datetime
 
+from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.models.audit_log import AuditLog
@@ -10,9 +10,6 @@ from info_service.models.audit_log import AuditLog
 
 class AuditLogCRUD:
     """Data access for AuditLog model (Log DB)."""
-
-    def __init__(self) -> None:
-        warnings.warn("TODO: AuditLogCRUD — implement all methods")
 
     async def write(
         self,
@@ -28,8 +25,20 @@ class AuditLogCRUD:
         request_id: str = "",
     ) -> AuditLog:
         """Write an immutable audit log entry."""
-        warnings.warn("TODO: implement write")
-        raise NotImplementedError("write not implemented")
+        entry = AuditLog(
+            operator_user_id=operator_user_id,
+            operator_role=operator_role,
+            target_type=target_type,
+            target_id=target_id,
+            action=action,
+            result=result,
+            reason=reason,
+            request_id=request_id,
+        )
+        db.add(entry)
+        await db.flush()
+        await db.refresh(entry)
+        return entry
 
     async def search(
         self,
@@ -45,8 +54,34 @@ class AuditLogCRUD:
         limit: int = 100,
     ) -> tuple[list[AuditLog], int]:
         """Search audit logs with filters. Returns (items, total)."""
-        warnings.warn("TODO: implement search")
-        raise NotImplementedError("search not implemented")
+        conditions = []
+
+        if operator_user_id:
+            conditions.append(AuditLog.operator_user_id == operator_user_id)
+        if target_type:
+            conditions.append(AuditLog.target_type == target_type)
+        if action:
+            conditions.append(AuditLog.action == action)
+        if result:
+            conditions.append(AuditLog.result == result)
+        if start_date:
+            conditions.append(AuditLog.created_at >= start_date)
+        if end_date:
+            conditions.append(AuditLog.created_at <= end_date)
+
+        base_query = select(AuditLog)
+        count_query = select(func.count()).select_from(AuditLog)
+        if conditions:
+            base_query = base_query.where(*conditions)
+            count_query = count_query.where(*conditions)
+
+        total_result = await db.exec(count_query)
+        total = total_result.one()
+
+        items_result = await db.exec(
+            base_query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
+        )
+        return list(items_result.all()), total
 
 
 audit_log_crud = AuditLogCRUD()
