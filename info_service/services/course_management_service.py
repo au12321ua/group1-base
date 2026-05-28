@@ -400,6 +400,17 @@ class CourseManagementService:
         schedule = await self._ensure_schedule_exists(db, schedule_id)
         return schedule.offering_id
 
+    async def _sync_offering_teacher_snapshot(
+        self, db: AsyncSession, offering_id: int
+    ) -> CourseOffering:
+        """Keep the offering.teacher_ids snapshot aligned with assignment rows."""
+        offering = await self._ensure_offering_exists(db, offering_id)
+        assignments = await teacher_assignment_crud.get_by_offering(db, offering_id)
+        teacher_ids = self._serialize_string_list(
+            [assignment.teacher_id for assignment in assignments]
+        )
+        return await offering_crud.update(db, offering, teacher_ids=teacher_ids)
+
     async def list_teachers_for_schedule(
         self, db: AsyncSession, schedule_id: int
     ) -> list[TeacherCourseAssignment]:
@@ -425,6 +436,7 @@ class CourseManagementService:
                 role_type="instructor",
             )
             created.append(await teacher_assignment_crud.create(db, assignment))
+        await self._sync_offering_teacher_snapshot(db, offering_id)
         return created
 
     async def add_teachers(
@@ -448,6 +460,7 @@ class CourseManagementService:
             )
             existing_by_teacher[teacher_id] = await teacher_assignment_crud.create(db, assignment)
 
+        await self._sync_offering_teacher_snapshot(db, offering_id)
         return list(existing_by_teacher.values())
 
     async def assign_teacher(
@@ -469,26 +482,32 @@ class CourseManagementService:
                 offering_id=offering_id,
                 role_type=normalized_role_type,
             )
-            return await teacher_assignment_crud.create(db, assignment)
+            assignment = await teacher_assignment_crud.create(db, assignment)
+        else:
+            assignment = await teacher_assignment_crud.update(
+                db,
+                assignment,
+                role_type=normalized_role_type,
+            )
 
-        return await teacher_assignment_crud.update(
-            db,
-            assignment,
-            role_type=normalized_role_type,
-        )
+        await self._sync_offering_teacher_snapshot(db, offering_id)
+        return assignment
 
     async def remove_teacher(self, db: AsyncSession, schedule_id: int, teacher_id: str) -> None:
         """Remove a teacher assignment."""
         offering_id = await self._get_schedule_offering_id(db, schedule_id)
         normalized_teacher_id = teacher_id.strip()
         deleted = await teacher_assignment_crud.delete_by_offering_and_teacher(
-            db, offering_id, normalized_teacher_id
+            db,
+            offering_id,
+            normalized_teacher_id,
         )
         if not deleted:
             raise ResourceNotFoundError(
                 "TeacherAssignment",
                 f"schedule={schedule_id}, teacher={normalized_teacher_id}",
             )
+        await self._sync_offering_teacher_snapshot(db, offering_id)
 
     # ---- Calendars ----
 

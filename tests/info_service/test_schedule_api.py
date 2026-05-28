@@ -111,6 +111,9 @@ class TestScheduleAPI:
         assert replace_resp.status_code == 200
         replaced = replace_resp.json()["data"]["items"]
         assert [item["teacher_id"] for item in replaced] == ["t-1", "t-2"]
+        offering_snapshot_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
+        assert offering_snapshot_resp.status_code == 200
+        assert offering_snapshot_resp.json()["data"]["teacher_ids"] == "t-1,t-2"
 
         add_resp = await async_client_info.post(
             f"/api/v1/schedules/{schedule_id}/teachers",
@@ -119,6 +122,9 @@ class TestScheduleAPI:
         assert add_resp.status_code == 200
         added = add_resp.json()["data"]["items"]
         assert [item["teacher_id"] for item in added] == ["t-1", "t-2", "t-3"]
+        offering_snapshot_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
+        assert offering_snapshot_resp.status_code == 200
+        assert offering_snapshot_resp.json()["data"]["teacher_ids"] == "t-1,t-2,t-3"
 
         assign_resp = await async_client_info.put(
             f"/api/v1/schedules/{schedule_id}/teachers/t-4",
@@ -126,6 +132,9 @@ class TestScheduleAPI:
         )
         assert assign_resp.status_code == 200
         assert assign_resp.json()["data"]["role_type"] == "assistant"
+        offering_snapshot_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
+        assert offering_snapshot_resp.status_code == 200
+        assert offering_snapshot_resp.json()["data"]["teacher_ids"] == "t-1,t-2,t-3,t-4"
 
         teacher_list_resp = await async_client_info.get(
             f"/api/v1/schedules/{schedule_id}/teachers"
@@ -145,6 +154,9 @@ class TestScheduleAPI:
         assert teacher_list_resp.status_code == 200
         teacher_items = teacher_list_resp.json()["data"]["items"]
         assert [item["teacher_id"] for item in teacher_items] == ["t-1", "t-3", "t-4"]
+        offering_snapshot_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
+        assert offering_snapshot_resp.status_code == 200
+        assert offering_snapshot_resp.json()["data"]["teacher_ids"] == "t-1,t-3,t-4"
 
         delete_resp = await async_client_info.delete(f"/api/v1/schedules/{schedule_id}")
         assert delete_resp.status_code == 200
