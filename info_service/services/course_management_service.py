@@ -1,22 +1,21 @@
 """CourseManagementService — course, offering, schedule, classroom CRUD orchestration."""
 
-import warnings
 
 from pydantic import BaseModel
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from info_service.crud.classroom_crud import classroom_crud
 from info_service.crud.base_info_crud import base_info_crud
 from info_service.crud.calendar_crud import calendar_crud
+from info_service.crud.classroom_crud import classroom_crud
 from info_service.crud.course_crud import course_crud
 from info_service.crud.offering_crud import offering_crud
 from info_service.crud.schedule_crud import schedule_crud
 from info_service.crud.teacher_assignment_crud import teacher_assignment_crud
 from info_service.crud.training_program_crud import training_program_crud
-from info_service.models.classroom import Classroom
 from info_service.models.academic_calendar import AcademicCalendar
 from info_service.models.base_info_item import BaseInfoItem
+from info_service.models.classroom import Classroom
 from info_service.models.course import Course
 from info_service.models.course_offering import CourseOffering
 from info_service.models.course_schedule import CourseSchedule
