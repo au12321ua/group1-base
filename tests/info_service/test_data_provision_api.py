@@ -76,6 +76,14 @@ async def _seed_training_program(
         await session.commit()
 
 
+async def _cleanup_table(table) -> None:
+    from sqlmodel import delete
+
+    async with AsyncSession(info_engine, expire_on_commit=False) as session:
+        await session.exec(delete(table))
+        await session.commit()
+
+
 @pytest.mark.integration
 class TestDataProvisionAPI:
     """Verify the data provision endpoints used by downstream systems."""
@@ -116,6 +124,9 @@ class TestDataProvisionAPI:
         assert student_data["items"][0]["grade"] == "2023"
         assert student_data["snapshot_time"]
 
+        await _cleanup_table(UserProfile)
+        await _cleanup_table(UserInfo)
+
     async def test_get_calendars(self, async_client_info) -> None:
         """Should expose calendar snapshots with top-level snapshot metadata."""
         await _seed_calendar(
@@ -136,6 +147,8 @@ class TestDataProvisionAPI:
         assert data["pagination"] == {"total": 2, "page": 1, "page_size": 2}
         assert [item["term_code"] for item in data["items"]] == ["2026-FALL", "2027-SPRING"]
         assert data["snapshot_time"] == "2026-12-01T00:00:00Z"
+
+        await _cleanup_table(AcademicCalendar)
 
     async def test_list_training_programs_supports_filters(self, async_client_info) -> None:
         """Should return normalized training program snapshots and filter by query params."""
@@ -174,6 +187,8 @@ class TestDataProvisionAPI:
         assert data["items"][0]["program_code"] == "CS-2026-V1"
         assert data["items"][0]["required_course_ids"] == [1, 2, 3]
         assert data["snapshot_time"] == "2026-04-01T00:00:00Z"
+
+        await _cleanup_table(TrainingProgram)
 
     async def test_query_selected_students_proxies_normalized_payload(
         self,
