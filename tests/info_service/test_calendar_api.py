@@ -1,4 +1,4 @@
-"""Integration tests for Calendar API contract."""
+"""校历 API 集成测试。"""
 
 import pytest
 

@@ -1,4 +1,4 @@
-"""Integration tests for user API behavior."""
+"""用户 API 集成测试。"""
 
 from unittest.mock import AsyncMock
 
@@ -9,7 +9,7 @@ from tests.utils import build_identity_headers
 
 
 def _make_user_payload(*, suffix: str) -> dict[str, object]:
-    """Build a deterministic user payload with a unique suffix."""
+    """构造带唯一后缀的用户创建 payload。"""
     return {
         "user_no": f"S2026{suffix}",
         "username": f"user_{suffix}",
@@ -33,7 +33,7 @@ class TestUserAPI:
 
     @pytest.fixture(autouse=True)
     def mock_auth_sync(self, monkeypatch) -> None:
-        """Mock Auth sync calls to keep integration tests deterministic."""
+        """Mock Auth 同步调用，确保集成测试可重复且稳定。"""
         monkeypatch.setattr(
             user_management_service,
             "_sync_create_to_auth",

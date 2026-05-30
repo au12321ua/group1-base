@@ -1,26 +1,26 @@
-"""Integration tests for offering API behavior."""
+"""开课 API 集成测试。"""
 
 import pytest
 
-from tests.utils import make_course_payload
+from tests.info_service.api_helpers import (
+    assert_status_and_data,
+    create_course,
+    create_offering,
+)
 
 
 @pytest.mark.integration
 class TestOfferingAPI:
-    """Verify the /api/v1/offerings CRUD flow."""
+    """验证 /api/v1/offerings 的 CRUD 及关键约束。"""
 
     async def test_offering_crud_flow(self, async_client_info) -> None:
-        """Should create, read, list, patch, and delete an offering."""
-        course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS510",
-                course_name="Distributed Systems",
-                capacity=120,
-            ),
+        """应支持创建、查询、列表、更新和删除开课记录。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS510",
+            course_name="Distributed Systems",
+            capacity=120,
         )
-        assert course_resp.status_code == 200
-        course_id = course_resp.json()["data"]["id"]
 
         create_resp = await async_client_info.post(
             "/api/v1/offerings/",
@@ -33,8 +33,7 @@ class TestOfferingAPI:
             },
         )
 
-        assert create_resp.status_code == 200
-        created = create_resp.json()["data"]
+        created = assert_status_and_data(create_resp)
         assert created["course_id"] == course_id
         assert created["teacher_ids"] == "t-1,t-2"
         offering_id = created["id"]
@@ -69,28 +68,23 @@ class TestOfferingAPI:
         assert missing_resp.status_code == 404
 
     async def test_create_offering_rejects_duplicate_identity(self, async_client_info) -> None:
-        """Should reject duplicate course + term + class combinations."""
-        course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS511",
-                course_name="Parallel Computing",
-                capacity=100,
-            ),
+        """当 course_id + term_code + class_no 重复时应返回 409。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS511",
+            course_name="Parallel Computing",
+            capacity=100,
         )
-        course_id = course_resp.json()["data"]["id"]
 
-        first_resp = await async_client_info.post(
-            "/api/v1/offerings/",
-            json={
-                "course_id": course_id,
-                "term_code": "2026-FALL",
-                "class_no": "01",
-                "teacher_ids": [],
-                "capacity": 60,
-            },
+        first_offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=[],
+            capacity=60,
         )
-        assert first_resp.status_code == 200
+        assert first_offering_id > 0
 
         duplicate_resp = await async_client_info.post(
             "/api/v1/offerings/",
@@ -106,29 +100,21 @@ class TestOfferingAPI:
         assert duplicate_resp.status_code == 409
 
     async def test_put_offering_applies_full_replacement_defaults(self, async_client_info) -> None:
-        """PUT should overwrite omitted optional fields with schema defaults."""
-        course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS512",
-                course_name="Software Testing",
-            ),
+        """PUT 全量更新时，省略可选字段应回落到 schema 默认值。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS512",
+            course_name="Software Testing",
         )
-        assert course_resp.status_code == 200
-        course_id = course_resp.json()["data"]["id"]
 
-        create_resp = await async_client_info.post(
-            "/api/v1/offerings/",
-            json={
-                "course_id": course_id,
-                "term_code": "2026-FALL",
-                "class_no": "02",
-                "teacher_ids": ["t-9"],
-                "capacity": 88,
-            },
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="02",
+            teacher_ids=["t-9"],
+            capacity=88,
         )
-        assert create_resp.status_code == 200
-        offering_id = create_resp.json()["data"]["id"]
 
         put_resp = await async_client_info.put(
             f"/api/v1/offerings/{offering_id}",
@@ -139,8 +125,7 @@ class TestOfferingAPI:
             },
         )
 
-        assert put_resp.status_code == 200
-        updated = put_resp.json()["data"]
+        updated = assert_status_and_data(put_resp)
         assert updated["teacher_ids"] == ""
         assert updated["capacity"] == 0
         assert updated["status"] == "ACTIVE"
