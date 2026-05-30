@@ -14,6 +14,7 @@ from shared.exceptions import (
     AuthenticationError,
     AuthorizationError,
     BusinessRuleError,
+    ExternalServiceError,
     ResourceNotFoundError,
     ServiceCredentialInvalidError,
     TokenExpiredError,
@@ -31,6 +32,7 @@ _EXCEPTION_STATUS: dict[type[AppError], int] = {
     AuthorizationError: 403,
     ResourceNotFoundError: 404,
     BusinessRuleError: 409,
+    ExternalServiceError: 502,
     AccountLockedError: 423,
 }
 

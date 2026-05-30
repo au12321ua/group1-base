@@ -24,6 +24,13 @@ class InfoSettings(BaseSettings):
     # Auth Service (cross-service calls)
     auth_service_url: str = "http://localhost:8001"
     auth_service_timeout: int = 10  # seconds
+    teacher_role_id: int = 2
+    student_role_id: int = 1
+
+    # Course Selection Service (cross-service calls)
+    course_selection_service_url: str = "http://localhost:8003"
+    course_selection_selected_students_path: str = "/api/v1/selected-students"
+    course_selection_service_timeout: int = 10  # seconds
 
     # File upload
     upload_dir: str = "./uploads"

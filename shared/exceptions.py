@@ -40,6 +40,13 @@ class BusinessRuleError(AppError):
         super().__init__(code=code, message=message)
 
 
+class ExternalServiceError(AppError):
+    """Upstream service call failed or returned invalid data."""
+
+    def __init__(self, message: str = "External service unavailable", code: int = 5020) -> None:
+        super().__init__(code=code, message=message)
+
+
 class AccountLockedError(AppError):
     """Account locked due to repeated failed login attempts."""
 
