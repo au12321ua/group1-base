@@ -319,3 +319,54 @@ class TestScheduleAPI:
         resp = await async_client_info.get(f"/api/v1/schedules/{schedule_id}/teachers")
         assert resp.status_code == 200
         assert resp.json()["data"]["pagination"] == {"total": 0, "page": 1, "page_size": 0}
+
+    async def test_assign_teacher_rejects_path_body_mismatch(self, async_client_info) -> None:
+        """Path/body teacher_id mismatch should be rejected by API layer."""
+        classroom_id = await _create_classroom(room_no="B-205")
+
+        course_resp = await async_client_info.post(
+            "/api/v1/courses/",
+            json=make_course_payload(
+                course_code="CS825",
+                course_name="Teacher ID Validation",
+            ),
+        )
+        assert course_resp.status_code == 200
+        course_id = course_resp.json()["data"]["id"]
+
+        offering_resp = await async_client_info.post(
+            "/api/v1/offerings/",
+            json={
+                "course_id": course_id,
+                "term_code": "2026-FALL",
+                "class_no": "04",
+                "teacher_ids": [],
+                "capacity": 20,
+            },
+        )
+        assert offering_resp.status_code == 200
+        offering_id = offering_resp.json()["data"]["id"]
+
+        schedule_resp = await async_client_info.post(
+            "/api/v1/schedules/",
+            json={
+                "offering_id": offering_id,
+                "classroom_id": classroom_id,
+                "day_of_week": 2,
+                "start_period": 1,
+                "end_period": 2,
+            },
+        )
+        assert schedule_resp.status_code == 200
+        schedule_id = schedule_resp.json()["data"]["id"]
+
+        resp = await async_client_info.put(
+            f"/api/v1/schedules/{schedule_id}/teachers/t-6",
+            json={"teacher_id": "t-7", "role_type": "assistant"},
+        )
+        assert resp.status_code == 409
+
+    async def test_list_schedules_rejects_invalid_pagination(self, async_client_info) -> None:
+        """Invalid pagination query values should return 422."""
+        resp = await async_client_info.get("/api/v1/schedules/", params={"page": 0})
+        assert resp.status_code == 422
