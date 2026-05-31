@@ -3,6 +3,8 @@
 Dependencies in this module are injected into route handlers via Depends().
 """
 
+from typing import Annotated
+
 from fastapi import Depends, Header
 
 from shared.exceptions import AuthenticationError, AuthorizationError
@@ -10,7 +12,12 @@ from shared.security import IdentityContext
 
 
 def _is_missing(value: object) -> bool:
-    """True when a dependency value was not provided."""
+    """True when a header value was not provided.
+
+    When called directly (unit tests), the default FastAPI ``Header(None)``
+    is a ``Header`` object rather than ``None``.  The ``isinstance`` guard
+    catches both cases so the dependency works in tests and at runtime.
+    """
     return value is None or not isinstance(value, str)
 
 
@@ -51,7 +58,7 @@ class _PermissionChecker:
         self._code = permission_code
 
     def __call__(
-        self, current_user: IdentityContext = Depends(get_current_user)
+        self, current_user: Annotated[IdentityContext, Depends(get_current_user)],
     ) -> IdentityContext:
         if not current_user.has_permission(self._code):
             raise AuthorizationError(
@@ -67,7 +74,7 @@ def require_permission(code: str) -> _PermissionChecker:
         @router.get("/users")
         async def list_users(
             db: InfoDbSession,
-            current_user: IdentityContext = Depends(require_permission("user:read")),
+            current_user: Annotated[IdentityContext, Depends(require_permission("user:read"))],
         ):
             ...
     """

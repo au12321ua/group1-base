@@ -88,7 +88,9 @@ async def _cleanup_table(table) -> None:
 class TestDataProvisionAPI:
     """Verify the data provision endpoints used by downstream systems."""
 
-    async def test_list_teachers_and_candidate_students(self, async_client_info) -> None:
+    async def test_list_teachers_and_candidate_students(
+        self, async_client_info, auth_headers
+    ) -> None:
         """Should return paginated teachers and candidate students with snapshot metadata."""
         await _seed_user(
             user_no="T1001",
@@ -106,6 +108,7 @@ class TestDataProvisionAPI:
         teacher_resp = await async_client_info.get(
             "/api/v1/data-provision/teachers",
             params={"page": 1, "page_size": 20},
+            headers=auth_headers,
         )
         assert teacher_resp.status_code == 200
         teacher_data = teacher_resp.json()["data"]
@@ -116,6 +119,7 @@ class TestDataProvisionAPI:
         student_resp = await async_client_info.get(
             "/api/v1/data-provision/candidate-students",
             params={"page": 1, "page_size": 20},
+            headers=auth_headers,
         )
         assert student_resp.status_code == 200
         student_data = student_resp.json()["data"]
@@ -127,7 +131,7 @@ class TestDataProvisionAPI:
         await _cleanup_table(UserProfile)
         await _cleanup_table(UserInfo)
 
-    async def test_get_calendars(self, async_client_info) -> None:
+    async def test_get_calendars(self, async_client_info, auth_headers) -> None:
         """Should expose calendar snapshots with top-level snapshot metadata."""
         await _seed_calendar(
             term_code="2026-FALL",
@@ -140,7 +144,9 @@ class TestDataProvisionAPI:
             snapshot_time=datetime(2026, 12, 1, tzinfo=UTC),
         )
 
-        resp = await async_client_info.get("/api/v1/data-provision/calendars")
+        resp = await async_client_info.get(
+            "/api/v1/data-provision/calendars", headers=auth_headers
+        )
 
         assert resp.status_code == 200
         data = resp.json()["data"]
@@ -150,9 +156,11 @@ class TestDataProvisionAPI:
 
         await _cleanup_table(AcademicCalendar)
 
-    async def test_get_calendars_empty(self, async_client_info) -> None:
+    async def test_get_calendars_empty(self, async_client_info, auth_headers) -> None:
         """Should return empty items with fallback snapshot and pagination."""
-        resp = await async_client_info.get("/api/v1/data-provision/calendars")
+        resp = await async_client_info.get(
+            "/api/v1/data-provision/calendars", headers=auth_headers
+        )
 
         assert resp.status_code == 200
         data = resp.json()["data"]
@@ -161,7 +169,9 @@ class TestDataProvisionAPI:
         assert data["version"] == "1.0"
         assert data["snapshot_time"]  # should be a fallback datetime
 
-    async def test_list_training_programs_supports_filters(self, async_client_info) -> None:
+    async def test_list_training_programs_supports_filters(
+        self, async_client_info, auth_headers
+    ) -> None:
         """Should return normalized training program snapshots and filter by query params."""
         await _seed_training_program(
             program_code="CS-2026-V1",
@@ -189,6 +199,7 @@ class TestDataProvisionAPI:
                 "grade": "2026",
                 "version": "1.0",
             },
+            headers=auth_headers,
         )
 
         assert resp.status_code == 200
@@ -204,6 +215,7 @@ class TestDataProvisionAPI:
     async def test_query_selected_students_proxies_normalized_payload(
         self,
         async_client_info,
+        auth_headers,
     ) -> None:
         """Should return the normalized selected student payload from the proxy service."""
         with patch.object(
@@ -221,6 +233,7 @@ class TestDataProvisionAPI:
             resp = await async_client_info.get(
                 "/api/v1/data-provision/selected-students",
                 params={"course_id": 1001, "term_code": "2026-FALL", "page_size": 20},
+                headers=auth_headers,
             )
 
         assert resp.status_code == 200

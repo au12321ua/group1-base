@@ -4,9 +4,6 @@ Info Service trusts Gateway-transmitted identity headers and does NOT perform
 local JWT verification. This module provides permission-checking helpers.
 """
 
-import warnings
-
-
 def parse_permissions_header(x_user_permissions: str | None) -> list[str]:
     """Parse comma-separated permissions from X-User-Permissions header."""
     if not x_user_permissions:
@@ -27,7 +24,6 @@ def check_resource_access(
     - TEACHER: can access if resource_teacher_ids contains current user
     - All: can access own resources
     """
-    warnings.warn("TODO: implement check_resource_access — resource-level permission logic")
     admin_roles = {"SYS_ADMIN", "ACADEMIC_ADMIN"}
     if current_role in admin_roles:
         return True

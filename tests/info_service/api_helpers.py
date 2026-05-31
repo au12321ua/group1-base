@@ -5,7 +5,14 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.main import info_engine
 from info_service.models.classroom import Classroom
-from tests.utils import make_course_payload
+from tests.utils import build_identity_headers, make_course_payload
+
+
+def _default_auth_headers(resource: str) -> dict[str, str]:
+    """Build auth headers with standard CRUD permissions for a resource."""
+    return build_identity_headers(
+        permissions=[f"{resource}:{action}" for action in ("read", "create", "update", "delete")]
+    )
 
 
 def assert_status_and_data(response: Response, expected_status: int = 200) -> dict:
@@ -21,8 +28,11 @@ async def create_course(
     course_name: str,
     credit: int = 3,
     capacity: int = 80,
+    auth_headers: dict[str, str] | None = None,
 ) -> int:
     """创建课程并返回 course_id。"""
+    if auth_headers is None:
+        auth_headers = _default_auth_headers("course")
     response = await async_client_info.post(
         "/api/v1/courses/",
         json=make_course_payload(
@@ -31,6 +41,7 @@ async def create_course(
             credit=credit,
             capacity=capacity,
         ),
+        headers=auth_headers,
     )
     return assert_status_and_data(response)["id"]
 
@@ -43,8 +54,11 @@ async def create_offering(
     class_no: str,
     teacher_ids: list[str] | None = None,
     capacity: int = 60,
+    auth_headers: dict[str, str] | None = None,
 ) -> int:
     """创建开课记录并返回 offering_id。"""
+    if auth_headers is None:
+        auth_headers = _default_auth_headers("offering")
     response = await async_client_info.post(
         "/api/v1/offerings/",
         json={
@@ -54,6 +68,7 @@ async def create_offering(
             "teacher_ids": teacher_ids or [],
             "capacity": capacity,
         },
+        headers=auth_headers,
     )
     return assert_status_and_data(response)["id"]
 
@@ -67,8 +82,11 @@ async def create_schedule(
     start_period: int,
     end_period: int,
     week_range: str = "1-16",
+    auth_headers: dict[str, str] | None = None,
 ) -> int:
     """创建排课记录并返回 schedule_id。"""
+    if auth_headers is None:
+        auth_headers = _default_auth_headers("schedule")
     response = await async_client_info.post(
         "/api/v1/schedules/",
         json={
@@ -79,6 +97,7 @@ async def create_schedule(
             "end_period": end_period,
             "week_range": week_range,
         },
+        headers=auth_headers,
     )
     return assert_status_and_data(response)["id"]
 

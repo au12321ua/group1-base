@@ -1,5 +1,7 @@
 """Info Service — /files/* endpoints."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import StreamingResponse
 
@@ -18,7 +20,7 @@ router = APIRouter(tags=["files"])
 @router.post("/", status_code=201, response_model=APIResponse[FileUploadResponse])
 async def upload_file(
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
     file: UploadFile = File(...),
 ) -> APIResponse[FileUploadResponse]:
     """Upload a file (requires authentication, any role)."""
@@ -41,7 +43,7 @@ async def upload_file(
 async def get_file_metadata(
     file_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
 ) -> APIResponse[FileResponse]:
     """Get file metadata (requires authentication)."""
     resource = await file_resource_crud.get(db, file_id)
@@ -64,7 +66,7 @@ async def get_file_metadata(
 async def download_file(
     file_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
 ):
     """Download file content (requires authentication)."""
     content, mime_type = await file_storage_service.get_file(db, file_id)
@@ -81,7 +83,7 @@ async def download_file(
 async def delete_file(
     file_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(get_current_user),
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
 ) -> APIResponse[None]:
     """Delete a file (owner or admin only)."""
     await file_storage_service.delete_file(

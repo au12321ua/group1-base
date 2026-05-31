@@ -1,5 +1,7 @@
 """Info Service — /audit-logs/* endpoints."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession
@@ -15,7 +17,7 @@ router = APIRouter(tags=["audit-logs"])
 @router.get("/", response_model=APIResponse[PaginatedData[AuditLogResponse]])
 async def search_audit_logs(
     db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("audit:read")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("audit:read"))],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     operator_user_id: str | None = Query(default=None),
@@ -48,7 +50,7 @@ async def search_audit_logs(
 @router.get("/export", response_model=APIResponse[str])
 async def export_audit_logs(
     db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("audit:read")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("audit:read"))],
     operator_user_id: str | None = Query(default=None),
     target_type: str | None = Query(default=None),
     action: str | None = Query(default=None),

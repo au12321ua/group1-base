@@ -1,5 +1,7 @@
 """Info Service — /base-info/* endpoints."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
@@ -20,7 +22,7 @@ router = APIRouter(tags=["base-info"])
 @router.get("/", response_model=APIResponse[PaginatedData[BaseInfoResponse]])
 async def list_base_info(
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("base-info:read")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("base-info:read"))],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     category: str | None = Query(default=None),
@@ -41,7 +43,7 @@ async def list_base_info(
 async def create_base_info(
     request: BaseInfoCreateRequest,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("base-info:create")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("base-info:create"))],
 ) -> APIResponse[BaseInfoResponse]:
     """Create a base info entry."""
     item = await course_management_service.create_base_info(db, request)
@@ -52,7 +54,7 @@ async def create_base_info(
 async def get_base_info(
     item_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("base-info:read")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("base-info:read"))],
 ) -> APIResponse[BaseInfoResponse]:
     """Get base info detail."""
     item = await course_management_service.get_base_info(db, item_id)
@@ -64,7 +66,7 @@ async def update_base_info(
     item_id: int,
     request: BaseInfoUpdateRequest,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("base-info:update")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("base-info:update"))],
 ) -> APIResponse[BaseInfoResponse]:
     """Full update base info."""
     item = await course_management_service.update_base_info(db, item_id, request)
@@ -76,7 +78,7 @@ async def patch_base_info(
     item_id: int,
     request: BaseInfoPatchRequest,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("base-info:update")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("base-info:update"))],
 ) -> APIResponse[BaseInfoResponse]:
     """Partial update base info."""
     item = await course_management_service.patch_base_info(db, item_id, request)
@@ -87,7 +89,7 @@ async def patch_base_info(
 async def delete_base_info(
     item_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("base-info:delete")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("base-info:delete"))],
 ) -> APIResponse[None]:
     """Delete base info entry."""
     await course_management_service.delete_base_info(db, item_id)

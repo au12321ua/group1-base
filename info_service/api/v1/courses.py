@@ -1,8 +1,11 @@
 """Info Service — /courses/* endpoints."""
 
-from fastapi import APIRouter, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
+from info_service.deps import require_permission
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
     CoursePatchRequest,
@@ -17,6 +20,7 @@ from shared.response import (
     PaginationMeta,
     SingleResponse,
 )
+from shared.security import IdentityContext
 
 router = APIRouter(tags=["courses"])
 
@@ -24,6 +28,7 @@ router = APIRouter(tags=["courses"])
 @router.get("/", response_model=ListResponse[CourseResponse])
 async def list_courses(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:read"))],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     keyword: str | None = Query(default=None),
@@ -49,6 +54,7 @@ async def list_courses(
 @router.post("/", response_model=SingleResponse[CourseResponse])
 async def create_course(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:create"))],
     request: CourseCreateRequest,
 ) -> SingleResponse[CourseResponse]:
     """Create a new course."""
@@ -59,6 +65,7 @@ async def create_course(
 @router.get("/{course_id}", response_model=SingleResponse[CourseResponse])
 async def get_course(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:read"))],
     course_id: int,
 ) -> SingleResponse[CourseResponse]:
     """Get course detail."""
@@ -69,6 +76,7 @@ async def get_course(
 @router.put("/{course_id}", response_model=SingleResponse[CourseResponse])
 async def update_course(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
     course_id: int,
     request: CourseUpdateRequest,
 ) -> SingleResponse[CourseResponse]:
@@ -80,6 +88,7 @@ async def update_course(
 @router.patch("/{course_id}", response_model=SingleResponse[CourseResponse])
 async def patch_course(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
     course_id: int,
     request: CoursePatchRequest,
 ) -> SingleResponse[CourseResponse]:
@@ -91,6 +100,7 @@ async def patch_course(
 @router.delete("/{course_id}", response_model=APIResponse[None])
 async def delete_course(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:delete"))],
     course_id: int,
 ) -> APIResponse[None]:
     """Delete course."""
