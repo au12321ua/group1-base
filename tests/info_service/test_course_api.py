@@ -1,6 +1,8 @@
-"""Integration tests for Course API contract."""
+"""课程 API 集成测试。"""
 
 import pytest
+
+from tests.info_service.api_helpers import create_course
 
 
 @pytest.mark.integration
@@ -28,17 +30,11 @@ class TestCourseAPI:
         self, async_client_info
     ) -> None:
         """逻辑删除后，原 course_code 仍然不可复用。"""
-        create_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json={
-                "course_code": "CS200",
-                "course_name": "Reusable Code Check",
-                "credit": 3,
-                "capacity": 80,
-            },
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS200",
+            course_name="Reusable Code Check",
         )
-        assert create_resp.status_code == 200
-        course_id = create_resp.json()["data"]["id"]
 
         delete_resp = await async_client_info.delete(f"/api/v1/courses/{course_id}")
         assert delete_resp.status_code == 200
@@ -52,5 +48,4 @@ class TestCourseAPI:
                 "capacity": 60,
             },
         )
-
         assert recreate_resp.status_code == 409

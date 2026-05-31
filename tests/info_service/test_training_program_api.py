@@ -1,26 +1,22 @@
-"""Integration tests for training program API behavior."""
+"""培养方案 API 集成测试。"""
 
 import pytest
 
-from tests.utils import make_course_payload
+from tests.info_service.api_helpers import assert_status_and_data, create_course
 
 
 @pytest.mark.integration
 class TestTrainingProgramAPI:
-    """Verify the /api/v1/training-programs CRUD flow."""
+    """验证 /api/v1/training-programs 的 CRUD 及数据校验行为。"""
 
     async def test_training_program_crud_flow(self, async_client_info) -> None:
-        """Should create, query, update, and delete a training program."""
-        course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS610",
-                course_name="Machine Learning Systems",
-                credit=4,
-            ),
+        """应支持创建、查询、更新和删除培养方案。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS610",
+            course_name="Machine Learning Systems",
+            credit=4,
         )
-        assert course_resp.status_code == 200
-        course_id = course_resp.json()["data"]["id"]
 
         create_resp = await async_client_info.post(
             "/api/v1/training-programs/",
@@ -33,8 +29,7 @@ class TestTrainingProgramAPI:
             },
         )
 
-        assert create_resp.status_code == 200
-        created = create_resp.json()["data"]
+        created = assert_status_and_data(create_resp)
         assert created["program_code"] == "CS-AI-2026"
         assert created["required_course_ids"] == str(course_id)
         program_id = created["id"]
@@ -73,7 +68,7 @@ class TestTrainingProgramAPI:
         assert missing_resp.status_code == 404
 
     async def test_create_training_program_rejects_unknown_course(self, async_client_info) -> None:
-        """Should reject snapshots referencing non-existent courses."""
+        """required_course_ids 包含不存在课程时应返回 404。"""
         resp = await async_client_info.post(
             "/api/v1/training-programs/",
             json={
