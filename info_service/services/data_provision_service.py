@@ -246,6 +246,49 @@ class DataProvisionService:
         ]
         return items, total
 
+    async def get_training_program_snapshot_time(
+        self,
+        db: AsyncSession,
+        major_code: str | None = None,
+        grade: str | None = None,
+        version: str | None = None,
+    ) -> datetime:
+        """Return the latest snapshot_time across ALL matching records, not just current page."""
+        conditions = []
+        if major_code:
+            conditions.append(TrainingProgram.major_code == major_code)
+        if grade:
+            conditions.append(TrainingProgram.grade == grade)
+        if version:
+            conditions.append(TrainingProgram.version == version)
+        max_ts = (
+            await db.exec(
+                select(func.max(TrainingProgram.snapshot_time)).where(*conditions)
+            )
+        ).one()
+        return self._ensure_utc(max_ts) if max_ts else datetime.now(UTC)
+
+    async def resolve_training_program_version(
+        self,
+        db: AsyncSession,
+        requested_version: str | None = None,
+        major_code: str | None = None,
+        grade: str | None = None,
+    ) -> str:
+        """Infer version string from matching records (or return 'multiple'/'1.0')."""
+        if requested_version:
+            return requested_version
+        conditions = []
+        if major_code:
+            conditions.append(TrainingProgram.major_code == major_code)
+        if grade:
+            conditions.append(TrainingProgram.grade == grade)
+        stmt = select(TrainingProgram.version).where(*conditions).distinct()
+        versions = list((await db.exec(stmt)).all())
+        if len(versions) == 1:
+            return versions[0]
+        return "multiple" if versions else "1.0"
+
     async def query_selected_students(self, db: AsyncSession, **filters) -> dict:
         """Proxy to C system for selected students query. Not stored locally."""
         del db

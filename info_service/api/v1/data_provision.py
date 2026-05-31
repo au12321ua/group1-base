@@ -20,19 +20,6 @@ def _pagination(total: int, page: int, page_size: int) -> dict[str, int]:
     }
 
 
-def _resolve_version(items: list[dict], requested_version: str | None = None) -> str:
-    if requested_version:
-        return requested_version
-    versions = {
-        item.get("version")
-        for item in items
-        if isinstance(item, dict) and item.get("version")
-    }
-    if len(versions) == 1:
-        return versions.pop()
-    return "multiple" if versions else "1.0"
-
-
 @router.get("/teachers", response_model=APIResponse[DataProvisionWrapper])
 async def list_teachers(
     db: InfoDbSession,
@@ -110,16 +97,24 @@ async def list_training_programs(
         version=version,
     )
     serialized_items = [item.model_dump() for item in items]
-    snapshot_time = max(
-        (item.snapshot_time for item in items),
-        default=datetime.now(UTC),
+    snapshot_time = await data_provision_service.get_training_program_snapshot_time(
+        db,
+        major_code=major_code,
+        grade=grade,
+        version=version,
+    )
+    resolved_version = await data_provision_service.resolve_training_program_version(
+        db,
+        requested_version=version,
+        major_code=major_code,
+        grade=grade,
     )
     return APIResponse(
         data=DataProvisionWrapper(
             items=serialized_items,
             pagination=_pagination(total=total, page=page, page_size=page_size),
             snapshot_time=snapshot_time,
-            version=_resolve_version(serialized_items, version),
+            version=resolved_version,
         )
     )
 
