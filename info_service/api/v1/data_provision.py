@@ -62,7 +62,11 @@ async def list_candidate_students(
 
 @router.get("/calendars", response_model=APIResponse[DataProvisionWrapper])
 async def get_calendars(db: InfoDbSession) -> APIResponse[DataProvisionWrapper]:
-    """Get academic calendars (for B 排课 system, Service Token auth)."""
+    """Get academic calendars (for B 排课 system, Service Token auth).
+
+    Returns all calendars without pagination — the dataset is tiny
+    (one record per academic term, typically < 10 rows).
+    """
     items = await data_provision_service.get_calendars(db)
     serialized_items = [item.model_dump() for item in items]
     snapshot_time = max(

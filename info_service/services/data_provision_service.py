@@ -30,6 +30,11 @@ class DataProvisionService:
         self._settings = get_info_settings()
 
     def _role_token_filter(self, role_id: int):
+        """Build a SQL filter matching a role_id inside a comma-separated role_ids column.
+
+        Uses four LIKE patterns to cover all positions (sole, first, middle, last)
+        while avoiding false matches on multi-digit IDs (e.g. role_id=1 won't match "11").
+        """
         token = str(role_id)
         return or_(
             UserInfo.role_ids == token,
@@ -72,6 +77,11 @@ class DataProvisionService:
 
     @staticmethod
     def _ensure_utc(value: datetime | str) -> datetime:
+        """Normalize a datetime value to UTC, handling ISO-8601 strings.
+
+        The Z → +00:00 replacement is defensive — Python 3.11+ fromisoformat
+        supports 'Z' natively, but older consumers may still emit it.
+        """
         if isinstance(value, str):
             value = datetime.fromisoformat(value.replace("Z", "+00:00"))
         return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
@@ -289,10 +299,8 @@ class DataProvisionService:
             return versions[0]
         return "multiple" if versions else "1.0"
 
-    async def query_selected_students(self, db: AsyncSession, **filters) -> dict:
+    async def query_selected_students(self, _db: AsyncSession, **filters) -> dict:
         """Proxy to C system for selected students query. Not stored locally."""
-        del db
-
         params = {
             key: value
             for key, value in filters.items()
