@@ -1,8 +1,11 @@
 """Info Service — /schedules/* endpoints (including teacher sub-resource)."""
 
-from fastapi import APIRouter, Body, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Depends, Query
 
 from info_service.api.deps import InfoDbSession
+from info_service.deps import require_permission
 from info_service.schemas.schedule_schema import (
     ScheduleCreateRequest,
     SchedulePatchRequest,
@@ -19,6 +22,7 @@ from shared.response import (
     PaginationMeta,
     SingleResponse,
 )
+from shared.security import IdentityContext
 
 router = APIRouter(tags=["schedules"])
 
@@ -39,6 +43,7 @@ def _teacher_assignment_list_response(items) -> ListResponse[TeacherAssignmentRe
 @router.get("/", response_model=ListResponse[ScheduleResponse])
 async def list_schedules(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:read"))],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     offering_id: int | None = Query(default=None),
@@ -62,6 +67,7 @@ async def list_schedules(
 @router.post("/", response_model=SingleResponse[ScheduleResponse])
 async def create_schedule(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:create"))],
     request: ScheduleCreateRequest,
 ) -> SingleResponse[ScheduleResponse]:
     """Create a schedule entry (with conflict check)."""
@@ -72,6 +78,7 @@ async def create_schedule(
 @router.get("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
 async def get_schedule(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:read"))],
     schedule_id: int,
 ) -> SingleResponse[ScheduleResponse]:
     """Get schedule detail."""
@@ -82,6 +89,7 @@ async def get_schedule(
 @router.put("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
 async def update_schedule(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     request: ScheduleUpdateRequest,
 ) -> SingleResponse[ScheduleResponse]:
@@ -93,6 +101,7 @@ async def update_schedule(
 @router.patch("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
 async def patch_schedule(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     request: SchedulePatchRequest,
 ) -> SingleResponse[ScheduleResponse]:
@@ -104,6 +113,7 @@ async def patch_schedule(
 @router.delete("/{schedule_id}", response_model=APIResponse[None])
 async def delete_schedule(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:delete"))],
     schedule_id: int,
 ) -> APIResponse[None]:
     """Delete schedule."""
@@ -117,6 +127,7 @@ async def delete_schedule(
 @router.get("/{schedule_id}/teachers", response_model=ListResponse[TeacherAssignmentResponse])
 async def list_teachers(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:read"))],
     schedule_id: int,
 ) -> ListResponse[TeacherAssignmentResponse]:
     """List teachers assigned to a schedule."""
@@ -127,6 +138,7 @@ async def list_teachers(
 @router.put("/{schedule_id}/teachers", response_model=ListResponse[TeacherAssignmentResponse])
 async def replace_teachers(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     teacher_ids: list[str] = Body(...),
 ) -> ListResponse[TeacherAssignmentResponse]:
@@ -138,6 +150,7 @@ async def replace_teachers(
 @router.post("/{schedule_id}/teachers", response_model=ListResponse[TeacherAssignmentResponse])
 async def add_teachers(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     teacher_ids: list[str] = Body(...),
 ) -> ListResponse[TeacherAssignmentResponse]:
@@ -152,6 +165,7 @@ async def add_teachers(
 )
 async def assign_teacher(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     teacher_id: str,
     request: TeacherAssignmentCreateRequest,
@@ -174,6 +188,7 @@ async def assign_teacher(
 @router.delete("/{schedule_id}/teachers/{teacher_id}", response_model=APIResponse[None])
 async def remove_teacher(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("schedule:delete"))],
     schedule_id: int,
     teacher_id: str,
 ) -> APIResponse[None]:

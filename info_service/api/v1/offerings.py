@@ -1,8 +1,11 @@
 """Info Service — /offerings/* endpoints."""
 
-from fastapi import APIRouter, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
+from info_service.deps import require_permission
 from info_service.schemas.offering_schema import (
     OfferingCreateRequest,
     OfferingPatchRequest,
@@ -17,6 +20,7 @@ from shared.response import (
     PaginationMeta,
     SingleResponse,
 )
+from shared.security import IdentityContext
 
 router = APIRouter(tags=["offerings"])
 
@@ -24,6 +28,7 @@ router = APIRouter(tags=["offerings"])
 @router.get("/", response_model=ListResponse[OfferingResponse])
 async def list_offerings(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("offering:read"))],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     course_id: int | None = Query(default=None),
@@ -51,6 +56,7 @@ async def list_offerings(
 @router.post("/", response_model=SingleResponse[OfferingResponse])
 async def create_offering(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("offering:create"))],
     request: OfferingCreateRequest,
 ) -> SingleResponse[OfferingResponse]:
     """Create a new offering."""
@@ -61,6 +67,7 @@ async def create_offering(
 @router.get("/{offering_id}", response_model=SingleResponse[OfferingResponse])
 async def get_offering(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("offering:read"))],
     offering_id: int,
 ) -> SingleResponse[OfferingResponse]:
     """Get offering detail."""
@@ -71,6 +78,7 @@ async def get_offering(
 @router.put("/{offering_id}", response_model=SingleResponse[OfferingResponse])
 async def update_offering(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("offering:update"))],
     offering_id: int,
     request: OfferingUpdateRequest,
 ) -> SingleResponse[OfferingResponse]:
@@ -82,6 +90,7 @@ async def update_offering(
 @router.patch("/{offering_id}", response_model=SingleResponse[OfferingResponse])
 async def patch_offering(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("offering:update"))],
     offering_id: int,
     request: OfferingPatchRequest,
 ) -> SingleResponse[OfferingResponse]:
@@ -93,6 +102,7 @@ async def patch_offering(
 @router.delete("/{offering_id}", response_model=APIResponse[None])
 async def delete_offering(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("offering:delete"))],
     offering_id: int,
 ) -> APIResponse[None]:
     """Delete offering."""
