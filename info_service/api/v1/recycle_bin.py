@@ -1,5 +1,7 @@
 """Info Service — /recycle-bin/* endpoints."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
@@ -19,7 +21,7 @@ router = APIRouter(tags=["recycle-bin"])
 @router.get("/", response_model=APIResponse[PaginatedData[RecycleBinItemResponse]])
 async def list_deleted_users(
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("recycle:read")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("recycle:read"))],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     keyword: str | None = Query(default=None),
@@ -41,7 +43,7 @@ async def restore_user(
     user_id: int,
     db: InfoDbSession,
     audit_db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("recycle:restore")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("recycle:restore"))],
 ) -> APIResponse[None]:
     """Restore a user from recycle bin (cross-service enable Auth account)."""
     await recycle_bin_service.restore_user(db, user_id)
@@ -63,7 +65,7 @@ async def physical_delete_user(
     user_id: int,
     db: InfoDbSession,
     audit_db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("recycle:delete")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("recycle:delete"))],
 ) -> APIResponse[None]:
     """Permanently delete user (requires confirmation)."""
     await recycle_bin_service.physical_delete_user(db, user_id)
@@ -85,7 +87,7 @@ async def batch_physical_delete(
     request: BatchDeleteRequest,
     db: InfoDbSession,
     audit_db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("recycle:delete")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("recycle:delete"))],
 ) -> APIResponse[None]:
     """Batch permanent delete users."""
     await recycle_bin_service.batch_physical_delete(db, request.user_ids)

@@ -1,5 +1,7 @@
 """Info Service — /users/* endpoints."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, File, UploadFile
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
@@ -23,8 +25,8 @@ router = APIRouter(tags=["users"])
 @router.get("/", response_model=APIResponse[PaginatedData[UserResponse]])
 async def list_users(
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("user:read")),
-    query: UserListQuery = Depends(),
+    current_user: Annotated[IdentityContext, Depends(require_permission("user:read"))],
+    query: Annotated[UserListQuery, Depends()],
 ) -> APIResponse[PaginatedData[UserResponse]]:
     """Get paginated user list with filters."""
     items, total = await user_management_service.list_users(
@@ -52,7 +54,7 @@ async def create_user(
     request: UserCreateRequest,
     db: InfoDbSession,
     audit_db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("user:create")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("user:create"))],
 ) -> APIResponse[UserResponse]:
     """Create a new user (cross-service sync with Auth Service)."""
     user = await user_management_service.create_user(db, request, current_user)
@@ -74,7 +76,7 @@ async def create_user(
 async def get_user(
     user_id: int,
     db: InfoDbSession,
-    current_user: IdentityContext = Depends(require_permission("user:read")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("user:read"))],
 ) -> APIResponse[UserResponse]:
     """Get user detail with profile."""
     user = await user_management_service.get_user(db, user_id)
@@ -87,7 +89,7 @@ async def update_user(
     request: UserUpdateRequest,
     db: InfoDbSession,
     audit_db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("user:update")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("user:update"))],
 ) -> APIResponse[UserResponse]:
     """Full update user."""
     # Check if role changed
@@ -117,7 +119,7 @@ async def patch_user(
     request: UserPatchRequest,
     db: InfoDbSession,
     audit_db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("user:update")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("user:update"))],
 ) -> APIResponse[UserResponse]:
     """Partial update user (may trigger role sync with Auth)."""
     old_user = await user_management_service.get_user(db, user_id)
@@ -145,7 +147,7 @@ async def delete_user(
     user_id: int,
     db: InfoDbSession,
     audit_db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("user:delete")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("user:delete"))],
 ) -> APIResponse[None]:
     """Logical delete user → recycle bin."""
     await user_management_service.logical_delete_user(db, user_id, current_user)
@@ -166,7 +168,7 @@ async def delete_user(
 async def batch_import_users(
     db: InfoDbSession,
     audit_db: AuditDbSession,
-    current_user: IdentityContext = Depends(require_permission("user:create")),
+    current_user: Annotated[IdentityContext, Depends(require_permission("user:create"))],
     file: UploadFile = File(...),
 ) -> APIResponse[UserImportResult]:
     """CSV batch import users."""

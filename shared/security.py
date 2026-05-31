@@ -50,7 +50,7 @@ def require_permission(permission_code: str) -> Callable:
 
     Usage:
         @router.get("/users")
-        async def list_users(perms: list[str] = Depends(require_permission("user:read"))):
+        async def list_users(perms: Annotated[list[str], Depends(require_permission("user:read"))]):
             ...
     """
 

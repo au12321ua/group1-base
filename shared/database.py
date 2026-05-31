@@ -26,7 +26,7 @@ def create_get_db(engine: AsyncEngine) -> Callable[[], AsyncGenerator[AsyncSessi
         get_auth_db = create_get_db(engine_auth)
 
         @router.get("/users")
-        async def list_users(db: AsyncSession = Depends(get_auth_db)):
+        async def list_users(db: Annotated[AsyncSession, Depends(get_auth_db)]):
             ...
     """
 
