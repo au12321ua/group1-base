@@ -5,8 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
-from info_service.core.security import check_resource_access
-from info_service.deps import require_permission
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.training_program_schema import (
     TrainingProgramCreateRequest,
     TrainingProgramPatchRequest,
@@ -14,7 +13,6 @@ from info_service.schemas.training_program_schema import (
     TrainingProgramUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
-from shared.exceptions import AuthorizationError
 from shared.response import (
     APIResponse,
     ListResponse,
@@ -103,10 +101,9 @@ async def update_training_program(
     current_user: Annotated[IdentityContext, Depends(require_permission("training:update"))],
     program_id: int,
     request: TrainingProgramUpdateRequest,
+    _admin: None = Depends(require_admin),
 ) -> SingleResponse[TrainingProgramResponse]:
     """Full update training program (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can modify training programs")
     program = await course_management_service.update_training_program(db, program_id, request)
     return SingleResponse(data=TrainingProgramResponse.model_validate(program))
 
@@ -117,10 +114,9 @@ async def patch_training_program(
     current_user: Annotated[IdentityContext, Depends(require_permission("training:update"))],
     program_id: int,
     request: TrainingProgramPatchRequest,
+    _admin: None = Depends(require_admin),
 ) -> SingleResponse[TrainingProgramResponse]:
     """Partial update training program (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can modify training programs")
     program = await course_management_service.update_training_program(db, program_id, request)
     return SingleResponse(data=TrainingProgramResponse.model_validate(program))
 
@@ -130,9 +126,8 @@ async def delete_training_program(
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("training:delete"))],
     program_id: int,
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Delete training program (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can delete training programs")
     await course_management_service.delete_training_program(db, program_id)
     return APIResponse(data=None)

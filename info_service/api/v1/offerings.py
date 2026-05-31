@@ -13,6 +13,7 @@ from info_service.schemas.offering_schema import (
     OfferingResponse,
     OfferingUpdateRequest,
 )
+from info_service.models.course_offering import CourseOffering
 from info_service.services.course_management_service import course_management_service
 from shared.exceptions import AuthorizationError
 from shared.response import (
@@ -25,6 +26,22 @@ from shared.response import (
 from shared.security import IdentityContext
 
 router = APIRouter(tags=["offerings"])
+
+
+async def _check_offering_access(
+    current_user: IdentityContext, db, offering_id: int,
+) -> CourseOffering:
+    """Verify the current user can modify the offering, returning it for reuse."""
+    offering = await course_management_service.get_offering(db, offering_id)
+    teacher_ids = [t for t in offering.teacher_ids.split(",") if t]
+    if not check_resource_access(
+        current_user.user_id, current_user.role,
+        resource_teacher_ids=teacher_ids,
+    ):
+        raise AuthorizationError(
+            "Access denied: only assigned teachers or administrators can modify this offering"
+        )
+    return offering
 
 
 @router.get("/", response_model=ListResponse[OfferingResponse])
@@ -85,15 +102,7 @@ async def update_offering(
     request: OfferingUpdateRequest,
 ) -> SingleResponse[OfferingResponse]:
     """Full update offering (assigned teachers or admin only)."""
-    offering = await course_management_service.get_offering(db, offering_id)
-    teacher_ids = [t for t in offering.teacher_ids.split(",") if t]
-    if not check_resource_access(
-        current_user.user_id, current_user.role,
-        resource_teacher_ids=teacher_ids,
-    ):
-        raise AuthorizationError(
-            "Access denied: only assigned teachers or administrators can modify this offering"
-        )
+    await _check_offering_access(current_user, db, offering_id)
     offering = await course_management_service.update_offering(db, offering_id, request)
     return SingleResponse(data=OfferingResponse.model_validate(offering))
 
@@ -106,15 +115,7 @@ async def patch_offering(
     request: OfferingPatchRequest,
 ) -> SingleResponse[OfferingResponse]:
     """Partial update offering (assigned teachers or admin only)."""
-    offering = await course_management_service.get_offering(db, offering_id)
-    teacher_ids = [t for t in offering.teacher_ids.split(",") if t]
-    if not check_resource_access(
-        current_user.user_id, current_user.role,
-        resource_teacher_ids=teacher_ids,
-    ):
-        raise AuthorizationError(
-            "Access denied: only assigned teachers or administrators can modify this offering"
-        )
+    await _check_offering_access(current_user, db, offering_id)
     offering = await course_management_service.update_offering(db, offering_id, request)
     return SingleResponse(data=OfferingResponse.model_validate(offering))
 
@@ -126,14 +127,6 @@ async def delete_offering(
     offering_id: int,
 ) -> APIResponse[None]:
     """Delete offering (assigned teachers or admin only)."""
-    offering = await course_management_service.get_offering(db, offering_id)
-    teacher_ids = [t for t in offering.teacher_ids.split(",") if t]
-    if not check_resource_access(
-        current_user.user_id, current_user.role,
-        resource_teacher_ids=teacher_ids,
-    ):
-        raise AuthorizationError(
-            "Access denied: only assigned teachers or administrators can delete this offering"
-        )
+    await _check_offering_access(current_user, db, offering_id)
     await course_management_service.delete_offering(db, offering_id)
     return APIResponse(data=None)

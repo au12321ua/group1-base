@@ -79,3 +79,26 @@ def require_permission(code: str) -> _PermissionChecker:
             ...
     """
     return _PermissionChecker(code)
+
+
+async def require_admin(
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
+) -> None:
+    """Dependency: require admin role (SYS_ADMIN or ACADEMIC_ADMIN).
+
+    Raises ``AuthorizationError`` if the current user is not an administrator.
+    Use as a guard dependency on endpoints that should be admin-only::
+
+        async def delete_course(
+            ...,
+            current_user: Annotated[IdentityContext, Depends(require_permission("course:delete"))],
+            _admin: None = Depends(require_admin),
+        ):
+            ...
+    """
+    from info_service.core.security import check_resource_access
+
+    if not check_resource_access(current_user.user_id, current_user.role):
+        raise AuthorizationError(
+            "Access denied: only administrators can perform this action"
+        )

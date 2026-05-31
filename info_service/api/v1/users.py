@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.security import check_resource_access
-from info_service.deps import require_permission
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.user_schema import (
     UserCreateRequest,
     UserImportResult,
@@ -165,10 +165,9 @@ async def delete_user(
     db: InfoDbSession,
     audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("user:delete"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Logical delete user → recycle bin (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can delete users")
     await user_management_service.logical_delete_user(db, user_id, current_user)
     await audit_service.write_audit_log(
         audit_db,

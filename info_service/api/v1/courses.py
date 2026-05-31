@@ -5,8 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
-from info_service.core.security import check_resource_access
-from info_service.deps import require_permission
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
     CoursePatchRequest,
@@ -14,7 +13,6 @@ from info_service.schemas.course_schema import (
     CourseUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
-from shared.exceptions import AuthorizationError
 from shared.response import (
     APIResponse,
     ListResponse,
@@ -81,10 +79,9 @@ async def update_course(
     current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
     course_id: int,
     request: CourseUpdateRequest,
+    _admin: None = Depends(require_admin),
 ) -> SingleResponse[CourseResponse]:
     """Full update course (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can modify courses")
     course = await course_management_service.update_course(db, course_id, request)
     return SingleResponse(data=CourseResponse.model_validate(course))
 
@@ -95,10 +92,9 @@ async def patch_course(
     current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
     course_id: int,
     request: CoursePatchRequest,
+    _admin: None = Depends(require_admin),
 ) -> SingleResponse[CourseResponse]:
     """Partial update course (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can modify courses")
     course = await course_management_service.update_course(db, course_id, request)
     return SingleResponse(data=CourseResponse.model_validate(course))
 
@@ -108,9 +104,8 @@ async def delete_course(
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("course:delete"))],
     course_id: int,
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Delete course (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can delete courses")
     await course_management_service.delete_course(db, course_id)
     return APIResponse(data=None)

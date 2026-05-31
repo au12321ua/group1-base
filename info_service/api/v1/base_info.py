@@ -5,8 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
-from info_service.core.security import check_resource_access
-from info_service.deps import require_permission
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.base_info_schema import (
     BaseInfoCreateRequest,
     BaseInfoPatchRequest,
@@ -14,7 +13,6 @@ from info_service.schemas.base_info_schema import (
     BaseInfoUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
-from shared.exceptions import AuthorizationError
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
 
@@ -69,10 +67,9 @@ async def update_base_info(
     request: BaseInfoUpdateRequest,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:update"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[BaseInfoResponse]:
     """Full update base info (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can modify base info")
     item = await course_management_service.update_base_info(db, item_id, request)
     return APIResponse(data=BaseInfoResponse.model_validate(item))
 
@@ -83,10 +80,9 @@ async def patch_base_info(
     request: BaseInfoPatchRequest,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:update"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[BaseInfoResponse]:
     """Partial update base info (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can modify base info")
     item = await course_management_service.patch_base_info(db, item_id, request)
     return APIResponse(data=BaseInfoResponse.model_validate(item))
 
@@ -96,9 +92,8 @@ async def delete_base_info(
     item_id: int,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:delete"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Delete base info entry (admin only)."""
-    if not check_resource_access(current_user.user_id, current_user.role):
-        raise AuthorizationError("Access denied: only administrators can delete base info")
     await course_management_service.delete_base_info(db, item_id)
     return APIResponse(data=None)
