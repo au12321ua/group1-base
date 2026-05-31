@@ -7,13 +7,13 @@ from fastapi import APIRouter, Depends, Query
 from info_service.api.deps import InfoDbSession
 from info_service.core.security import check_resource_access
 from info_service.deps import require_permission
+from info_service.models.course_offering import CourseOffering
 from info_service.schemas.offering_schema import (
     OfferingCreateRequest,
     OfferingPatchRequest,
     OfferingResponse,
     OfferingUpdateRequest,
 )
-from info_service.models.course_offering import CourseOffering
 from info_service.services.course_management_service import course_management_service
 from shared.exceptions import AuthorizationError
 from shared.response import (
