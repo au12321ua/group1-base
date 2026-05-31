@@ -7,18 +7,11 @@ from tests.info_service.api_helpers import (
     create_course,
     create_offering,
 )
-from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
 class TestOfferingAPI:
     """验证 /api/v1/offerings 的 CRUD 及关键约束。"""
-
-    @pytest.fixture
-    def auth_headers(self) -> dict[str, str]:
-        return build_identity_headers(
-            permissions=["offering:read", "offering:create", "offering:update", "offering:delete"]
-        )
 
     async def test_offering_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、列表、更新和删除开课记录。"""

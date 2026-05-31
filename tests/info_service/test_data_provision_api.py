@@ -12,7 +12,6 @@ from info_service.models.training_program import TrainingProgram
 from info_service.models.user import UserInfo
 from info_service.models.user_profile import UserProfile
 from info_service.services.data_provision_service import data_provision_service
-from tests.utils import build_identity_headers
 
 
 async def _seed_user(
@@ -88,10 +87,6 @@ async def _cleanup_table(table) -> None:
 @pytest.mark.integration
 class TestDataProvisionAPI:
     """Verify the data provision endpoints used by downstream systems."""
-
-    @pytest.fixture
-    def auth_headers(self) -> dict[str, str]:
-        return build_identity_headers()
 
     async def test_list_teachers_and_candidate_students(
         self, async_client_info, auth_headers

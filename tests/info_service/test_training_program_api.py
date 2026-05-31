@@ -3,18 +3,11 @@
 import pytest
 
 from tests.info_service.api_helpers import assert_status_and_data, create_course
-from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
 class TestTrainingProgramAPI:
     """验证 /api/v1/training-programs 的 CRUD 及数据校验行为。"""
-
-    @pytest.fixture
-    def auth_headers(self) -> dict[str, str]:
-        return build_identity_headers(
-            permissions=["training:read", "training:create", "training:update", "training:delete"]
-        )
 
     async def test_training_program_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、更新和删除培养方案。"""

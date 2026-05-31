@@ -9,21 +9,11 @@ from tests.info_service.api_helpers import (
     create_offering,
     create_schedule,
 )
-from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
 class TestScheduleAPI:
     """验证 /api/v1/schedules 的 CRUD 与教师分配行为。"""
-
-    @pytest.fixture
-    def auth_headers(self) -> dict[str, str]:
-        return build_identity_headers(
-            permissions=[
-                "schedule:read", "schedule:create", "schedule:update", "schedule:delete",
-                "offering:read",
-            ]
-        )
 
     async def test_schedule_crud_and_teacher_assignment_flow(
         self, async_client_info, auth_headers

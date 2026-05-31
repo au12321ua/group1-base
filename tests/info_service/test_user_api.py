@@ -25,12 +25,6 @@ def _make_user_payload(*, suffix: str) -> dict[str, object]:
 class TestUserAPI:
     """验证 /api/v1/users 的 CRUD、鉴权和跨服务补偿行为。"""
 
-    @pytest.fixture
-    def auth_headers(self) -> dict[str, str]:
-        return build_identity_headers(
-            permissions=["user:read", "user:create", "user:update", "user:delete"]
-        )
-
     @pytest.fixture(autouse=True)
     def mock_auth_sync(self, monkeypatch) -> None:
         """Mock Auth 同步调用，确保集成测试可重复且稳定。"""

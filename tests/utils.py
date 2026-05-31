@@ -38,6 +38,10 @@ def build_identity_headers(
             "training:create",
             "training:update",
             "training:delete",
+            "calendar:read",
+            "calendar:create",
+            "calendar:update",
+            "calendar:delete",
         ]
     return {
         "X-User-Id": user_id,

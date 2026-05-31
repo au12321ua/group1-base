@@ -8,6 +8,13 @@ from info_service.models.classroom import Classroom
 from tests.utils import build_identity_headers, make_course_payload
 
 
+def _default_auth_headers(resource: str) -> dict[str, str]:
+    """Build auth headers with standard CRUD permissions for a resource."""
+    return build_identity_headers(
+        permissions=[f"{resource}:{action}" for action in ("read", "create", "update", "delete")]
+    )
+
+
 def assert_status_and_data(response: Response, expected_status: int = 200) -> dict:
     """断言 HTTP 状态码并返回 APIResponse.data。"""
     assert response.status_code == expected_status
@@ -25,9 +32,7 @@ async def create_course(
 ) -> int:
     """创建课程并返回 course_id。"""
     if auth_headers is None:
-        auth_headers = build_identity_headers(
-            permissions=["course:read", "course:create", "course:update", "course:delete"]
-        )
+        auth_headers = _default_auth_headers("course")
     response = await async_client_info.post(
         "/api/v1/courses/",
         json=make_course_payload(
@@ -53,9 +58,7 @@ async def create_offering(
 ) -> int:
     """创建开课记录并返回 offering_id。"""
     if auth_headers is None:
-        auth_headers = build_identity_headers(
-            permissions=["offering:read", "offering:create", "offering:update", "offering:delete"]
-        )
+        auth_headers = _default_auth_headers("offering")
     response = await async_client_info.post(
         "/api/v1/offerings/",
         json={
@@ -83,9 +86,7 @@ async def create_schedule(
 ) -> int:
     """创建排课记录并返回 schedule_id。"""
     if auth_headers is None:
-        auth_headers = build_identity_headers(
-            permissions=["schedule:read", "schedule:create", "schedule:update", "schedule:delete"]
-        )
+        auth_headers = _default_auth_headers("schedule")
     response = await async_client_info.post(
         "/api/v1/schedules/",
         json={

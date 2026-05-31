@@ -3,18 +3,11 @@
 import pytest
 
 from tests.info_service.api_helpers import create_course
-from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
 class TestCourseAPI:
     """测试 /api/v1/courses 已实现的 HTTP 参数校验契约。"""
-
-    @pytest.fixture
-    def auth_headers(self) -> dict[str, str]:
-        return build_identity_headers(
-            permissions=["course:read", "course:create", "course:update", "course:delete"]
-        )
 
     async def test_list_courses_rejects_invalid_query(
         self, async_client_info, auth_headers

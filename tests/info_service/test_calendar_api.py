@@ -2,21 +2,10 @@
 
 import pytest
 
-from tests.utils import build_identity_headers
-
 
 @pytest.mark.integration
 class TestCalendarAPI:
     """测试 /api/v1/calendars 已实现的 HTTP 参数校验契约。"""
-
-    @pytest.fixture
-    def auth_headers(self) -> dict[str, str]:
-        return build_identity_headers(
-            permissions=[
-                "calendar:read", "calendar:create", "calendar:update",
-                "calendar:delete",
-            ]
-        )
 
     async def test_list_calendars_rejects_invalid_query(
         self, async_client_info, auth_headers

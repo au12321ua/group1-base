@@ -12,7 +12,12 @@ from shared.security import IdentityContext
 
 
 def _is_missing(value: object) -> bool:
-    """True when a dependency value was not provided."""
+    """True when a header value was not provided.
+
+    When called directly (unit tests), the default FastAPI ``Header(None)``
+    is a ``Header`` object rather than ``None``.  The ``isinstance`` guard
+    catches both cases so the dependency works in tests and at runtime.
+    """
     return value is None or not isinstance(value, str)
 
 
