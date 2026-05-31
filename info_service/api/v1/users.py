@@ -81,12 +81,12 @@ async def get_user(
     current_user: Annotated[IdentityContext, Depends(require_permission("user:read"))],
 ) -> APIResponse[UserResponse]:
     """Get user detail with profile (own profile or admin only)."""
-    user = await user_management_service.get_user(db, user_id)
     if not check_resource_access(
         current_user.user_id, current_user.role,
         resource_owner_id=str(user_id),
     ):
         raise AuthorizationError("Access denied: can only view own profile")
+    user = await user_management_service.get_user(db, user_id)
     return APIResponse(data=user)
 
 
@@ -99,12 +99,12 @@ async def update_user(
     current_user: Annotated[IdentityContext, Depends(require_permission("user:update"))],
 ) -> APIResponse[UserResponse]:
     """Full update user (own profile or admin only)."""
-    # Check if role changed
     if not check_resource_access(
         current_user.user_id, current_user.role,
         resource_owner_id=str(user_id),
     ):
         raise AuthorizationError("Access denied: can only update own profile")
+    # Check if role changed
     old_user = await user_management_service.get_user(db, user_id)
     old_roles = old_user.role_ids
 

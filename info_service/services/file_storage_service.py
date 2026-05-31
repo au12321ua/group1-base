@@ -108,11 +108,19 @@ class FileStorageService:
             "access_url": f"/api/v1/files/{resource.id}/download",
         }
 
-    async def get_file(self, db: AsyncSession, file_id: int) -> tuple[bytes, str]:
-        """Retrieve file content and MIME type from disk."""
-        resource = await file_resource_crud.get(db, file_id)
-        if not resource:
-            raise ResourceNotFoundError("File", str(file_id))
+    async def get_file(
+        self, db: AsyncSession, file_id: int,
+        resource: FileResource | None = None,
+    ) -> tuple[bytes, str]:
+        """Retrieve file content and MIME type from disk.
+
+        If *resource* was already fetched for an access check, pass it in
+        to avoid a second ``file_resource_crud.get`` query.
+        """
+        if resource is None:
+            resource = await file_resource_crud.get(db, file_id)
+            if not resource:
+                raise ResourceNotFoundError("File", str(file_id))
 
         path = resource.storage_path
         exists = await asyncio.to_thread(os.path.exists, path)

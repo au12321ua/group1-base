@@ -83,7 +83,7 @@ async def download_file(
         resource_owner_id=resource.owner_user_id,
     ):
         raise AuthorizationError("Access denied: not the file owner")
-    content, mime_type = await file_storage_service.get_file(db, file_id)
+    content, mime_type = await file_storage_service.get_file(db, file_id, resource=resource)
     filename = resource.file_name
     return StreamingResponse(
         iter([content]),
