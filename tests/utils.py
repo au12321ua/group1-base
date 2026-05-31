@@ -56,6 +56,22 @@ def build_auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def build_service_token_header(token: str) -> dict[str, str]:
+    """Build Authorization header with Bearer service token (for internal endpoint tests)."""
+    return {"Authorization": f"Bearer {token}"}
+
+
+def create_test_service_token(
+    client_id: str = "info_service",
+    scope: str = "internal",
+    audience: str = "auth_service",
+) -> str:
+    """Create a valid service token for testing internal endpoints."""
+    from auth_service.core.security import create_service_token
+
+    return create_service_token(client_id=client_id, scope=scope, audience=audience)
+
+
 # ---------------------------------------------------------------------------
 # Data factories (minimal — expand as tests grow)
 # ---------------------------------------------------------------------------
