@@ -89,17 +89,12 @@ class DataProvisionService:
     async def get_user_snapshot_time(self, db: AsyncSession, role_id: int) -> datetime:
         """Return the latest update time for the requested role dataset."""
         conditions = self._active_user_conditions(role_id)
-        user_ts = (
+        user_ts, profile_ts = (
             await db.exec(
-                select(func.max(UserInfo.updated_at))
-                .select_from(UserInfo)
-                .join(UserProfile, UserProfile.user_id == UserInfo.id, isouter=True)
-                .where(*conditions)
-            )
-        ).one()
-        profile_ts = (
-            await db.exec(
-                select(func.max(UserProfile.updated_at))
+                select(
+                    func.max(UserInfo.updated_at),
+                    func.max(UserProfile.updated_at),
+                )
                 .select_from(UserInfo)
                 .join(UserProfile, UserProfile.user_id == UserInfo.id, isouter=True)
                 .where(*conditions)
