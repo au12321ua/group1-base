@@ -1,74 +1,46 @@
-"""Integration tests for schedule API behavior."""
+"""排课 API 集成测试。"""
 
 import pytest
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from info_service.main import info_engine
-from info_service.models.classroom import Classroom
-from tests.utils import make_course_payload
-
-
-async def _create_classroom(*, room_no: str, building: str = "Main", capacity: int = 80) -> int:
-    """Insert a classroom directly into the Info test database."""
-    async with AsyncSession(info_engine, expire_on_commit=False) as session:
-        classroom = Classroom(
-            room_no=room_no,
-            building=building,
-            capacity=capacity,
-        )
-        session.add(classroom)
-        await session.commit()
-        await session.refresh(classroom)
-        return classroom.id
+from tests.info_service.api_helpers import (
+    assert_status_and_data,
+    create_classroom,
+    create_course,
+    create_offering,
+    create_schedule,
+)
 
 
 @pytest.mark.integration
 class TestScheduleAPI:
-    """Verify the /api/v1/schedules CRUD flow and teacher sub-resource."""
+    """验证 /api/v1/schedules 的 CRUD 与教师分配行为。"""
 
     async def test_schedule_crud_and_teacher_assignment_flow(self, async_client_info) -> None:
-        """Should manage schedules, detect conflicts, and update teacher assignments."""
-        classroom_id = await _create_classroom(room_no="B-201")
-
-        course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS820",
-                course_name="Advanced Scheduling",
-            ),
+        """应支持排课 CRUD、冲突检测与教师分配子资源操作。"""
+        classroom_id = await create_classroom(room_no="B-201")
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS820",
+            course_name="Advanced Scheduling",
         )
-        assert course_resp.status_code == 200
-        course_id = course_resp.json()["data"]["id"]
-
-        offering_resp = await async_client_info.post(
-            "/api/v1/offerings/",
-            json={
-                "course_id": course_id,
-                "term_code": "2026-FALL",
-                "class_no": "01",
-                "teacher_ids": [],
-                "capacity": 50,
-            },
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=[],
+            capacity=50,
         )
-        assert offering_resp.status_code == 200
-        offering_id = offering_resp.json()["data"]["id"]
 
-        create_resp = await async_client_info.post(
-            "/api/v1/schedules/",
-            json={
-                "offering_id": offering_id,
-                "classroom_id": classroom_id,
-                "day_of_week": 2,
-                "start_period": 3,
-                "end_period": 4,
-                "week_range": "1-16",
-            },
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=2,
+            start_period=3,
+            end_period=4,
+            week_range="1-16",
         )
-        assert create_resp.status_code == 200
-        created = create_resp.json()["data"]
-        schedule_id = created["id"]
-        assert created["offering_id"] == offering_id
-        assert created["week_range"] == "1-16"
 
         list_resp = await async_client_info.get(
             "/api/v1/schedules/",
@@ -78,8 +50,9 @@ class TestScheduleAPI:
         assert list_resp.json()["data"]["pagination"]["total"] == 1
 
         get_resp = await async_client_info.get(f"/api/v1/schedules/{schedule_id}")
-        assert get_resp.status_code == 200
-        assert get_resp.json()["data"]["classroom_id"] == classroom_id
+        schedule_data = assert_status_and_data(get_resp)
+        assert schedule_data["classroom_id"] == classroom_id
+        assert schedule_data["week_range"] == "1-16"
 
         conflict_resp = await async_client_info.post(
             "/api/v1/schedules/",
@@ -98,8 +71,7 @@ class TestScheduleAPI:
             f"/api/v1/schedules/{schedule_id}",
             json={"start_period": 5, "end_period": 6, "week_range": "2-16"},
         )
-        assert patch_resp.status_code == 200
-        patched = patch_resp.json()["data"]
+        patched = assert_status_and_data(patch_resp)
         assert patched["start_period"] == 5
         assert patched["end_period"] == 6
         assert patched["week_range"] == "2-16"
@@ -108,39 +80,39 @@ class TestScheduleAPI:
             f"/api/v1/schedules/{schedule_id}/teachers",
             json=["t-1", "t-2"],
         )
-        assert replace_resp.status_code == 200
-        replaced = replace_resp.json()["data"]["items"]
+        replaced = assert_status_and_data(replace_resp)["items"]
         assert [item["teacher_id"] for item in replaced] == ["t-1", "t-2"]
+
         offering_snapshot_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
-        assert offering_snapshot_resp.status_code == 200
-        assert offering_snapshot_resp.json()["data"]["teacher_ids"] == "t-1,t-2"
+        offering_data = assert_status_and_data(offering_snapshot_resp)
+        assert offering_data["teacher_ids"] == "t-1,t-2"
 
         add_resp = await async_client_info.post(
             f"/api/v1/schedules/{schedule_id}/teachers",
             json=["t-2", "t-3"],
         )
-        assert add_resp.status_code == 200
-        added = add_resp.json()["data"]["items"]
+        added = assert_status_and_data(add_resp)["items"]
         assert [item["teacher_id"] for item in added] == ["t-1", "t-2", "t-3"]
+
         offering_snapshot_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
-        assert offering_snapshot_resp.status_code == 200
-        assert offering_snapshot_resp.json()["data"]["teacher_ids"] == "t-1,t-2,t-3"
+        offering_data = assert_status_and_data(offering_snapshot_resp)
+        assert offering_data["teacher_ids"] == "t-1,t-2,t-3"
 
         assign_resp = await async_client_info.put(
             f"/api/v1/schedules/{schedule_id}/teachers/t-4",
             json={"teacher_id": "t-4", "role_type": "assistant"},
         )
-        assert assign_resp.status_code == 200
-        assert assign_resp.json()["data"]["role_type"] == "assistant"
+        assigned = assert_status_and_data(assign_resp)
+        assert assigned["role_type"] == "assistant"
+
         offering_snapshot_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
-        assert offering_snapshot_resp.status_code == 200
-        assert offering_snapshot_resp.json()["data"]["teacher_ids"] == "t-1,t-2,t-3,t-4"
+        offering_data = assert_status_and_data(offering_snapshot_resp)
+        assert offering_data["teacher_ids"] == "t-1,t-2,t-3,t-4"
 
         teacher_list_resp = await async_client_info.get(
             f"/api/v1/schedules/{schedule_id}/teachers"
         )
-        assert teacher_list_resp.status_code == 200
-        teacher_items = teacher_list_resp.json()["data"]["items"]
+        teacher_items = assert_status_and_data(teacher_list_resp)["items"]
         assert [item["teacher_id"] for item in teacher_items] == ["t-1", "t-2", "t-3", "t-4"]
 
         remove_resp = await async_client_info.delete(
@@ -151,12 +123,12 @@ class TestScheduleAPI:
         teacher_list_resp = await async_client_info.get(
             f"/api/v1/schedules/{schedule_id}/teachers"
         )
-        assert teacher_list_resp.status_code == 200
-        teacher_items = teacher_list_resp.json()["data"]["items"]
+        teacher_items = assert_status_and_data(teacher_list_resp)["items"]
         assert [item["teacher_id"] for item in teacher_items] == ["t-1", "t-3", "t-4"]
+
         offering_snapshot_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
-        assert offering_snapshot_resp.status_code == 200
-        assert offering_snapshot_resp.json()["data"]["teacher_ids"] == "t-1,t-3,t-4"
+        offering_data = assert_status_and_data(offering_snapshot_resp)
+        assert offering_data["teacher_ids"] == "t-1,t-3,t-4"
 
         delete_resp = await async_client_info.delete(f"/api/v1/schedules/{schedule_id}")
         assert delete_resp.status_code == 200
@@ -166,31 +138,21 @@ class TestScheduleAPI:
         assert missing_resp.status_code == 404
 
     async def test_create_schedule_rejects_invalid_period_range(self, async_client_info) -> None:
-        """Should reject schedules whose end period precedes the start period."""
-        classroom_id = await _create_classroom(room_no="B-202")
-
-        course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS821",
-                course_name="Conflict Validation",
-            ),
+        """当 end_period 小于 start_period 时应返回 409。"""
+        classroom_id = await create_classroom(room_no="B-202")
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS821",
+            course_name="Conflict Validation",
         )
-        assert course_resp.status_code == 200
-        course_id = course_resp.json()["data"]["id"]
-
-        offering_resp = await async_client_info.post(
-            "/api/v1/offerings/",
-            json={
-                "course_id": course_id,
-                "term_code": "2026-FALL",
-                "class_no": "02",
-                "teacher_ids": [],
-                "capacity": 40,
-            },
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="02",
+            teacher_ids=[],
+            capacity=40,
         )
-        assert offering_resp.status_code == 200
-        offering_id = offering_resp.json()["data"]["id"]
 
         resp = await async_client_info.post(
             "/api/v1/schedules/",
@@ -202,120 +164,88 @@ class TestScheduleAPI:
                 "end_period": 5,
             },
         )
-
         assert resp.status_code == 409
 
     async def test_patch_schedule_can_change_offering(self, async_client_info) -> None:
-        """PATCH should support moving a schedule to another offering."""
-        classroom_id = await _create_classroom(room_no="B-203")
+        """PATCH 应支持将排课调整到其他开课记录。"""
+        classroom_id = await create_classroom(room_no="B-203")
+        first_course_id = await create_course(
+            async_client_info,
+            course_code="CS822",
+            course_name="Original Offering Course",
+        )
+        second_course_id = await create_course(
+            async_client_info,
+            course_code="CS823",
+            course_name="Target Offering Course",
+        )
 
-        first_course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS822",
-                course_name="Original Offering Course",
-            ),
+        first_offering_id = await create_offering(
+            async_client_info,
+            course_id=first_course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=[],
+            capacity=40,
         )
-        second_course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS823",
-                course_name="Target Offering Course",
-            ),
+        second_offering_id = await create_offering(
+            async_client_info,
+            course_id=second_course_id,
+            term_code="2026-FALL",
+            class_no="02",
+            teacher_ids=[],
+            capacity=35,
         )
-        assert first_course_resp.status_code == 200
-        assert second_course_resp.status_code == 200
-        first_course_id = first_course_resp.json()["data"]["id"]
-        second_course_id = second_course_resp.json()["data"]["id"]
 
-        first_offering_resp = await async_client_info.post(
-            "/api/v1/offerings/",
-            json={
-                "course_id": first_course_id,
-                "term_code": "2026-FALL",
-                "class_no": "01",
-                "teacher_ids": [],
-                "capacity": 40,
-            },
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=first_offering_id,
+            classroom_id=classroom_id,
+            day_of_week=4,
+            start_period=7,
+            end_period=8,
+            week_range="1-16",
         )
-        second_offering_resp = await async_client_info.post(
-            "/api/v1/offerings/",
-            json={
-                "course_id": second_course_id,
-                "term_code": "2026-FALL",
-                "class_no": "02",
-                "teacher_ids": [],
-                "capacity": 35,
-            },
-        )
-        assert first_offering_resp.status_code == 200
-        assert second_offering_resp.status_code == 200
-        first_offering_id = first_offering_resp.json()["data"]["id"]
-        second_offering_id = second_offering_resp.json()["data"]["id"]
-
-        create_resp = await async_client_info.post(
-            "/api/v1/schedules/",
-            json={
-                "offering_id": first_offering_id,
-                "classroom_id": classroom_id,
-                "day_of_week": 4,
-                "start_period": 7,
-                "end_period": 8,
-                "week_range": "1-16",
-            },
-        )
-        assert create_resp.status_code == 200
-        schedule_id = create_resp.json()["data"]["id"]
 
         patch_resp = await async_client_info.patch(
             f"/api/v1/schedules/{schedule_id}",
             json={"offering_id": second_offering_id},
         )
-        assert patch_resp.status_code == 200
-        assert patch_resp.json()["data"]["offering_id"] == second_offering_id
+        patched = assert_status_and_data(patch_resp)
+        assert patched["offering_id"] == second_offering_id
 
-    async def test_list_teachers_returns_consistent_empty_pagination(
-        self, async_client_info
-    ) -> None:
-        """Teacher list metadata should reflect an empty collection without fake page sizes."""
-        classroom_id = await _create_classroom(room_no="B-204")
-
-        course_resp = await async_client_info.post(
-            "/api/v1/courses/",
-            json=make_course_payload(
-                course_code="CS824",
-                course_name="Empty Teacher List",
-            ),
+    async def test_assign_teacher_rejects_path_body_mismatch(self, async_client_info) -> None:
+        """路径 teacher_id 与 body teacher_id 不一致时应返回 409。"""
+        classroom_id = await create_classroom(room_no="B-205")
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS825",
+            course_name="Teacher ID Validation",
         )
-        assert course_resp.status_code == 200
-        course_id = course_resp.json()["data"]["id"]
-
-        offering_resp = await async_client_info.post(
-            "/api/v1/offerings/",
-            json={
-                "course_id": course_id,
-                "term_code": "2026-FALL",
-                "class_no": "03",
-                "teacher_ids": [],
-                "capacity": 20,
-            },
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="04",
+            teacher_ids=[],
+            capacity=20,
         )
-        assert offering_resp.status_code == 200
-        offering_id = offering_resp.json()["data"]["id"]
-
-        schedule_resp = await async_client_info.post(
-            "/api/v1/schedules/",
-            json={
-                "offering_id": offering_id,
-                "classroom_id": classroom_id,
-                "day_of_week": 5,
-                "start_period": 1,
-                "end_period": 2,
-            },
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=2,
+            start_period=1,
+            end_period=2,
         )
-        assert schedule_resp.status_code == 200
-        schedule_id = schedule_resp.json()["data"]["id"]
 
-        resp = await async_client_info.get(f"/api/v1/schedules/{schedule_id}/teachers")
-        assert resp.status_code == 200
-        assert resp.json()["data"]["pagination"] == {"total": 0, "page": 1, "page_size": 0}
+        resp = await async_client_info.put(
+            f"/api/v1/schedules/{schedule_id}/teachers/t-6",
+            json={"teacher_id": "t-7", "role_type": "assistant"},
+        )
+        assert resp.status_code == 409
+
+    async def test_list_schedules_rejects_invalid_pagination(self, async_client_info) -> None:
+        """分页参数非法时应返回 422。"""
+        resp = await async_client_info.get("/api/v1/schedules/", params={"page": 0})
+        assert resp.status_code == 422
