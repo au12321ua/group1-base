@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
+from info_service.core.security import check_resource_access
 from info_service.deps import require_permission
 from info_service.schemas.calendar_schema import (
     CalendarCreateRequest,
@@ -13,7 +14,7 @@ from info_service.schemas.calendar_schema import (
     CalendarUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
-from shared.exceptions import ResourceNotFoundError
+from shared.exceptions import AuthorizationError, ResourceNotFoundError
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
 
@@ -79,7 +80,9 @@ async def update_calendar(
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("calendar:update"))],
 ) -> APIResponse[CalendarResponse]:
-    """Full update calendar."""
+    """Full update calendar (admin only)."""
+    if not check_resource_access(current_user.user_id, current_user.role):
+        raise AuthorizationError("Access denied: only administrators can modify calendars")
     cal = await course_management_service.update_calendar(db, calendar_id, request)
     return APIResponse(data=CalendarResponse.model_validate(cal))
 
@@ -91,7 +94,9 @@ async def patch_calendar(
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("calendar:update"))],
 ) -> APIResponse[CalendarResponse]:
-    """Partial update calendar."""
+    """Partial update calendar (admin only)."""
+    if not check_resource_access(current_user.user_id, current_user.role):
+        raise AuthorizationError("Access denied: only administrators can modify calendars")
     cal = await course_management_service.patch_calendar(db, calendar_id, request)
     return APIResponse(data=CalendarResponse.model_validate(cal))
 
@@ -102,6 +107,8 @@ async def delete_calendar(
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("calendar:delete"))],
 ) -> APIResponse[None]:
-    """Delete calendar."""
+    """Delete calendar (admin only)."""
+    if not check_resource_access(current_user.user_id, current_user.role):
+        raise AuthorizationError("Access denied: only administrators can delete calendars")
     await course_management_service.delete_calendar(db, calendar_id)
     return APIResponse(data=None)

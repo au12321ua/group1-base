@@ -221,3 +221,174 @@ class TestUserAPI:
             ),
         )
         assert invalid_payload_resp.status_code == 422
+
+
+@pytest.mark.integration
+class TestUserResourceAccess:
+    """验证用户资源级授权：非管理员只能访问自己的资料，管理员不受限制。"""
+
+    @pytest.fixture(autouse=True)
+    def mock_auth_sync(self, monkeypatch) -> None:
+        """Mock Auth 同步调用。"""
+        monkeypatch.setattr(
+            user_management_service,
+            "_sync_create_to_auth",
+            AsyncMock(return_value=True),
+        )
+        monkeypatch.setattr(
+            user_management_service,
+            "_sync_disable_to_auth",
+            AsyncMock(return_value=None),
+        )
+        monkeypatch.setattr(
+            user_management_service,
+            "_sync_roles_to_auth",
+            AsyncMock(return_value=None),
+        )
+
+    async def test_non_admin_can_view_own_profile(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """非管理员用户可以查看自己的资料。"""
+        create_resp = await async_client_info.post(
+            "/api/v1/users/",
+            json=_make_user_payload(suffix="2101"),
+            headers=auth_headers,
+        )
+        user_id = create_resp.json()["data"]["id"]
+
+        own_headers = build_identity_headers(
+            user_id=str(user_id), role="STUDENT", permissions=["user:read"]
+        )
+        resp = await async_client_info.get(
+            f"/api/v1/users/{user_id}", headers=own_headers
+        )
+        assert resp.status_code == 200
+
+    async def test_non_admin_cannot_view_other_profile(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """非管理员用户查看他人资料应返回 403。"""
+        create_resp = await async_client_info.post(
+            "/api/v1/users/",
+            json=_make_user_payload(suffix="2102"),
+            headers=auth_headers,
+        )
+        user_id = create_resp.json()["data"]["id"]
+
+        other_headers = build_identity_headers(
+            user_id="other-user", role="STUDENT", permissions=["user:read"]
+        )
+        resp = await async_client_info.get(
+            f"/api/v1/users/{user_id}", headers=other_headers
+        )
+        assert resp.status_code == 403
+
+    async def test_admin_can_view_any_profile(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """管理员可以查看任意用户资料。"""
+        create_resp = await async_client_info.post(
+            "/api/v1/users/",
+            json=_make_user_payload(suffix="2103"),
+            headers=auth_headers,
+        )
+        user_id = create_resp.json()["data"]["id"]
+
+        admin_headers = build_identity_headers(
+            user_id="admin-user", role="SYS_ADMIN", permissions=["user:read"]
+        )
+        resp = await async_client_info.get(
+            f"/api/v1/users/{user_id}", headers=admin_headers
+        )
+        assert resp.status_code == 200
+
+    async def test_non_admin_cannot_update_other_profile(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """非管理员用户更新他人资料应返回 403。"""
+        create_resp = await async_client_info.post(
+            "/api/v1/users/",
+            json=_make_user_payload(suffix="2104"),
+            headers=auth_headers,
+        )
+        user_id = create_resp.json()["data"]["id"]
+
+        other_headers = build_identity_headers(
+            user_id="other-user", role="TEACHER", permissions=["user:update"]
+        )
+        resp = await async_client_info.put(
+            f"/api/v1/users/{user_id}",
+            json={
+                "user_no": "S20262104",
+                "username": "user_2104",
+                "role_ids": [2],
+                "full_name": "被篡改",
+                "gender": "MALE",
+                "email": "hacked@test.edu.cn",
+                "phone": "13800000000",
+                "status": "ACTIVE",
+            },
+            headers=other_headers,
+        )
+        assert resp.status_code == 403
+
+    async def test_non_admin_can_update_own_profile(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """非管理员用户可以更新自己的资料。"""
+        create_resp = await async_client_info.post(
+            "/api/v1/users/",
+            json=_make_user_payload(suffix="2105"),
+            headers=auth_headers,
+        )
+        user_id = create_resp.json()["data"]["id"]
+
+        own_headers = build_identity_headers(
+            user_id=str(user_id), role="STUDENT", permissions=["user:update"]
+        )
+        resp = await async_client_info.patch(
+            f"/api/v1/users/{user_id}",
+            json={"full_name": "自己更新"},
+            headers=own_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["data"]["profile"]["full_name"] == "自己更新"
+
+    async def test_non_admin_cannot_delete_users(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """非管理员用户删除用户应返回 403（即使删除自己也不行）。"""
+        create_resp = await async_client_info.post(
+            "/api/v1/users/",
+            json=_make_user_payload(suffix="2106"),
+            headers=auth_headers,
+        )
+        user_id = create_resp.json()["data"]["id"]
+
+        own_headers = build_identity_headers(
+            user_id=str(user_id), role="TEACHER", permissions=["user:delete"]
+        )
+        resp = await async_client_info.delete(
+            f"/api/v1/users/{user_id}", headers=own_headers
+        )
+        assert resp.status_code == 403
+
+    async def test_admin_can_delete_users(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """管理员可以删除用户。"""
+        create_resp = await async_client_info.post(
+            "/api/v1/users/",
+            json=_make_user_payload(suffix="2107"),
+            headers=auth_headers,
+        )
+        user_id = create_resp.json()["data"]["id"]
+
+        admin_delete_headers = build_identity_headers(
+            user_id="admin-user", role="SYS_ADMIN", permissions=["user:delete"]
+        )
+        resp = await async_client_info.delete(
+            f"/api/v1/users/{user_id}", headers=admin_delete_headers
+        )
+        assert resp.status_code == 200
