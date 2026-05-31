@@ -7,13 +7,20 @@ from tests.info_service.api_helpers import (
     create_course,
     create_offering,
 )
+from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
 class TestOfferingAPI:
     """验证 /api/v1/offerings 的 CRUD 及关键约束。"""
 
-    async def test_offering_crud_flow(self, async_client_info) -> None:
+    @pytest.fixture
+    def auth_headers(self) -> dict[str, str]:
+        return build_identity_headers(
+            permissions=["offering:read", "offering:create", "offering:update", "offering:delete"]
+        )
+
+    async def test_offering_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、列表、更新和删除开课记录。"""
         course_id = await create_course(
             async_client_info,
@@ -31,6 +38,7 @@ class TestOfferingAPI:
                 "teacher_ids": ["t-1", "t-2"],
                 "capacity": 80,
             },
+            headers=auth_headers,
         )
 
         created = assert_status_and_data(create_resp)
@@ -41,33 +49,43 @@ class TestOfferingAPI:
         list_resp = await async_client_info.get(
             "/api/v1/offerings/",
             params={"course_id": course_id, "term_code": "2026-FALL", "status": "ACTIVE"},
+            headers=auth_headers,
         )
         assert list_resp.status_code == 200
         payload = list_resp.json()["data"]
         assert payload["pagination"]["total"] == 1
         assert payload["items"][0]["id"] == offering_id
 
-        get_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
+        get_resp = await async_client_info.get(
+            f"/api/v1/offerings/{offering_id}", headers=auth_headers
+        )
         assert get_resp.status_code == 200
         assert get_resp.json()["data"]["class_no"] == "01"
 
         patch_resp = await async_client_info.patch(
             f"/api/v1/offerings/{offering_id}",
             json={"teacher_ids": ["t-2", "t-3"], "status": "COMPLETED"},
+            headers=auth_headers,
         )
         assert patch_resp.status_code == 200
         patched = patch_resp.json()["data"]
         assert patched["teacher_ids"] == "t-2,t-3"
         assert patched["status"] == "COMPLETED"
 
-        delete_resp = await async_client_info.delete(f"/api/v1/offerings/{offering_id}")
+        delete_resp = await async_client_info.delete(
+            f"/api/v1/offerings/{offering_id}", headers=auth_headers
+        )
         assert delete_resp.status_code == 200
         assert delete_resp.json()["data"] is None
 
-        missing_resp = await async_client_info.get(f"/api/v1/offerings/{offering_id}")
+        missing_resp = await async_client_info.get(
+            f"/api/v1/offerings/{offering_id}", headers=auth_headers
+        )
         assert missing_resp.status_code == 404
 
-    async def test_create_offering_rejects_duplicate_identity(self, async_client_info) -> None:
+    async def test_create_offering_rejects_duplicate_identity(
+        self, async_client_info, auth_headers
+    ) -> None:
         """当 course_id + term_code + class_no 重复时应返回 409。"""
         course_id = await create_course(
             async_client_info,
@@ -95,11 +113,14 @@ class TestOfferingAPI:
                 "teacher_ids": [],
                 "capacity": 60,
             },
+            headers=auth_headers,
         )
 
         assert duplicate_resp.status_code == 409
 
-    async def test_put_offering_applies_full_replacement_defaults(self, async_client_info) -> None:
+    async def test_put_offering_applies_full_replacement_defaults(
+        self, async_client_info, auth_headers
+    ) -> None:
         """PUT 全量更新时，省略可选字段应回落到 schema 默认值。"""
         course_id = await create_course(
             async_client_info,
@@ -123,6 +144,7 @@ class TestOfferingAPI:
                 "term_code": "2026-FALL",
                 "class_no": "02",
             },
+            headers=auth_headers,
         )
 
         updated = assert_status_and_data(put_resp)

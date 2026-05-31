@@ -3,13 +3,20 @@
 import pytest
 
 from tests.info_service.api_helpers import assert_status_and_data, create_course
+from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
 class TestTrainingProgramAPI:
     """验证 /api/v1/training-programs 的 CRUD 及数据校验行为。"""
 
-    async def test_training_program_crud_flow(self, async_client_info) -> None:
+    @pytest.fixture
+    def auth_headers(self) -> dict[str, str]:
+        return build_identity_headers(
+            permissions=["training:read", "training:create", "training:update", "training:delete"]
+        )
+
+    async def test_training_program_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、更新和删除培养方案。"""
         course_id = await create_course(
             async_client_info,
@@ -27,6 +34,7 @@ class TestTrainingProgramAPI:
                 "version": "1.0",
                 "required_course_ids": [course_id],
             },
+            headers=auth_headers,
         )
 
         created = assert_status_and_data(create_resp)
@@ -34,40 +42,52 @@ class TestTrainingProgramAPI:
         assert created["required_course_ids"] == str(course_id)
         program_id = created["id"]
 
-        list_resp = await async_client_info.get("/api/v1/training-programs/")
+        list_resp = await async_client_info.get(
+            "/api/v1/training-programs/", headers=auth_headers
+        )
         assert list_resp.status_code == 200
         assert list_resp.json()["data"]["pagination"]["total"] == 1
 
         by_major_resp = await async_client_info.get(
             "/api/v1/training-programs/by-major",
             params={"major_code": "CS", "grade": "2026", "page": 1, "page_size": 5},
+            headers=auth_headers,
         )
         assert by_major_resp.status_code == 200
         by_major_data = by_major_resp.json()["data"]
         assert by_major_data["items"][0]["id"] == program_id
         assert by_major_data["pagination"] == {"total": 1, "page": 1, "page_size": 5}
 
-        get_resp = await async_client_info.get(f"/api/v1/training-programs/{program_id}")
+        get_resp = await async_client_info.get(
+            f"/api/v1/training-programs/{program_id}", headers=auth_headers
+        )
         assert get_resp.status_code == 200
         assert get_resp.json()["data"]["major_code"] == "CS"
 
         patch_resp = await async_client_info.patch(
             f"/api/v1/training-programs/{program_id}",
             json={"version": "2.0", "required_course_ids": [course_id]},
+            headers=auth_headers,
         )
         assert patch_resp.status_code == 200
         patched = patch_resp.json()["data"]
         assert patched["version"] == "2.0"
         assert patched["required_course_ids"] == str(course_id)
 
-        delete_resp = await async_client_info.delete(f"/api/v1/training-programs/{program_id}")
+        delete_resp = await async_client_info.delete(
+            f"/api/v1/training-programs/{program_id}", headers=auth_headers
+        )
         assert delete_resp.status_code == 200
         assert delete_resp.json()["data"] is None
 
-        missing_resp = await async_client_info.get(f"/api/v1/training-programs/{program_id}")
+        missing_resp = await async_client_info.get(
+            f"/api/v1/training-programs/{program_id}", headers=auth_headers
+        )
         assert missing_resp.status_code == 404
 
-    async def test_create_training_program_rejects_unknown_course(self, async_client_info) -> None:
+    async def test_create_training_program_rejects_unknown_course(
+        self, async_client_info, auth_headers
+    ) -> None:
         """required_course_ids 包含不存在课程时应返回 404。"""
         resp = await async_client_info.post(
             "/api/v1/training-programs/",
@@ -78,6 +98,7 @@ class TestTrainingProgramAPI:
                 "version": "1.0",
                 "required_course_ids": [9999],
             },
+            headers=auth_headers,
         )
 
         assert resp.status_code == 404

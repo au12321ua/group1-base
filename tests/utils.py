@@ -26,6 +26,18 @@ def build_identity_headers(
             "course:create",
             "course:update",
             "course:delete",
+            "offering:read",
+            "offering:create",
+            "offering:update",
+            "offering:delete",
+            "schedule:read",
+            "schedule:create",
+            "schedule:update",
+            "schedule:delete",
+            "training:read",
+            "training:create",
+            "training:update",
+            "training:delete",
         ]
     return {
         "X-User-Id": user_id,
