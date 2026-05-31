@@ -134,6 +134,8 @@ sequenceDiagram
 | calendar | `calendar:read`, `calendar:create`, `calendar:update`, `calendar:delete` |
 | training | `training:read`, `training:create`, `training:update`, `training:delete` |
 | base-info | `base-info:read`, `base-info:create`, `base-info:update`, `base-info:delete` |
+| file | `file:read`, `file:create`, `file:delete` |
+| data-provision | `data-provision:read` |
 | audit | `audit:read` |
 | recycle | `recycle:read`, `recycle:restore`, `recycle:delete` |
 
@@ -158,6 +160,10 @@ sequenceDiagram
 | training:create/update/delete | — | — | ✓ | ✓ |
 | base-info:read | ✓ | ✓ | ✓ | ✓ |
 | base-info:create/update/delete | — | — | ✓ | ✓ |
+| file:read | ✓ | ✓ | ✓ | ✓ |
+| file:create | ✓ | ✓ | ✓ | ✓ |
+| file:delete | ✓ | ✓ | ✓ | ✓ |
+| data-provision:read | — | — | ✓ | ✓ |
 | audit:read | — | — | — | ✓ |
 | recycle:* | — | — | ✓ | ✓ |
 

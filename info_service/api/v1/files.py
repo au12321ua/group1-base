@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import StreamingResponse
 
 from info_service.api.deps import InfoDbSession
+from info_service.core.security import check_resource_access
 from info_service.crud.file_resource_crud import file_resource_crud
-from info_service.deps import get_current_user
+from info_service.deps import require_permission
 from info_service.schemas.file_schema import FileResponse, FileUploadResponse
 from info_service.services.file_storage_service import file_storage_service
-from shared.exceptions import ResourceNotFoundError
+from shared.exceptions import AuthorizationError, ResourceNotFoundError
 from shared.response import APIResponse
 from shared.security import IdentityContext
 
@@ -20,10 +21,10 @@ router = APIRouter(tags=["files"])
 @router.post("/", status_code=201, response_model=APIResponse[FileUploadResponse])
 async def upload_file(
     db: InfoDbSession,
-    current_user: Annotated[IdentityContext, Depends(get_current_user)],
+    current_user: Annotated[IdentityContext, Depends(require_permission("file:create"))],
     file: UploadFile = File(...),
 ) -> APIResponse[FileUploadResponse]:
-    """Upload a file (requires authentication, any role)."""
+    """Upload a file (requires file:create permission)."""
     content = await file.read()
     parts = file.filename.rsplit(".", 1) if file.filename else []
     file_type = parts[-1].lower() if len(parts) == 2 else "bin"
@@ -43,12 +44,17 @@ async def upload_file(
 async def get_file_metadata(
     file_id: int,
     db: InfoDbSession,
-    current_user: Annotated[IdentityContext, Depends(get_current_user)],
+    current_user: Annotated[IdentityContext, Depends(require_permission("file:read"))],
 ) -> APIResponse[FileResponse]:
-    """Get file metadata (requires authentication)."""
+    """Get file metadata (requires file:read permission, owner or admin)."""
     resource = await file_resource_crud.get(db, file_id)
     if not resource:
         raise ResourceNotFoundError("File", str(file_id))
+    if not check_resource_access(
+        current_user.user_id, current_user.role,
+        resource_owner_id=resource.owner_user_id,
+    ):
+        raise AuthorizationError("Access denied: not the file owner")
     return APIResponse(
         data=FileResponse(
             id=resource.id,
@@ -66,12 +72,19 @@ async def get_file_metadata(
 async def download_file(
     file_id: int,
     db: InfoDbSession,
-    current_user: Annotated[IdentityContext, Depends(get_current_user)],
+    current_user: Annotated[IdentityContext, Depends(require_permission("file:read"))],
 ):
-    """Download file content (requires authentication)."""
-    content, mime_type = await file_storage_service.get_file(db, file_id)
+    """Download file content (requires file:read permission, owner or admin)."""
     resource = await file_resource_crud.get(db, file_id)
-    filename = resource.file_name if resource else f"file-{file_id}"
+    if not resource:
+        raise ResourceNotFoundError("File", str(file_id))
+    if not check_resource_access(
+        current_user.user_id, current_user.role,
+        resource_owner_id=resource.owner_user_id,
+    ):
+        raise AuthorizationError("Access denied: not the file owner")
+    content, mime_type = await file_storage_service.get_file(db, file_id)
+    filename = resource.file_name
     return StreamingResponse(
         iter([content]),
         media_type=mime_type,
@@ -83,9 +96,9 @@ async def download_file(
 async def delete_file(
     file_id: int,
     db: InfoDbSession,
-    current_user: Annotated[IdentityContext, Depends(get_current_user)],
+    current_user: Annotated[IdentityContext, Depends(require_permission("file:delete"))],
 ) -> APIResponse[None]:
-    """Delete a file (owner or admin only)."""
+    """Delete a file (requires file:delete permission, owner or admin only)."""
     await file_storage_service.delete_file(
         db, file_id, current_user.user_id, current_user.role
     )
