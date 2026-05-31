@@ -150,6 +150,17 @@ class TestDataProvisionAPI:
 
         await _cleanup_table(AcademicCalendar)
 
+    async def test_get_calendars_empty(self, async_client_info) -> None:
+        """Should return empty items with fallback snapshot and pagination."""
+        resp = await async_client_info.get("/api/v1/data-provision/calendars")
+
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["items"] == []
+        assert data["pagination"] == {"total": 0, "page": 1, "page_size": 0}
+        assert data["version"] == "1.0"
+        assert data["snapshot_time"]  # should be a fallback datetime
+
     async def test_list_training_programs_supports_filters(self, async_client_info) -> None:
         """Should return normalized training program snapshots and filter by query params."""
         await _seed_training_program(

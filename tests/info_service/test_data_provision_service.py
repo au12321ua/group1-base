@@ -3,12 +3,14 @@
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from info_service.models.training_program import TrainingProgram
 from info_service.models.user import UserInfo
 from info_service.models.user_profile import UserProfile
 from info_service.services.data_provision_service import data_provision_service
+from shared.exceptions import ExternalServiceError
 
 
 async def _create_user(
@@ -177,3 +179,140 @@ class TestDataProvisionService:
         assert payload["pagination"] == {"total": 1, "page": 1, "page_size": 50}
         assert payload["version"] == "2.0"
         assert payload["snapshot_time"] == datetime(2026, 5, 30, tzinfo=UTC)
+
+    async def test_query_selected_students_raises_on_http_error(
+        self, info_db_session,
+    ) -> None:
+        """Should wrap upstream HTTP 500 in ExternalServiceError."""
+        response = MagicMock()
+        response.status_code = 500
+        response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Server Error", request=MagicMock(), response=response,
+        )
+
+        client = MagicMock()
+        client.get = AsyncMock(return_value=response)
+        client_cm = MagicMock()
+        client_cm.__aenter__ = AsyncMock(return_value=client)
+        client_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch(
+            "info_service.services.data_provision_service.httpx.AsyncClient",
+            return_value=client_cm,
+        ):
+            with pytest.raises(ExternalServiceError, match="returned 500"):
+                await data_provision_service.query_selected_students(
+                    info_db_session, course_id=101,
+                )
+
+    async def test_query_selected_students_raises_on_network_error(
+        self, info_db_session,
+    ) -> None:
+        """Should wrap network-level errors in ExternalServiceError."""
+        client = MagicMock()
+        client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+        client_cm = MagicMock()
+        client_cm.__aenter__ = AsyncMock(return_value=client)
+        client_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch(
+            "info_service.services.data_provision_service.httpx.AsyncClient",
+            return_value=client_cm,
+        ):
+            with pytest.raises(ExternalServiceError, match="unavailable"):
+                await data_provision_service.query_selected_students(
+                    info_db_session, course_id=101,
+                )
+
+    async def test_query_selected_students_raises_on_invalid_json(
+        self, info_db_session,
+    ) -> None:
+        """Should wrap JSON decode errors in ExternalServiceError."""
+        response = MagicMock()
+        response.raise_for_status.return_value = None
+        response.json.side_effect = ValueError("Invalid JSON")
+
+        client = MagicMock()
+        client.get = AsyncMock(return_value=response)
+        client_cm = MagicMock()
+        client_cm.__aenter__ = AsyncMock(return_value=client)
+        client_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch(
+            "info_service.services.data_provision_service.httpx.AsyncClient",
+            return_value=client_cm,
+        ):
+            with pytest.raises(ExternalServiceError, match="invalid JSON"):
+                await data_provision_service.query_selected_students(
+                    info_db_session, course_id=101,
+                )
+
+    async def test_query_selected_students_raises_on_invalid_payload(
+        self, info_db_session,
+    ) -> None:
+        """Should reject when upstream response data field is not a dict."""
+        response = MagicMock()
+        response.raise_for_status.return_value = None
+        # payload is a dict, but its "data" field is a non-dict — triggers the guard
+        response.json.return_value = {"data": "not_an_object"}
+
+        client = MagicMock()
+        client.get = AsyncMock(return_value=response)
+        client_cm = MagicMock()
+        client_cm.__aenter__ = AsyncMock(return_value=client)
+        client_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch(
+            "info_service.services.data_provision_service.httpx.AsyncClient",
+            return_value=client_cm,
+        ):
+            with pytest.raises(ExternalServiceError, match="invalid payload"):
+                await data_provision_service.query_selected_students(
+                    info_db_session, course_id=101,
+                )
+
+    async def test_role_token_filter_handles_multi_digit_ids(
+        self, info_db_session,
+    ) -> None:
+        """Role ID=1 should not match user with role_ids='11' (substring trap)."""
+        await _create_user(
+            info_db_session,
+            user_no="T011",
+            username="user_role_11",
+            role_ids="11",
+            full_name="Role 11 User",
+        )
+        await _create_user(
+            info_db_session,
+            user_no="T001",
+            username="user_role_1",
+            role_ids="1",
+            full_name="Role 1 User",
+        )
+
+        # list_candidate_students uses student_role_id=1 (per default config).
+        # Only the role_ids='1' user should appear; role_ids='11' is NOT role_id=1.
+        students, student_total = await data_provision_service.list_candidate_students(
+            info_db_session, page=1, page_size=20,
+        )
+        assert student_total == 1
+        assert students[0].username == "user_role_1"
+
+    async def test_list_teachers_uses_default_pagination(
+        self, info_db_session,
+    ) -> None:
+        """Should default to page=1, page_size=100 when not specified."""
+        # Seed multiple teachers
+        for i in range(3):
+            await _create_user(
+                info_db_session,
+                user_no=f"T00{i}",
+                username=f"teacher_paginate_{i}",
+                role_ids="2",
+                full_name=f"Teacher Paginate {i}",
+            )
+
+        items, total = await data_provision_service.list_teachers(info_db_session)
+
+        assert total == 3
+        assert len(items) == 3  # all fit within default page_size=100
