@@ -1,13 +1,16 @@
 """Info Service — /data-provision/* endpoints (for B/C/F system consumption)."""
 
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
+from info_service.deps import get_current_user
 from info_service.schemas.data_provision_schema import DataProvisionWrapper
 from info_service.services.data_provision_service import data_provision_service
 from shared.response import APIResponse
+from shared.security import IdentityContext
 
 router = APIRouter(tags=["data-provision"])
 
@@ -23,6 +26,7 @@ def _pagination(total: int, page: int, page_size: int) -> dict[str, int]:
 @router.get("/teachers", response_model=APIResponse[DataProvisionWrapper])
 async def list_teachers(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=1, le=500),
 ) -> APIResponse[DataProvisionWrapper]:
@@ -42,6 +46,7 @@ async def list_teachers(
 @router.get("/candidate-students", response_model=APIResponse[DataProvisionWrapper])
 async def list_candidate_students(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=1, le=500),
 ) -> APIResponse[DataProvisionWrapper]:
@@ -61,7 +66,10 @@ async def list_candidate_students(
 
 
 @router.get("/calendars", response_model=APIResponse[DataProvisionWrapper])
-async def get_calendars(db: InfoDbSession) -> APIResponse[DataProvisionWrapper]:
+async def get_calendars(
+    db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
+) -> APIResponse[DataProvisionWrapper]:
     """Get academic calendars (for B 排课 system, Service Token auth).
 
     Returns all calendars without pagination — the dataset is tiny
@@ -85,6 +93,7 @@ async def get_calendars(db: InfoDbSession) -> APIResponse[DataProvisionWrapper]:
 @router.get("/training-programs", response_model=APIResponse[DataProvisionWrapper])
 async def list_training_programs(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=1, le=500),
     major_code: str | None = Query(default=None),
@@ -126,6 +135,7 @@ async def list_training_programs(
 @router.get("/selected-students", response_model=APIResponse[DataProvisionWrapper])
 async def query_selected_students(
     db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(get_current_user)],
     course_id: int | None = Query(default=None),
     term_code: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
