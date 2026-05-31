@@ -25,7 +25,7 @@ router = APIRouter(tags=["internal"])
 async def verify_token(
     request: InternalVerifyRequest,
     db: AuthDbSession,
-    _token: ServiceTokenPayload,
+    _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[InternalVerifyResponse]:
     """Verify JWT and return identity info (called by Gateway)."""
     data = await identity_service.verify_token(db, request)
@@ -40,7 +40,7 @@ async def verify_token(
 async def create_internal_user(
     request: InternalCreateUserRequest,
     db: AuthDbSession,
-    _token: ServiceTokenPayload,
+    _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[InternalUserResponse]:
     """Create minimal auth user + credential (called by Info Service on user creation)."""
     data = await auth_service.create_internal_user(
@@ -53,7 +53,7 @@ async def create_internal_user(
 async def disable_user(
     user_id: str,
     db: AuthDbSession,
-    _token: ServiceTokenPayload,
+    _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[None]:
     """Disable a user account (called by Info Service on logical delete)."""
     await auth_service.disable_user(db, user_id)
@@ -64,7 +64,7 @@ async def disable_user(
 async def enable_user(
     user_id: str,
     db: AuthDbSession,
-    _token: ServiceTokenPayload,
+    _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[None]:
     """Enable a user account (called by Info Service on restore)."""
     await auth_service.enable_user(db, user_id)
@@ -76,7 +76,7 @@ async def sync_user_roles(
     user_id: str,
     request: InternalSyncRolesRequest,
     db: AuthDbSession,
-    _token: ServiceTokenPayload,
+    _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[InternalRoleSyncResponse]:
     """Sync user role assignments (called by Info Service on role change)."""
     role_ids = await auth_service.sync_user_roles(db, user_id, request.role_ids)
@@ -92,7 +92,7 @@ async def sync_user_roles(
 async def delete_user(
     user_id: str,
     db: AuthDbSession,
-    _token: ServiceTokenPayload,
+    _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> Response:
     """Physically delete all auth data for a user (called by Info Service on permanent delete)."""
     await auth_service.delete_user(db, user_id)
