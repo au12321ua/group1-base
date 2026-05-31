@@ -3,12 +3,12 @@
 import pytest
 
 from auth_service.core.config import get_auth_settings
-from tests.utils import build_service_token_header, create_test_service_token
+from tests.utils import build_auth_header, create_test_service_token
 
 
 def _svc_headers() -> dict[str, str]:
     """Build service token auth headers for internal endpoint calls."""
-    return build_service_token_header(create_test_service_token())
+    return build_auth_header(create_test_service_token())
 
 
 @pytest.mark.integration
@@ -218,10 +218,6 @@ class TestInternalEndpointsAuth:
     # ── 辅助方法 ──────────────────────────────────────────────
 
     @staticmethod
-    def _svc_headers() -> dict[str, str]:
-        return build_service_token_header(create_test_service_token())
-
-    @staticmethod
     async def _login_and_get_access(async_client_auth) -> str:
         """创建用户并登录，返回 access token。"""
         from auth_service.core.config import get_auth_settings
@@ -233,7 +229,7 @@ class TestInternalEndpointsAuth:
         await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": uid, "username": uname, "role_ids": []},
-            headers=TestInternalEndpointsAuth._svc_headers(),
+            headers=_svc_headers(),
         )
         resp = await async_client_auth.post(
             "/api/v1/auth/login",
@@ -277,7 +273,7 @@ class TestInternalEndpointsAuth:
     ) -> None:
         """使用 Access Token（非 Service Token）调用内部接口应返回 401。"""
         access_token = await self._login_and_get_access(async_client_auth)
-        headers = build_service_token_header(access_token)
+        headers = build_auth_header(access_token)
         resp = await async_client_auth.request(method, url, json=body, headers=headers)
         assert resp.status_code == 401
 
@@ -288,7 +284,7 @@ class TestInternalEndpointsAuth:
     ) -> None:
         """合法 Service Token 下 /internal/verify 应成功。"""
         access_token = await self._login_and_get_access(async_client_auth)
-        headers = self._svc_headers()
+        headers = _svc_headers()
         resp = await async_client_auth.post(
             "/api/v1/internal/verify",
             json={"token": access_token},
@@ -300,7 +296,7 @@ class TestInternalEndpointsAuth:
         self, async_client_auth, auth_security_env
     ) -> None:
         """合法 Service Token 下 /internal/users 应创建成功。"""
-        headers = self._svc_headers()
+        headers = _svc_headers()
         resp = await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": "svc-u1", "username": "svcuser", "role_ids": []},
@@ -312,7 +308,7 @@ class TestInternalEndpointsAuth:
         self, async_client_auth, auth_security_env
     ) -> None:
         """合法 Service Token 下 disable/enable 应成功。"""
-        headers = self._svc_headers()
+        headers = _svc_headers()
         await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": "svc-u2", "username": "svcuser2", "role_ids": []},
@@ -331,7 +327,7 @@ class TestInternalEndpointsAuth:
         self, async_client_auth, auth_security_env
     ) -> None:
         """合法 Service Token 下角色同步应成功。"""
-        headers = self._svc_headers()
+        headers = _svc_headers()
         await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": "svc-u3", "username": "svcuser3", "role_ids": []},
@@ -348,7 +344,7 @@ class TestInternalEndpointsAuth:
         self, async_client_auth, auth_security_env
     ) -> None:
         """合法 Service Token 下删除用户应返回 204。"""
-        headers = self._svc_headers()
+        headers = _svc_headers()
         await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": "svc-u4", "username": "svcuser4", "role_ids": []},

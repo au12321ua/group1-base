@@ -116,9 +116,11 @@ _ACADEMIC_WRITE = (
     "recycle:delete",
 )
 
+_STUDENT_TEACHER_PERMISSIONS = frozenset((*_READ_PERMISSIONS, "file:create", "file:delete"))
+
 _ROLE_PERMISSION_CODES: dict[str, frozenset[str]] = {
-    "STUDENT": frozenset((*_READ_PERMISSIONS, "file:create", "file:delete")),
-    "TEACHER": frozenset((*_READ_PERMISSIONS, "file:create", "file:delete")),
+    "STUDENT": _STUDENT_TEACHER_PERMISSIONS,
+    "TEACHER": _STUDENT_TEACHER_PERMISSIONS,
     "ACADEMIC_ADMIN": frozenset(_ACADEMIC_WRITE),
     "SYS_ADMIN": frozenset(code for code, *_ in _PERMISSIONS),
 }

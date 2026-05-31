@@ -60,11 +60,6 @@ def build_auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def build_service_token_header(token: str) -> dict[str, str]:
-    """Build Authorization header with Bearer service token (for internal endpoint tests)."""
-    return {"Authorization": f"Bearer {token}"}
-
-
 def create_test_service_token(
     client_id: str = "info_service",
     scope: str = "internal",
