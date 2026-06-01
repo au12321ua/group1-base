@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Response
 
-from auth_service.api.deps import AuthDbSession
+from auth_service.api.deps import AuditDbSession, AuthDbSession
 from auth_service.deps import ServiceTokenPayload
 from auth_service.schemas.auth_schema import (
     InternalCreateUserRequest,
@@ -17,8 +17,14 @@ from auth_service.schemas.auth_schema import (
 from auth_service.services.auth_service import auth_service
 from auth_service.services.identity_service import identity_service
 from shared.response import APIResponse
+from shared.services.audit_service import audit_service
 
 router = APIRouter(tags=["internal"])
+
+
+def _service_operator(payload: dict) -> str:
+    """Extract service client_id from the service token payload."""
+    return payload.get("client_id", payload.get("sub", "unknown_service"))
 
 
 @router.post("/verify", response_model=APIResponse[InternalVerifyResponse])
@@ -40,11 +46,21 @@ async def verify_token(
 async def create_internal_user(
     request: InternalCreateUserRequest,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
     _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[InternalUserResponse]:
     """Create minimal auth user + credential (called by Info Service on user creation)."""
     data = await auth_service.create_internal_user(
         db, request.user_id, request.username, request.role_ids
+    )
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=_service_operator(_service_auth),
+        operator_role="SERVICE",
+        target_type="user",
+        target_id=request.user_id,
+        action="user_created",
+        result="success",
     )
     return APIResponse(data=data)
 
@@ -53,10 +69,20 @@ async def create_internal_user(
 async def disable_user(
     user_id: str,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
     _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[None]:
     """Disable a user account (called by Info Service on logical delete)."""
     await auth_service.disable_user(db, user_id)
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=_service_operator(_service_auth),
+        operator_role="SERVICE",
+        target_type="user",
+        target_id=user_id,
+        action="user_disabled",
+        result="success",
+    )
     return APIResponse(data=None)
 
 
@@ -64,10 +90,20 @@ async def disable_user(
 async def enable_user(
     user_id: str,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
     _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[None]:
     """Enable a user account (called by Info Service on restore)."""
     await auth_service.enable_user(db, user_id)
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=_service_operator(_service_auth),
+        operator_role="SERVICE",
+        target_type="user",
+        target_id=user_id,
+        action="user_enabled",
+        result="success",
+    )
     return APIResponse(data=None)
 
 
@@ -76,10 +112,21 @@ async def sync_user_roles(
     user_id: str,
     request: InternalSyncRolesRequest,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
     _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> APIResponse[InternalRoleSyncResponse]:
     """Sync user role assignments (called by Info Service on role change)."""
     role_ids = await auth_service.sync_user_roles(db, user_id, request.role_ids)
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=_service_operator(_service_auth),
+        operator_role="SERVICE",
+        target_type="user",
+        target_id=user_id,
+        action="user_roles_synced",
+        result="success",
+        reason=f"roles: {role_ids}",
+    )
     data = InternalRoleSyncResponse(
         user_id=user_id,
         role_ids=role_ids,
@@ -92,8 +139,18 @@ async def sync_user_roles(
 async def delete_user(
     user_id: str,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
     _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
 ) -> Response:
     """Physically delete all auth data for a user (called by Info Service on permanent delete)."""
     await auth_service.delete_user(db, user_id)
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=_service_operator(_service_auth),
+        operator_role="SERVICE",
+        target_type="user",
+        target_id=user_id,
+        action="user_deleted",
+        result="success",
+    )
     return Response(status_code=204)

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 
 import auth_service.models  # noqa: F401  — register tables in SQLModel.metadata
+import shared.models.audit_log  # noqa: F401  — register audit tables in SQLModel.metadata
 from auth_service.api.v1.router import router as v1_router
 from auth_service.core.config import get_auth_settings
 from shared.database import create_get_db
@@ -17,9 +18,11 @@ from shared.logging import RequestIDMiddleware, RequestLoggingMiddleware, get_lo
 
 settings = get_auth_settings()
 engine = create_async_engine(settings.auth_database_url, echo=False)
+audit_engine = create_async_engine(settings.audit_database_url, echo=False)
 get_db = create_get_db(engine)
+get_audit_db = create_get_db(audit_engine)
 
-__all__ = ["app", "engine", "get_db"]
+__all__ = ["app", "engine", "get_db", "audit_engine", "get_audit_db"]
 
 _AUTH_TABLES = frozenset(
     {
@@ -34,16 +37,31 @@ _AUTH_TABLES = frozenset(
     }
 )
 
+_AUDIT_TABLES = frozenset(
+    {
+        "audit_logs",
+        "dead_letter_queue",
+        "operation_logs",
+    }
+)
+
+
+def _create_tables(conn, table_names: frozenset[str]) -> None:
+    tables = [t for t in SQLModel.metadata.sorted_tables if t.name in table_names]
+    SQLModel.metadata.create_all(conn, tables=tables)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create Auth DB tables and runtime dirs on startup, dispose engine on shutdown."""
+    """Create Auth + Audit DB tables and runtime dirs on startup, dispose engines on shutdown."""
     os.makedirs("data", exist_ok=True)
     async with engine.begin() as conn:
-        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _AUTH_TABLES]
-        await conn.run_sync(SQLModel.metadata.create_all, tables=tables)
+        await conn.run_sync(_create_tables, _AUTH_TABLES)
+    async with audit_engine.begin() as conn:
+        await conn.run_sync(_create_tables, _AUDIT_TABLES)
     yield
     await engine.dispose()
+    await audit_engine.dispose()
 
 
 app = FastAPI(

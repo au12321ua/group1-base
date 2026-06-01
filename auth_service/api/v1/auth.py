@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter, Request
 
-from auth_service.api.deps import AuthDbSession
+from auth_service.api.deps import AuditDbSession, AuthDbSession
+from auth_service.core.security import verify_token
 from auth_service.deps import CurrentUserId
 from auth_service.schemas.auth_schema import (
     ChangePasswordRequest,
@@ -18,7 +19,9 @@ from auth_service.schemas.auth_schema import (
 from auth_service.schemas.user_schema import AuthUserResponse
 from auth_service.services.auth_service import auth_service
 from auth_service.services.key_service import key_service
+from shared.exceptions import AccountDisabledError, AccountLockedError, AuthenticationError
 from shared.response import APIResponse
+from shared.services.audit_service import audit_service
 
 router = APIRouter(tags=["auth"])
 
@@ -28,11 +31,34 @@ async def login(
     body: LoginRequest,
     http_request: Request,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
 ) -> APIResponse[LoginResponse]:
     """User login — returns access + refresh token pair."""
     client_ip = http_request.client.host if http_request.client else ""
-    data = await auth_service.login(
-        db, body.username, body.password, client_ip=client_ip
+    try:
+        data = await auth_service.login(
+            db, body.username, body.password, client_ip=client_ip
+        )
+    except (AuthenticationError, AccountLockedError, AccountDisabledError) as exc:
+        await audit_service.write_audit_log(
+            audit_db,
+            operator_user_id=body.username,
+            operator_role="",
+            target_type="auth",
+            action="user_login",
+            result="failed",
+            reason=str(exc.message) if hasattr(exc, "message") else type(exc).__name__,
+        )
+        raise
+
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=data.user_id,
+        operator_role=data.role,
+        target_type="auth",
+        target_id=data.user_id,
+        action="user_login",
+        result="success",
     )
     return APIResponse(data=data)
 
@@ -41,9 +67,31 @@ async def login(
 async def service_login(
     request: ServiceLoginRequest,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
 ) -> APIResponse[ServiceLoginResponse]:
     """Service-to-service login — returns service token."""
-    data = await auth_service.service_login(db, request.client_id, request.client_secret)
+    try:
+        data = await auth_service.service_login(db, request.client_id, request.client_secret)
+    except AuthenticationError as exc:
+        await audit_service.write_audit_log(
+            audit_db,
+            operator_user_id=request.client_id,
+            operator_role="SERVICE",
+            target_type="auth",
+            action="service_login",
+            result="failed",
+            reason=str(exc.message) if hasattr(exc, "message") else type(exc).__name__,
+        )
+        raise
+
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=request.client_id,
+        operator_role="SERVICE",
+        target_type="auth",
+        action="service_login",
+        result="success",
+    )
     return APIResponse(data=data)
 
 
@@ -51,9 +99,26 @@ async def service_login(
 async def logout(
     request: LogoutRequest,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
 ) -> APIResponse[None]:
     """Logout — revoke refresh token."""
+    # Extract user_id from refresh token for audit before revocation
+    try:
+        payload = verify_token(request.refresh_token)
+        user_id = payload.get("sub", "")
+    except Exception:
+        user_id = ""
+
     await auth_service.logout(db, request.refresh_token)
+
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=user_id,
+        operator_role="",
+        target_type="auth",
+        action="user_logout",
+        result="success",
+    )
     return APIResponse(data=None)
 
 
@@ -82,9 +147,20 @@ async def change_password(
     request: ChangePasswordRequest,
     current_user_id: CurrentUserId,
     db: AuthDbSession,
+    audit_db: AuditDbSession,
 ) -> APIResponse[None]:
     """Change password — requires old password verification."""
     await auth_service.change_password(db, current_user_id, request)
+
+    await audit_service.write_audit_log(
+        audit_db,
+        operator_user_id=current_user_id,
+        operator_role="",
+        target_type="auth",
+        target_id=current_user_id,
+        action="password_changed",
+        result="success",
+    )
     return APIResponse(data=None)
 
 
