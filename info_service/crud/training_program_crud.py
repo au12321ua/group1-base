@@ -76,6 +76,23 @@ class TrainingProgramCRUD(BaseCRUD[TrainingProgram]):
         )
         return list(result.all())
 
+    async def get_course_ids_by_programs(
+        self, db: AsyncSession, program_ids: list[int]
+    ) -> dict[int, list[int]]:
+        """Batch lookup: return {program_id: [course_id, ...]} for the given programs."""
+        if not program_ids:
+            return {}
+        result = await db.exec(
+            select(
+                TrainingProgramCourse.program_id,
+                TrainingProgramCourse.course_id,
+            ).where(TrainingProgramCourse.program_id.in_(program_ids))
+        )
+        mapping: dict[int, list[int]] = {pid: [] for pid in program_ids}
+        for pid, cid in result.all():
+            mapping[pid].append(cid)
+        return mapping
+
     async def add_courses_to_program(
         self, db: AsyncSession, program_id: int, course_ids: list[int]
     ) -> list[TrainingProgramCourse]:
@@ -92,14 +109,13 @@ class TrainingProgramCRUD(BaseCRUD[TrainingProgram]):
         self, db: AsyncSession, program_id: int, course_ids: list[int]
     ) -> list[TrainingProgramCourse]:
         """Atomically replace all course associations for a program."""
-        # Delete existing associations (flush to emit DELETE before INSERT)
-        existing = await db.exec(
-            select(TrainingProgramCourse).where(
+        # Bulk delete existing associations
+        from sqlmodel import delete as sql_delete
+        await db.exec(
+            sql_delete(TrainingProgramCourse).where(
                 TrainingProgramCourse.program_id == program_id
             )
         )
-        for assoc in existing.all():
-            await db.delete(assoc)
         await db.flush()
 
         # Create new associations

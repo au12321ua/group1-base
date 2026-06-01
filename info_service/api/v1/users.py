@@ -37,7 +37,6 @@ async def list_users(
         page_size=query.page_size,
         keyword=query.keyword,
         status=query.status,
-        role=query.role,
         sort_by=query.sort_by,
         sort_order=query.sort_order,
     )

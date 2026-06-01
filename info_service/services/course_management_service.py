@@ -213,10 +213,6 @@ class CourseManagementService:
         if target_course_id != offering.course_id:
             await self._ensure_course_exists(db, target_course_id)
 
-        # Remove teacher_ids from payload — teachers are managed via
-        # TeacherCourseAssignment, not stored inline on the offering.
-        payload.pop("teacher_ids", None)
-
         try:
             return await offering_crud.update(db, offering, **payload)
         except IntegrityError:
@@ -354,6 +350,18 @@ class CourseManagementService:
 
     # ---- Teacher assignments ----
 
+    @staticmethod
+    def _normalize_teacher_ids(teacher_ids: list[str]) -> list[str]:
+        """Deduplicate and strip whitespace from a list of teacher IDs."""
+        seen: set[str] = set()
+        normalized: list[str] = []
+        for tid in teacher_ids:
+            tid = tid.strip()
+            if tid and tid not in seen:
+                seen.add(tid)
+                normalized.append(tid)
+        return normalized
+
     async def _get_schedule_offering_id(self, db: AsyncSession, schedule_id: int) -> int:
         """Resolve the offering behind a schedule sub-resource."""
         schedule = await self._ensure_schedule_exists(db, schedule_id)
@@ -371,14 +379,7 @@ class CourseManagementService:
     ) -> list[TeacherCourseAssignment]:
         """Replace all teacher assignments for a schedule."""
         offering_id = await self._get_schedule_offering_id(db, schedule_id)
-        # Deduplicate and strip whitespace
-        seen: set[str] = set()
-        normalized: list[str] = []
-        for teacher_id in teacher_ids:
-            tid = teacher_id.strip()
-            if tid and tid not in seen:
-                seen.add(tid)
-                normalized.append(tid)
+        normalized = self._normalize_teacher_ids(teacher_ids)
 
         await teacher_assignment_crud.delete_by_offering(db, offering_id)
 
@@ -397,14 +398,7 @@ class CourseManagementService:
     ) -> list[TeacherCourseAssignment]:
         """Add teacher assignments to a schedule."""
         offering_id = await self._get_schedule_offering_id(db, schedule_id)
-        # Deduplicate and strip whitespace
-        seen: set[str] = set()
-        normalized: list[str] = []
-        for teacher_id in teacher_ids:
-            tid = teacher_id.strip()
-            if tid and tid not in seen:
-                seen.add(tid)
-                normalized.append(tid)
+        normalized = self._normalize_teacher_ids(teacher_ids)
 
         existing = await teacher_assignment_crud.get_by_offering(db, offering_id)
         existing_by_teacher = {assignment.teacher_id: assignment for assignment in existing}

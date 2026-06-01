@@ -8,9 +8,9 @@ from sqlmodel import func, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.core.config import get_info_settings
+from info_service.crud.training_program_crud import training_program_crud
 from info_service.models.academic_calendar import AcademicCalendar
 from info_service.models.training_program import TrainingProgram
-from info_service.models.training_program_course import TrainingProgramCourse
 from info_service.models.user import UserInfo
 from info_service.models.user_profile import UserProfile
 from info_service.schemas.data_provision_schema import (
@@ -29,11 +29,11 @@ class DataProvisionService:
     def __init__(self) -> None:
         self._settings = get_info_settings()
 
-    def _active_user_conditions(self, role_id: int) -> list:  # noqa: ARG002
+    @staticmethod
+    def _active_user_conditions() -> list:
         """Build filtering conditions for active users.
 
-        Note: role_id is no longer used for filtering — role information
-        is managed by Auth Service, not stored in Info Service.
+        Role information is managed by Auth Service, not stored in Info Service.
         """
         return [
             UserInfo.is_deleted == False,  # noqa: E712
@@ -46,17 +46,6 @@ class DataProvisionService:
     @staticmethod
     def _paginate(page: int, page_size: int) -> tuple[int, int]:
         return (page - 1) * page_size, page_size
-
-    async def _get_program_course_ids(
-        self, db: AsyncSession, program_id: int
-    ) -> list[int]:
-        """Get required course IDs for a training program from association table."""
-        result = await db.exec(
-            select(TrainingProgramCourse.course_id).where(
-                TrainingProgramCourse.program_id == program_id
-            )
-        )
-        return list(result.all())
 
     @staticmethod
     def _infer_grade(user_no: str) -> str:
@@ -81,9 +70,13 @@ class DataProvisionService:
             value = datetime.fromisoformat(value.replace("Z", "+00:00"))
         return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
-    async def get_user_snapshot_time(self, db: AsyncSession, role_id: int) -> datetime:
-        """Return the latest update time for the requested role dataset."""
-        conditions = self._active_user_conditions(role_id)
+    async def get_user_snapshot_time(self, db: AsyncSession, role_id: int) -> datetime:  # noqa: ARG002
+        """Return the latest update time for the requested role dataset.
+
+        The *role_id* parameter is accepted for backward compatibility
+        (callers were built when roles were still stored in Info Service).
+        """
+        conditions = self._active_user_conditions()
         user_ts, profile_ts = (
             await db.exec(
                 select(
@@ -113,7 +106,7 @@ class DataProvisionService:
     ) -> tuple[list[TeacherDataResponse], int]:
         """List all active teachers for B system consumption."""
         skip, limit = self._paginate(page, page_size)
-        conditions = self._active_user_conditions(self._settings.teacher_role_id)
+        conditions = self._active_user_conditions()
 
         stmt = (
             select(UserInfo, UserProfile)
@@ -150,7 +143,7 @@ class DataProvisionService:
     ) -> tuple[list[CandidateStudentResponse], int]:
         """List all active candidate students for B system."""
         skip, limit = self._paginate(page, page_size)
-        conditions = self._active_user_conditions(self._settings.student_role_id)
+        conditions = self._active_user_conditions()
 
         stmt = (
             select(UserInfo, UserProfile)
@@ -230,9 +223,13 @@ class DataProvisionService:
 
         programs = list((await db.exec(stmt)).all())
         total = (await db.exec(count_stmt)).one()
+
+        # Batch-fetch course associations for all programs
+        program_ids = [p.id for p in programs]
+        course_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
+
         items = []
         for program in programs:
-            course_ids = await self._get_program_course_ids(db, program.id)
             items.append(
                 TrainingProgramDataResponse(
                     id=program.id,
@@ -240,7 +237,7 @@ class DataProvisionService:
                     major_code=program.major_code,
                     grade=program.grade,
                     version=program.version,
-                    required_course_ids=course_ids,
+                    required_course_ids=course_map.get(program.id, []),
                     snapshot_time=self._ensure_utc(program.snapshot_time),
                 )
             )

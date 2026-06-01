@@ -74,4 +74,3 @@ class UserListQuery(BaseModel):
     sort_order: str = Field(default="desc")
     keyword: str | None = None
     status: str | None = None
-    role: str | None = None

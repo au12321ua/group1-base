@@ -115,7 +115,6 @@ class UserManagementService:
             id=user.id,
             user_no=user.user_no,
             username=user.username,
-            role_ids="",  # managed by Auth Service
             is_deleted=user.is_deleted,
             profile=profile_schema,
             created_at=user.created_at,
@@ -198,15 +197,10 @@ class UserManagementService:
         page_size: int = 20,
         keyword: str | None = None,
         status: str | None = None,
-        role: str | None = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[UserResponse], int]:
-        """List users with pagination and filters. Returns (items, total).
-
-        The ``role`` parameter is accepted for backward compatibility
-        but ignored — role-based filtering requires Auth Service.
-        """
+        """List users with pagination and filters. Returns (items, total)."""
         skip = (page - 1) * page_size
         users, total = await user_crud.get_multi(
             db,

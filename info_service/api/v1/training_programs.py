@@ -28,21 +28,19 @@ from shared.security import IdentityContext
 router = APIRouter(tags=["training-programs"])
 
 
-async def _build_program_response(db, program) -> TrainingProgramResponse:
-    """Assemble response with required_course_ids from the association table."""
-    associations = await training_program_crud.get_courses_by_program(db, program.id)
-    course_ids = [assoc.course_id for assoc in associations]
-    return TrainingProgramResponse(
-        id=program.id,
-        program_code=program.program_code,
-        major_code=program.major_code,
-        grade=program.grade,
-        version=program.version,
-        required_course_ids=course_ids,
-        snapshot_time=program.snapshot_time,
-        created_at=program.created_at,
-        updated_at=program.updated_at,
-    )
+async def _build_program_response(
+    db, program, course_ids: list[int] | None = None
+) -> TrainingProgramResponse:
+    """Assemble response with required_course_ids from the association table.
+
+    If *course_ids* is provided the DB query is skipped (batch path).
+    """
+    if course_ids is None:
+        associations = await training_program_crud.get_courses_by_program(db, program.id)
+        course_ids = [assoc.course_id for assoc in associations]
+    resp = TrainingProgramResponse.model_validate(program)
+    resp.required_course_ids = course_ids
+    return resp
 
 
 @router.get("/", response_model=ListResponse[TrainingProgramResponse])
@@ -59,9 +57,12 @@ async def list_training_programs(
         skip=skip,
         limit=page_size,
     )
+    # Batch-fetch course associations for all programs in one query
+    program_ids = [p.id for p in items]
+    course_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
     return ListResponse(
         data=PaginatedData(
-            items=[await _build_program_response(db, item) for item in items],
+            items=[await _build_program_response(db, p, course_map.get(p.id, [])) for p in items],
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
@@ -104,9 +105,11 @@ async def get_by_major(
         major_code=major_code,
         grade=grade,
     )
+    program_ids = [p.id for p in items]
+    course_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
     return ListResponse(
         data=PaginatedData(
-            items=[await _build_program_response(db, item) for item in items],
+            items=[await _build_program_response(db, p, course_map.get(p.id, [])) for p in items],
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
