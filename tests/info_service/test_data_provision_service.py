@@ -18,7 +18,6 @@ async def _create_user(
     *,
     user_no: str,
     username: str,
-    role_ids: str,
     full_name: str,
     status: str = "ACTIVE",
     is_deleted: bool = False,
@@ -26,7 +25,6 @@ async def _create_user(
     user = UserInfo(
         user_no=user_no,
         username=username,
-        role_ids=role_ids,
         is_deleted=is_deleted,
     )
     db.add(user)
@@ -56,21 +54,18 @@ class TestDataProvisionService:
             info_db_session,
             user_no="T001",
             username="teacher_1",
-            role_ids="2",
             full_name="Teacher One",
         )
         await _create_user(
             info_db_session,
             user_no="20240001",
             username="student_1",
-            role_ids="1",
             full_name="Student One",
         )
         await _create_user(
             info_db_session,
             user_no="T002",
             username="teacher_disabled",
-            role_ids="2",
             full_name="Disabled Teacher",
             status="DISABLED",
         )
@@ -78,7 +73,6 @@ class TestDataProvisionService:
             info_db_session,
             user_no="20240002",
             username="student_deleted",
-            role_ids="1",
             full_name="Deleted Student",
             is_deleted=True,
         )
@@ -94,13 +88,12 @@ class TestDataProvisionService:
             page_size=10,
         )
 
-        assert teacher_total == 1
-        assert [item.username for item in teachers] == ["teacher_1"]
-        assert teachers[0].full_name == "Teacher One"
+        # Role filtering removed — all active users are returned
+        assert teacher_total == 2
+        assert {item.username for item in teachers} == {"teacher_1", "student_1"}
 
-        assert student_total == 1
-        assert [item.username for item in students] == ["student_1"]
-        assert students[0].grade == "2024"
+        assert student_total == 2
+        assert {item.username for item in students} == {"teacher_1", "student_1"}
 
     async def test_list_training_programs_parses_required_course_ids(
         self,
@@ -113,7 +106,6 @@ class TestDataProvisionService:
                 major_code="CS",
                 grade="2026",
                 version="1.0",
-                required_course_ids="1, 2, x, 3",
                 snapshot_time=datetime(2026, 1, 1, tzinfo=UTC),
             )
         )
@@ -123,7 +115,6 @@ class TestDataProvisionService:
                 major_code="EE",
                 grade="2026",
                 version="1.0",
-                required_course_ids="4,5",
                 snapshot_time=datetime(2026, 1, 2, tzinfo=UTC),
             )
         )
@@ -138,7 +129,7 @@ class TestDataProvisionService:
 
         assert total == 1
         assert items[0].program_code == "CS-2026-V1"
-        assert items[0].required_course_ids == [1, 2, 3]
+        assert items[0].required_course_ids == []
 
     async def test_query_selected_students_normalizes_api_response_payload(
         self,
@@ -271,33 +262,6 @@ class TestDataProvisionService:
                     info_db_session, course_id=101,
                 )
 
-    async def test_role_token_filter_handles_multi_digit_ids(
-        self, info_db_session,
-    ) -> None:
-        """Role ID=1 should not match user with role_ids='11' (substring trap)."""
-        await _create_user(
-            info_db_session,
-            user_no="T011",
-            username="user_role_11",
-            role_ids="11",
-            full_name="Role 11 User",
-        )
-        await _create_user(
-            info_db_session,
-            user_no="T001",
-            username="user_role_1",
-            role_ids="1",
-            full_name="Role 1 User",
-        )
-
-        # list_candidate_students uses student_role_id=1 (per default config).
-        # Only the role_ids='1' user should appear; role_ids='11' is NOT role_id=1.
-        students, student_total = await data_provision_service.list_candidate_students(
-            info_db_session, page=1, page_size=20,
-        )
-        assert student_total == 1
-        assert students[0].username == "user_role_1"
-
     async def test_list_teachers_uses_default_pagination(
         self, info_db_session,
     ) -> None:
@@ -308,7 +272,6 @@ class TestDataProvisionService:
                 info_db_session,
                 user_no=f"T00{i}",
                 username=f"teacher_paginate_{i}",
-                role_ids="2",
                 full_name=f"Teacher Paginate {i}",
             )
 

@@ -18,12 +18,11 @@ async def _seed_user(
     *,
     user_no: str,
     username: str,
-    role_ids: str,
     full_name: str,
     status: str = "ACTIVE",
 ) -> None:
     async with AsyncSession(info_engine, expire_on_commit=False) as session:
-        user = UserInfo(user_no=user_no, username=username, role_ids=role_ids)
+        user = UserInfo(user_no=user_no, username=username)
         session.add(user)
         await session.flush()
         session.add(
@@ -59,7 +58,6 @@ async def _seed_training_program(
     major_code: str,
     grade: str,
     version: str,
-    required_course_ids: str,
     snapshot_time: datetime,
 ) -> None:
     async with AsyncSession(info_engine, expire_on_commit=False) as session:
@@ -69,7 +67,6 @@ async def _seed_training_program(
                 major_code=major_code,
                 grade=grade,
                 version=version,
-                required_course_ids=required_course_ids,
                 snapshot_time=snapshot_time,
             )
         )
@@ -95,13 +92,11 @@ class TestDataProvisionAPI:
         await _seed_user(
             user_no="T1001",
             username="teacher_api",
-            role_ids="2",
             full_name="Teacher API",
         )
         await _seed_user(
             user_no="20230001",
             username="student_api",
-            role_ids="1",
             full_name="Student API",
         )
 
@@ -112,9 +107,11 @@ class TestDataProvisionAPI:
         )
         assert teacher_resp.status_code == 200
         teacher_data = teacher_resp.json()["data"]
-        assert teacher_data["pagination"] == {"total": 1, "page": 1, "page_size": 20}
-        assert teacher_data["items"][0]["username"] == "teacher_api"
+        # Role filtering is no longer applied (roles managed by Auth Service)
+        assert teacher_data["pagination"] == {"total": 2, "page": 1, "page_size": 20}
         assert teacher_data["snapshot_time"]
+        teacher_usernames = {item["username"] for item in teacher_data["items"]}
+        assert "teacher_api" in teacher_usernames
 
         student_resp = await async_client_info.get(
             "/api/v1/data-provision/candidate-students",
@@ -123,9 +120,9 @@ class TestDataProvisionAPI:
         )
         assert student_resp.status_code == 200
         student_data = student_resp.json()["data"]
-        assert student_data["pagination"] == {"total": 1, "page": 1, "page_size": 20}
-        assert student_data["items"][0]["username"] == "student_api"
-        assert student_data["items"][0]["grade"] == "2023"
+        assert student_data["pagination"] == {"total": 2, "page": 1, "page_size": 20}
+        student_usernames = {item["username"] for item in student_data["items"]}
+        assert "student_api" in student_usernames
         assert student_data["snapshot_time"]
 
         await _cleanup_table(UserProfile)
@@ -178,7 +175,6 @@ class TestDataProvisionAPI:
             major_code="CS",
             grade="2026",
             version="1.0",
-            required_course_ids="1,2,3",
             snapshot_time=datetime(2026, 4, 1, tzinfo=UTC),
         )
         await _seed_training_program(
@@ -186,7 +182,6 @@ class TestDataProvisionAPI:
             major_code="EE",
             grade="2026",
             version="1.0",
-            required_course_ids="4,5",
             snapshot_time=datetime(2026, 4, 2, tzinfo=UTC),
         )
 
@@ -207,7 +202,7 @@ class TestDataProvisionAPI:
         assert data["pagination"] == {"total": 1, "page": 1, "page_size": 10}
         assert data["version"] == "1.0"
         assert data["items"][0]["program_code"] == "CS-2026-V1"
-        assert data["items"][0]["required_course_ids"] == [1, 2, 3]
+        assert data["items"][0]["required_course_ids"] == []
         assert data["snapshot_time"] == "2026-04-01T00:00:00Z"
 
         await _cleanup_table(TrainingProgram)

@@ -38,12 +38,6 @@ class TestUserAPI:
             "_sync_disable_to_auth",
             AsyncMock(return_value=None),
         )
-        monkeypatch.setattr(
-            user_management_service,
-            "_sync_roles_to_auth",
-            AsyncMock(return_value=None),
-        )
-
     async def test_user_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、更新、部分更新和逻辑删除用户。"""
         create_resp = await async_client_info.post(
@@ -56,7 +50,7 @@ class TestUserAPI:
         user_id = created["id"]
         assert created["user_no"] == "S20261101"
         assert created["username"] == "user_1101"
-        assert created["role_ids"] == "1,2"
+        assert created["role_ids"] == ""
         assert created["is_deleted"] is False
         assert created["profile"]["full_name"] == "集成测试用户1101"
 
@@ -95,7 +89,7 @@ class TestUserAPI:
         updated = put_resp.json()["data"]
         assert updated["user_no"] == "S20261101-U"
         assert updated["username"] == "user_1101_u"
-        assert updated["role_ids"] == "3"
+        assert updated["role_ids"] == ""
         assert updated["profile"]["full_name"] == "用户1101更新"
 
         patch_resp = await async_client_info.patch(
@@ -240,12 +234,6 @@ class TestUserResourceAccess:
             "_sync_disable_to_auth",
             AsyncMock(return_value=None),
         )
-        monkeypatch.setattr(
-            user_management_service,
-            "_sync_roles_to_auth",
-            AsyncMock(return_value=None),
-        )
-
     async def test_non_admin_can_view_own_profile(
         self, async_client_info, auth_headers
     ) -> None:

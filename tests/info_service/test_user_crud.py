@@ -42,7 +42,7 @@ class TestUserInfoCRUD:
 
     async def test_create_user(self, info_db_session):
         user = await user_crud.create(
-            info_db_session, UserInfo(user_no="S002", username="bob", role_ids="1,2")
+            info_db_session, UserInfo(user_no="S002", username="bob")
         )
         assert user.id is not None
         assert user.user_no == "S002"
@@ -53,10 +53,9 @@ class TestUserInfoCRUD:
             info_db_session, UserInfo(user_no="S003", username="charlie")
         )
         updated = await user_crud.update(
-            info_db_session, user, user_no="S003-NEW", role_ids="3"
+            info_db_session, user, user_no="S003-NEW"
         )
         assert updated.user_no == "S003-NEW"
-        assert updated.role_ids == "3"
 
     async def test_get_multi_pagination(self, info_db_session):
         for i in range(3):
