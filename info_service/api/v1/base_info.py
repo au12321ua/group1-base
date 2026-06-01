@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
-from info_service.deps import require_permission
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.base_info_schema import (
     BaseInfoCreateRequest,
     BaseInfoPatchRequest,
@@ -67,8 +67,9 @@ async def update_base_info(
     request: BaseInfoUpdateRequest,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:update"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[BaseInfoResponse]:
-    """Full update base info."""
+    """Full update base info (admin only)."""
     item = await course_management_service.update_base_info(db, item_id, request)
     return APIResponse(data=BaseInfoResponse.model_validate(item))
 
@@ -79,8 +80,9 @@ async def patch_base_info(
     request: BaseInfoPatchRequest,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:update"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[BaseInfoResponse]:
-    """Partial update base info."""
+    """Partial update base info (admin only)."""
     item = await course_management_service.patch_base_info(db, item_id, request)
     return APIResponse(data=BaseInfoResponse.model_validate(item))
 
@@ -90,7 +92,8 @@ async def delete_base_info(
     item_id: int,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:delete"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
-    """Delete base info entry."""
+    """Delete base info entry (admin only)."""
     await course_management_service.delete_base_info(db, item_id)
     return APIResponse(data=None)

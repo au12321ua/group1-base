@@ -9,6 +9,7 @@ from tests.info_service.api_helpers import (
     create_offering,
     create_schedule,
 )
+from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
@@ -284,3 +285,174 @@ class TestScheduleAPI:
             "/api/v1/schedules/", params={"page": 0}, headers=auth_headers
         )
         assert resp.status_code == 422
+
+
+@pytest.mark.integration
+class TestScheduleResourceAccess:
+    """验证排课资源级授权：只有关联开课的分配教师或管理员可以修改排课。"""
+
+    async def test_assigned_teacher_can_update_schedule(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """关联开课的分配教师可以更新排课。"""
+        classroom_id = await create_classroom(room_no="C-301")
+        course_id = await create_course(
+            async_client_info, course_code="CS901", course_name="Schedule Auth Test"
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=["t-auth-1"],
+            capacity=50,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=1,
+            start_period=1,
+            end_period=2,
+        )
+        teacher_headers = build_identity_headers(
+            user_id="t-auth-1", role="TEACHER", permissions=["schedule:update"]
+        )
+        resp = await async_client_info.patch(
+            f"/api/v1/schedules/{schedule_id}",
+            json={"week_range": "1-8"},
+            headers=teacher_headers,
+        )
+        assert resp.status_code == 200
+
+    async def test_non_assigned_teacher_cannot_update_schedule(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """未分配到关联开课的教师更新排课应返回 403。"""
+        classroom_id = await create_classroom(room_no="C-302")
+        course_id = await create_course(
+            async_client_info, course_code="CS902", course_name="Schedule Deny Test"
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=["t-auth-2"],
+            capacity=50,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=3,
+            start_period=5,
+            end_period=6,
+        )
+        other_teacher_headers = build_identity_headers(
+            user_id="t-unauthorized", role="TEACHER", permissions=["schedule:update"]
+        )
+        resp = await async_client_info.patch(
+            f"/api/v1/schedules/{schedule_id}",
+            json={"day_of_week": 4},
+            headers=other_teacher_headers,
+        )
+        assert resp.status_code == 403
+
+    async def test_student_cannot_delete_schedule(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """学生尝试删除排课应返回 403。"""
+        classroom_id = await create_classroom(room_no="C-303")
+        course_id = await create_course(
+            async_client_info, course_code="CS903", course_name="Student Schedule Test"
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=[],
+            capacity=40,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=5,
+            start_period=7,
+            end_period=8,
+        )
+        student_headers = build_identity_headers(
+            user_id="student-1", role="STUDENT", permissions=["schedule:delete"]
+        )
+        resp = await async_client_info.delete(
+            f"/api/v1/schedules/{schedule_id}", headers=student_headers
+        )
+        assert resp.status_code == 403
+
+    async def test_non_assigned_cannot_manage_teachers(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """未分配教师不能管理排课教师分配。"""
+        classroom_id = await create_classroom(room_no="C-304")
+        course_id = await create_course(
+            async_client_info, course_code="CS904", course_name="Teacher Mgmt Test"
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=["t-assigned"],
+            capacity=50,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=1,
+            start_period=1,
+            end_period=2,
+        )
+        other_headers = build_identity_headers(
+            user_id="t-other", role="TEACHER", permissions=["schedule:update"]
+        )
+        resp = await async_client_info.put(
+            f"/api/v1/schedules/{schedule_id}/teachers",
+            json=["t-other"],
+            headers=other_headers,
+        )
+        assert resp.status_code == 403
+
+    async def test_admin_can_delete_schedule(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """管理员可以删除任意排课。"""
+        classroom_id = await create_classroom(room_no="C-305")
+        course_id = await create_course(
+            async_client_info, course_code="CS905", course_name="Admin Schedule Test"
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=[],
+            capacity=40,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=2,
+            start_period=3,
+            end_period=4,
+        )
+        admin_delete_headers = build_identity_headers(
+            user_id="admin-user", role="SYS_ADMIN", permissions=["schedule:delete"]
+        )
+        resp = await async_client_info.delete(
+            f"/api/v1/schedules/{schedule_id}", headers=admin_delete_headers
+        )
+        assert resp.status_code == 200

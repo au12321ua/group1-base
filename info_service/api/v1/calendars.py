@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
-from info_service.deps import require_permission
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.calendar_schema import (
     CalendarCreateRequest,
     CalendarPatchRequest,
@@ -78,8 +78,9 @@ async def update_calendar(
     request: CalendarUpdateRequest,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("calendar:update"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[CalendarResponse]:
-    """Full update calendar."""
+    """Full update calendar (admin only)."""
     cal = await course_management_service.update_calendar(db, calendar_id, request)
     return APIResponse(data=CalendarResponse.model_validate(cal))
 
@@ -90,8 +91,9 @@ async def patch_calendar(
     request: CalendarPatchRequest,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("calendar:update"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[CalendarResponse]:
-    """Partial update calendar."""
+    """Partial update calendar (admin only)."""
     cal = await course_management_service.patch_calendar(db, calendar_id, request)
     return APIResponse(data=CalendarResponse.model_validate(cal))
 
@@ -101,7 +103,8 @@ async def delete_calendar(
     calendar_id: int,
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("calendar:delete"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
-    """Delete calendar."""
+    """Delete calendar (admin only)."""
     await course_management_service.delete_calendar(db, calendar_id)
     return APIResponse(data=None)

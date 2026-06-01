@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
-from info_service.deps import require_permission
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
     CoursePatchRequest,
@@ -79,8 +79,9 @@ async def update_course(
     current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
     course_id: int,
     request: CourseUpdateRequest,
+    _admin: None = Depends(require_admin),
 ) -> SingleResponse[CourseResponse]:
-    """Full update course."""
+    """Full update course (admin only)."""
     course = await course_management_service.update_course(db, course_id, request)
     return SingleResponse(data=CourseResponse.model_validate(course))
 
@@ -91,8 +92,9 @@ async def patch_course(
     current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
     course_id: int,
     request: CoursePatchRequest,
+    _admin: None = Depends(require_admin),
 ) -> SingleResponse[CourseResponse]:
-    """Partial update course."""
+    """Partial update course (admin only)."""
     course = await course_management_service.update_course(db, course_id, request)
     return SingleResponse(data=CourseResponse.model_validate(course))
 
@@ -102,7 +104,8 @@ async def delete_course(
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("course:delete"))],
     course_id: int,
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
-    """Delete course."""
+    """Delete course (admin only)."""
     await course_management_service.delete_course(db, course_id)
     return APIResponse(data=None)

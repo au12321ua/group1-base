@@ -2,10 +2,12 @@
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CalendarResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     term_code: str
     term_name: str

@@ -50,6 +50,10 @@ _PERMISSIONS: list[tuple[str, str, str, str]] = [
     ("base-info:create", "创建基础信息", "base-info", "create"),
     ("base-info:update", "更新基础信息", "base-info", "update"),
     ("base-info:delete", "删除基础信息", "base-info", "delete"),
+    ("file:read", "查看文件", "file", "read"),
+    ("file:create", "上传文件", "file", "create"),
+    ("file:delete", "删除文件", "file", "delete"),
+    ("data-provision:read", "查看数据提供", "data-provision", "read"),
     ("audit:read", "查看审计日志", "audit", "read"),
     ("recycle:read", "查看回收站", "recycle", "read"),
     ("recycle:restore", "恢复回收站条目", "recycle", "restore"),
@@ -71,6 +75,7 @@ _READ_PERMISSIONS = (
     "calendar:read",
     "training:read",
     "base-info:read",
+    "file:read",
 )
 
 _ACADEMIC_WRITE = (
@@ -102,14 +107,20 @@ _ACADEMIC_WRITE = (
     "base-info:create",
     "base-info:update",
     "base-info:delete",
+    "file:read",
+    "file:create",
+    "file:delete",
+    "data-provision:read",
     "recycle:read",
     "recycle:restore",
     "recycle:delete",
 )
 
+_STUDENT_TEACHER_PERMISSIONS = frozenset((*_READ_PERMISSIONS, "file:create", "file:delete"))
+
 _ROLE_PERMISSION_CODES: dict[str, frozenset[str]] = {
-    "STUDENT": frozenset(_READ_PERMISSIONS),
-    "TEACHER": frozenset(_READ_PERMISSIONS),
+    "STUDENT": _STUDENT_TEACHER_PERMISSIONS,
+    "TEACHER": _STUDENT_TEACHER_PERMISSIONS,
     "ACADEMIC_ADMIN": frozenset(_ACADEMIC_WRITE),
     "SYS_ADMIN": frozenset(code for code, *_ in _PERMISSIONS),
 }

@@ -5,7 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, UploadFile
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
-from info_service.deps import require_permission
+from info_service.core.security import check_resource_access
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.user_schema import (
     UserCreateRequest,
     UserImportResult,
@@ -16,6 +17,7 @@ from info_service.schemas.user_schema import (
 )
 from info_service.services.audit_service import audit_service
 from info_service.services.user_management_service import user_management_service
+from shared.exceptions import AuthorizationError
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
 
@@ -78,7 +80,12 @@ async def get_user(
     db: InfoDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("user:read"))],
 ) -> APIResponse[UserResponse]:
-    """Get user detail with profile."""
+    """Get user detail with profile (own profile or admin only)."""
+    if not check_resource_access(
+        current_user.user_id, current_user.role,
+        resource_owner_id=str(user_id),
+    ):
+        raise AuthorizationError("Access denied: can only view own profile")
     user = await user_management_service.get_user(db, user_id)
     return APIResponse(data=user)
 
@@ -91,7 +98,12 @@ async def update_user(
     audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("user:update"))],
 ) -> APIResponse[UserResponse]:
-    """Full update user."""
+    """Full update user (own profile or admin only)."""
+    if not check_resource_access(
+        current_user.user_id, current_user.role,
+        resource_owner_id=str(user_id),
+    ):
+        raise AuthorizationError("Access denied: can only update own profile")
     # Check if role changed
     old_user = await user_management_service.get_user(db, user_id)
     old_roles = old_user.role_ids
@@ -121,7 +133,12 @@ async def patch_user(
     audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("user:update"))],
 ) -> APIResponse[UserResponse]:
-    """Partial update user (may trigger role sync with Auth)."""
+    """Partial update user (own profile or admin only, may trigger role sync with Auth)."""
+    if not check_resource_access(
+        current_user.user_id, current_user.role,
+        resource_owner_id=str(user_id),
+    ):
+        raise AuthorizationError("Access denied: can only update own profile")
     old_user = await user_management_service.get_user(db, user_id)
     old_roles = old_user.role_ids
 
@@ -148,8 +165,9 @@ async def delete_user(
     db: InfoDbSession,
     audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("user:delete"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
-    """Logical delete user → recycle bin."""
+    """Logical delete user → recycle bin (admin only)."""
     await user_management_service.logical_delete_user(db, user_id, current_user)
     await audit_service.write_audit_log(
         audit_db,

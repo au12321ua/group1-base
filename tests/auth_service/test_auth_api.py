@@ -3,6 +3,12 @@
 import pytest
 
 from auth_service.core.config import get_auth_settings
+from tests.utils import build_auth_header, create_test_service_token
+
+
+def _svc_headers() -> dict[str, str]:
+    """Build service token auth headers for internal endpoint calls."""
+    return build_auth_header(create_test_service_token())
 
 
 @pytest.mark.integration
@@ -20,6 +26,7 @@ class TestAuthAPI:
         create_resp = await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": user_id, "username": username, "role_ids": []},
+            headers=_svc_headers(),
         )
         assert create_resp.status_code == 201
         assert create_resp.json()["data"]["user_id"] == user_id
@@ -43,6 +50,7 @@ class TestAuthAPI:
         verify_resp = await async_client_auth.post(
             "/api/v1/internal/verify",
             json={"token": access},
+            headers=_svc_headers(),
         )
         assert verify_resp.status_code == 200
         assert verify_resp.json()["data"]["user_id"] == user_id
@@ -74,6 +82,7 @@ class TestAuthAPI:
         await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": "api-ref-u1", "username": "apirefuser", "role_ids": []},
+            headers=_svc_headers(),
         )
         login_resp = await async_client_auth.post(
             "/api/v1/auth/login",
@@ -103,6 +112,7 @@ class TestAuthAPI:
         create_resp = await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": user_id, "username": username, "role_ids": []},
+            headers=_svc_headers(),
         )
         assert create_resp.status_code == 201
 
@@ -146,10 +156,14 @@ class TestAuthAPI:
         create_resp = await async_client_auth.post(
             "/api/v1/internal/users",
             json={"user_id": user_id, "username": username, "role_ids": []},
+            headers=_svc_headers(),
         )
         assert create_resp.status_code == 201
 
-        disable_resp = await async_client_auth.post(f"/api/v1/internal/users/{user_id}/disable")
+        disable_resp = await async_client_auth.post(
+            f"/api/v1/internal/users/{user_id}/disable",
+            headers=_svc_headers(),
+        )
         assert disable_resp.status_code == 200
 
         disabled_login_resp = await async_client_auth.post(
@@ -159,7 +173,10 @@ class TestAuthAPI:
         assert disabled_login_resp.status_code == 423
         assert disabled_login_resp.json()["code"] == 1003
 
-        enable_resp = await async_client_auth.post(f"/api/v1/internal/users/{user_id}/enable")
+        enable_resp = await async_client_auth.post(
+            f"/api/v1/internal/users/{user_id}/enable",
+            headers=_svc_headers(),
+        )
         assert enable_resp.status_code == 200
 
         enabled_login_resp = await async_client_auth.post(
@@ -173,6 +190,7 @@ class TestAuthAPI:
         sync_resp = await async_client_auth.post(
             f"/api/v1/internal/users/{user_id}/roles",
             json={"role_ids": []},
+            headers=_svc_headers(),
         )
         assert sync_resp.status_code == 200
         assert sync_resp.json()["data"]["user_id"] == user_id
@@ -181,9 +199,158 @@ class TestAuthAPI:
         verify_refresh_resp = await async_client_auth.post(
             "/api/v1/internal/verify",
             json={"token": refresh_token},
+            headers=_svc_headers(),
         )
         assert verify_refresh_resp.status_code == 401
         assert verify_refresh_resp.json()["code"] == 1001
 
-        delete_resp = await async_client_auth.delete(f"/api/v1/internal/users/{user_id}")
+        delete_resp = await async_client_auth.delete(
+            f"/api/v1/internal/users/{user_id}",
+            headers=_svc_headers(),
+        )
         assert delete_resp.status_code == 204
+
+
+@pytest.mark.integration
+class TestInternalEndpointsAuth:
+    """测试 /api/v1/internal 端点的 Service Token 鉴权守卫。"""
+
+    # ── 辅助方法 ──────────────────────────────────────────────
+
+    @staticmethod
+    async def _login_and_get_access(async_client_auth) -> str:
+        """创建用户并登录，返回 access token。"""
+        from auth_service.core.config import get_auth_settings
+
+        settings = get_auth_settings()
+        uid = "auth-test-u1"
+        uname = "authtestuser"
+
+        await async_client_auth.post(
+            "/api/v1/internal/users",
+            json={"user_id": uid, "username": uname, "role_ids": []},
+            headers=_svc_headers(),
+        )
+        resp = await async_client_auth.post(
+            "/api/v1/auth/login",
+            json={"username": uname, "password": settings.default_initial_password},
+        )
+        return resp.json()["data"]["access_token"]
+
+    # ── 无 Token ───────────────────────────────────────────────
+
+    _NO_TOKEN_ENDPOINTS = [
+        ("POST", "/api/v1/internal/verify", {"token": "dummy"}),
+        ("POST", "/api/v1/internal/users", {"user_id": "u1", "username": "x", "role_ids": []}),
+        ("POST", "/api/v1/internal/users/u1/disable", None),
+        ("POST", "/api/v1/internal/users/u1/enable", None),
+        ("POST", "/api/v1/internal/users/u1/roles", {"role_ids": []}),
+        ("DELETE", "/api/v1/internal/users/u1", None),
+    ]
+
+    @pytest.mark.parametrize("method,url,body", _NO_TOKEN_ENDPOINTS)
+    async def test_no_token_returns_401(
+        self, method, url, body, async_client_auth, auth_security_env
+    ) -> None:
+        """缺少 Service Token 的请求应返回 401。"""
+        resp = await async_client_auth.request(method, url, json=body)
+        assert resp.status_code == 401
+
+    # ── Access Token 冒充 Service Token ────────────────────────
+
+    _ACCESS_TOKEN_ENDPOINTS = [
+        ("POST", "/api/v1/internal/verify", {"token": "dummy"}),
+        ("POST", "/api/v1/internal/users", {"user_id": "u2", "username": "y", "role_ids": []}),
+        ("POST", "/api/v1/internal/users/u2/disable", None),
+        ("POST", "/api/v1/internal/users/u2/enable", None),
+        ("POST", "/api/v1/internal/users/u2/roles", {"role_ids": []}),
+        ("DELETE", "/api/v1/internal/users/u2", None),
+    ]
+
+    @pytest.mark.parametrize("method,url,body", _ACCESS_TOKEN_ENDPOINTS)
+    async def test_access_token_returns_401(
+        self, method, url, body, async_client_auth, auth_security_env
+    ) -> None:
+        """使用 Access Token（非 Service Token）调用内部接口应返回 401。"""
+        access_token = await self._login_and_get_access(async_client_auth)
+        headers = build_auth_header(access_token)
+        resp = await async_client_auth.request(method, url, json=body, headers=headers)
+        assert resp.status_code == 401
+
+    # ── 合法 Service Token ─────────────────────────────────────
+
+    async def test_service_token_allows_verify(
+        self, async_client_auth, auth_security_env
+    ) -> None:
+        """合法 Service Token 下 /internal/verify 应成功。"""
+        access_token = await self._login_and_get_access(async_client_auth)
+        headers = _svc_headers()
+        resp = await async_client_auth.post(
+            "/api/v1/internal/verify",
+            json={"token": access_token},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+
+    async def test_service_token_allows_create_user(
+        self, async_client_auth, auth_security_env
+    ) -> None:
+        """合法 Service Token 下 /internal/users 应创建成功。"""
+        headers = _svc_headers()
+        resp = await async_client_auth.post(
+            "/api/v1/internal/users",
+            json={"user_id": "svc-u1", "username": "svcuser", "role_ids": []},
+            headers=headers,
+        )
+        assert resp.status_code == 201
+
+    async def test_service_token_allows_disable_enable(
+        self, async_client_auth, auth_security_env
+    ) -> None:
+        """合法 Service Token 下 disable/enable 应成功。"""
+        headers = _svc_headers()
+        await async_client_auth.post(
+            "/api/v1/internal/users",
+            json={"user_id": "svc-u2", "username": "svcuser2", "role_ids": []},
+            headers=headers,
+        )
+        dis = await async_client_auth.post(
+            "/api/v1/internal/users/svc-u2/disable", headers=headers
+        )
+        assert dis.status_code == 200
+        en = await async_client_auth.post(
+            "/api/v1/internal/users/svc-u2/enable", headers=headers
+        )
+        assert en.status_code == 200
+
+    async def test_service_token_allows_sync_roles(
+        self, async_client_auth, auth_security_env
+    ) -> None:
+        """合法 Service Token 下角色同步应成功。"""
+        headers = _svc_headers()
+        await async_client_auth.post(
+            "/api/v1/internal/users",
+            json={"user_id": "svc-u3", "username": "svcuser3", "role_ids": []},
+            headers=headers,
+        )
+        resp = await async_client_auth.post(
+            "/api/v1/internal/users/svc-u3/roles",
+            json={"role_ids": []},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+
+    async def test_service_token_allows_delete(
+        self, async_client_auth, auth_security_env
+    ) -> None:
+        """合法 Service Token 下删除用户应返回 204。"""
+        headers = _svc_headers()
+        await async_client_auth.post(
+            "/api/v1/internal/users",
+            json={"user_id": "svc-u4", "username": "svcuser4", "role_ids": []},
+            headers=headers,
+        )
+        resp = await async_client_auth.delete(
+            "/api/v1/internal/users/svc-u4", headers=headers
+        )
+        assert resp.status_code == 204

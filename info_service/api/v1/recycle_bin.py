@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
-from info_service.deps import require_permission
+from info_service.deps import require_admin, require_permission
 from info_service.schemas.recycle_bin_schema import (
     BatchDeleteRequest,
     RecycleBinItemResponse,
@@ -44,8 +44,9 @@ async def restore_user(
     db: InfoDbSession,
     audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("recycle:restore"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
-    """Restore a user from recycle bin (cross-service enable Auth account)."""
+    """Restore a user from recycle bin (admin only, cross-service enable Auth account)."""
     await recycle_bin_service.restore_user(db, user_id)
     await audit_service.write_audit_log(
         audit_db,
@@ -66,8 +67,9 @@ async def physical_delete_user(
     db: InfoDbSession,
     audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("recycle:delete"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
-    """Permanently delete user (requires confirmation)."""
+    """Permanently delete user (admin only, requires confirmation)."""
     await recycle_bin_service.physical_delete_user(db, user_id)
     await audit_service.write_audit_log(
         audit_db,
@@ -88,8 +90,9 @@ async def batch_physical_delete(
     db: InfoDbSession,
     audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("recycle:delete"))],
+    _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
-    """Batch permanent delete users."""
+    """Batch permanent delete users (admin only)."""
     await recycle_bin_service.batch_physical_delete(db, request.user_ids)
     await audit_service.write_audit_log(
         audit_db,

@@ -42,6 +42,10 @@ def build_identity_headers(
             "calendar:create",
             "calendar:update",
             "calendar:delete",
+            "file:read",
+            "file:create",
+            "file:delete",
+            "data-provision:read",
         ]
     return {
         "X-User-Id": user_id,
@@ -54,6 +58,17 @@ def build_identity_headers(
 def build_auth_header(token: str) -> dict[str, str]:
     """Build Authorization header with Bearer token (for Auth Service tests)."""
     return {"Authorization": f"Bearer {token}"}
+
+
+def create_test_service_token(
+    client_id: str = "info_service",
+    scope: str = "internal",
+    audience: str = "auth_service",
+) -> str:
+    """Create a valid service token for testing internal endpoints."""
+    from auth_service.core.security import create_service_token
+
+    return create_service_token(client_id=client_id, scope=scope, audience=audience)
 
 
 # ---------------------------------------------------------------------------

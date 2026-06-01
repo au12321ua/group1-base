@@ -7,6 +7,7 @@ from tests.info_service.api_helpers import (
     create_course,
     create_offering,
 )
+from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
@@ -144,3 +145,112 @@ class TestOfferingAPI:
         assert updated["teacher_ids"] == ""
         assert updated["capacity"] == 0
         assert updated["status"] == "ACTIVE"
+
+
+@pytest.mark.integration
+class TestOfferingResourceAccess:
+    """验证开课资源级授权：非分配教师且非管理员应被拒绝写操作。"""
+
+    async def test_assigned_teacher_can_update_offering(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """分配到此开课的教师可以更新开课信息。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS601",
+            course_name="Teacher Access Test",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=["t-100"],
+            capacity=60,
+        )
+        teacher_headers = build_identity_headers(
+            user_id="t-100", role="TEACHER", permissions=["offering:update"]
+        )
+        resp = await async_client_info.patch(
+            f"/api/v1/offerings/{offering_id}",
+            json={"status": "COMPLETED"},
+            headers=teacher_headers,
+        )
+        assert resp.status_code == 200
+
+    async def test_non_assigned_teacher_cannot_update_offering(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """未分配到该开课的教师更新开课应返回 403。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS602",
+            course_name="Unauthorized Teacher Test",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=["t-200"],
+            capacity=60,
+        )
+        other_teacher_headers = build_identity_headers(
+            user_id="t-999", role="TEACHER", permissions=["offering:update"]
+        )
+        resp = await async_client_info.patch(
+            f"/api/v1/offerings/{offering_id}",
+            json={"status": "CANCELLED"},
+            headers=other_teacher_headers,
+        )
+        assert resp.status_code == 403
+
+    async def test_student_cannot_delete_offering(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """学生尝试删除开课应返回 403。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS603",
+            course_name="Student Delete Test",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=[],
+            capacity=60,
+        )
+        student_headers = build_identity_headers(
+            user_id="student-99", role="STUDENT", permissions=["offering:delete"]
+        )
+        resp = await async_client_info.delete(
+            f"/api/v1/offerings/{offering_id}", headers=student_headers
+        )
+        assert resp.status_code == 403
+
+    async def test_admin_can_delete_any_offering(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """管理员可以删除任意开课。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS604",
+            course_name="Admin Delete Test",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            teacher_ids=["t-300"],
+            capacity=60,
+        )
+        admin_delete_headers = build_identity_headers(
+            user_id="admin-user", role="SYS_ADMIN", permissions=["offering:delete"]
+        )
+        resp = await async_client_info.delete(
+            f"/api/v1/offerings/{offering_id}", headers=admin_delete_headers
+        )
+        assert resp.status_code == 200

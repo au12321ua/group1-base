@@ -3,6 +3,7 @@
 import pytest
 
 from tests.info_service.api_helpers import assert_status_and_data, create_course
+from tests.utils import build_identity_headers
 
 
 @pytest.mark.integration
@@ -95,3 +96,102 @@ class TestTrainingProgramAPI:
         )
 
         assert resp.status_code == 404
+
+
+@pytest.mark.integration
+class TestTrainingProgramResourceAccess:
+    """验证培养方案资源级授权：非管理员写操作应返回 403。"""
+
+    async def test_non_admin_cannot_update_training_program(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """非管理员用户更新培养方案应返回 403。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS711",
+            course_name="Auth Training Test",
+        )
+        create_resp = await async_client_info.post(
+            "/api/v1/training-programs/",
+            json={
+                "program_code": "CS-AUTH-2026",
+                "major_code": "CS",
+                "grade": "2026",
+                "version": "1.0",
+                "required_course_ids": [course_id],
+            },
+            headers=auth_headers,
+        )
+        program_id = create_resp.json()["data"]["id"]
+
+        student_headers = build_identity_headers(
+            user_id="student-1", role="STUDENT", permissions=["training:update"]
+        )
+        resp = await async_client_info.patch(
+            f"/api/v1/training-programs/{program_id}",
+            json={"version": "hacked"},
+            headers=student_headers,
+        )
+        assert resp.status_code == 403
+
+    async def test_non_admin_cannot_delete_training_program(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """非管理员用户删除培养方案应返回 403。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS712",
+            course_name="Auth Delete Program Test",
+        )
+        create_resp = await async_client_info.post(
+            "/api/v1/training-programs/",
+            json={
+                "program_code": "CS-DEL-2026",
+                "major_code": "CS",
+                "grade": "2026",
+                "version": "1.0",
+                "required_course_ids": [course_id],
+            },
+            headers=auth_headers,
+        )
+        program_id = create_resp.json()["data"]["id"]
+
+        teacher_headers = build_identity_headers(
+            user_id="teacher-1", role="TEACHER", permissions=["training:delete"]
+        )
+        resp = await async_client_info.delete(
+            f"/api/v1/training-programs/{program_id}", headers=teacher_headers
+        )
+        assert resp.status_code == 403
+
+    async def test_admin_can_update_training_program(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """管理员更新培养方案应成功。"""
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS713",
+            course_name="Admin Program Test",
+        )
+        create_resp = await async_client_info.post(
+            "/api/v1/training-programs/",
+            json={
+                "program_code": "CS-ADMIN-2026",
+                "major_code": "CS",
+                "grade": "2026",
+                "version": "1.0",
+                "required_course_ids": [course_id],
+            },
+            headers=auth_headers,
+        )
+        program_id = create_resp.json()["data"]["id"]
+
+        admin_headers = build_identity_headers(
+            user_id="admin-user", role="SYS_ADMIN", permissions=["training:update"]
+        )
+        resp = await async_client_info.patch(
+            f"/api/v1/training-programs/{program_id}",
+            json={"version": "2.0"},
+            headers=admin_headers,
+        )
+        assert resp.status_code == 200

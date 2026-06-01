@@ -7,6 +7,7 @@ import os
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.core.config import get_info_settings
+from info_service.core.security import check_resource_access
 from info_service.crud.file_resource_crud import file_resource_crud
 from info_service.models.file_resource import FileResource
 from shared.exceptions import BusinessRuleError, ResourceNotFoundError
@@ -107,11 +108,19 @@ class FileStorageService:
             "access_url": f"/api/v1/files/{resource.id}/download",
         }
 
-    async def get_file(self, db: AsyncSession, file_id: int) -> tuple[bytes, str]:
-        """Retrieve file content and MIME type from disk."""
-        resource = await file_resource_crud.get(db, file_id)
-        if not resource:
-            raise ResourceNotFoundError("File", str(file_id))
+    async def get_file(
+        self, db: AsyncSession, file_id: int,
+        resource: FileResource | None = None,
+    ) -> tuple[bytes, str]:
+        """Retrieve file content and MIME type from disk.
+
+        If *resource* was already fetched for an access check, pass it in
+        to avoid a second ``file_resource_crud.get`` query.
+        """
+        if resource is None:
+            resource = await file_resource_crud.get(db, file_id)
+            if not resource:
+                raise ResourceNotFoundError("File", str(file_id))
 
         path = resource.storage_path
         exists = await asyncio.to_thread(os.path.exists, path)
@@ -138,8 +147,10 @@ class FileStorageService:
         if not resource:
             raise ResourceNotFoundError("File", str(file_id))
 
-        is_admin = user_role in ("SYS_ADMIN", "ACADEMIC_ADMIN")
-        if resource.owner_user_id != owner_user_id and not is_admin:
+        if not check_resource_access(
+            owner_user_id, user_role,
+            resource_owner_id=resource.owner_user_id,
+        ):
             raise BusinessRuleError("Only the file owner or admin can delete this file")
 
         # Remove from disk (offloaded to thread)
