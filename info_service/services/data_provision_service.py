@@ -4,13 +4,13 @@ import re
 from datetime import UTC, datetime
 
 import httpx
-from sqlalchemy import or_
-from sqlmodel import func, select
+from sqlmodel import func, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.core.config import get_info_settings
 from info_service.models.academic_calendar import AcademicCalendar
 from info_service.models.training_program import TrainingProgram
+from info_service.models.training_program_course import TrainingProgramCourse
 from info_service.models.user import UserInfo
 from info_service.models.user_profile import UserProfile
 from info_service.schemas.data_provision_schema import (
@@ -29,39 +29,34 @@ class DataProvisionService:
     def __init__(self) -> None:
         self._settings = get_info_settings()
 
-    def _role_token_filter(self, role_id: int):
-        """Build a SQL filter matching a role_id inside a comma-separated role_ids column.
+    def _active_user_conditions(self, role_id: int) -> list:  # noqa: ARG002
+        """Build filtering conditions for active users.
 
-        Uses four LIKE patterns to cover all positions (sole, first, middle, last)
-        while avoiding false matches on multi-digit IDs (e.g. role_id=1 won't match "11").
+        Note: role_id is no longer used for filtering — role information
+        is managed by Auth Service, not stored in Info Service.
         """
-        token = str(role_id)
-        return or_(
-            UserInfo.role_ids == token,
-            UserInfo.role_ids.like(f"{token},%"),
-            UserInfo.role_ids.like(f"%,{token},%"),
-            UserInfo.role_ids.like(f"%,{token}"),
-        )
-
-    def _active_user_conditions(self, role_id: int) -> list:
         return [
             UserInfo.is_deleted == False,  # noqa: E712
-            self._role_token_filter(role_id),
-            or_(UserProfile.status.is_(None), UserProfile.status == "ACTIVE"),
+            or_(
+                UserProfile.status.is_(None),
+                UserProfile.status == "ACTIVE",
+            ),
         ]
 
     @staticmethod
     def _paginate(page: int, page_size: int) -> tuple[int, int]:
         return (page - 1) * page_size, page_size
 
-    @staticmethod
-    def _parse_required_course_ids(value: str) -> list[int]:
-        items: list[int] = []
-        for token in value.split(","):
-            token = token.strip()
-            if token.isdigit():
-                items.append(int(token))
-        return items
+    async def _get_program_course_ids(
+        self, db: AsyncSession, program_id: int
+    ) -> list[int]:
+        """Get required course IDs for a training program from association table."""
+        result = await db.exec(
+            select(TrainingProgramCourse.course_id).where(
+                TrainingProgramCourse.program_id == program_id
+            )
+        )
+        return list(result.all())
 
     @staticmethod
     def _infer_grade(user_no: str) -> str:
@@ -235,20 +230,20 @@ class DataProvisionService:
 
         programs = list((await db.exec(stmt)).all())
         total = (await db.exec(count_stmt)).one()
-        items = [
-            TrainingProgramDataResponse(
-                id=program.id,
-                program_code=program.program_code,
-                major_code=program.major_code,
-                grade=program.grade,
-                version=program.version,
-                required_course_ids=self._parse_required_course_ids(
-                    program.required_course_ids
-                ),
-                snapshot_time=self._ensure_utc(program.snapshot_time),
+        items = []
+        for program in programs:
+            course_ids = await self._get_program_course_ids(db, program.id)
+            items.append(
+                TrainingProgramDataResponse(
+                    id=program.id,
+                    program_code=program.program_code,
+                    major_code=program.major_code,
+                    grade=program.grade,
+                    version=program.version,
+                    required_course_ids=course_ids,
+                    snapshot_time=self._ensure_utc(program.snapshot_time),
+                )
             )
-            for program in programs
-        ]
         return items, total
 
     async def get_training_program_snapshot_time(

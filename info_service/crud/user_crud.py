@@ -45,13 +45,16 @@ class UserCRUD:
         limit: int = 100,
         keyword: str | None = None,
         status: str | None = None,
-        role: str | None = None,
         include_deleted: bool = False,
         only_deleted: bool = False,
         sort_by: str = "id",
         sort_order: str = "asc",
     ) -> tuple[list[UserInfo], int]:
-        """Get paginated user list with optional filters. Returns (items, total)."""
+        """Get paginated user list with optional filters. Returns (items, total).
+
+        Role-based filtering is not supported here — roles are managed
+        by Auth Service, not stored in Info Service.
+        """
         conditions = []
         if only_deleted:
             conditions.append(UserInfo.is_deleted == True)  # noqa: E712
@@ -79,17 +82,6 @@ class UserCRUD:
                 .where(UserProfile.status == status)
             )
             conditions.append(UserInfo.id.in_(profile_status_match))
-
-        if role:
-            # Exact token match to avoid false positives (e.g. "1" matching "10")
-            conditions.append(
-                or_(
-                    UserInfo.role_ids == role,
-                    UserInfo.role_ids.like(f"{role},%"),
-                    UserInfo.role_ids.like(f"%,{role},%"),
-                    UserInfo.role_ids.like(f"%,{role}"),
-                )
-            )
 
         base_query = select(UserInfo).where(*conditions)
         count_query = select(func.count()).select_from(UserInfo).where(*conditions)

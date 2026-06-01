@@ -5,6 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.crud.base import BaseCRUD
 from info_service.models.training_program import TrainingProgram
+from info_service.models.training_program_course import TrainingProgramCourse
 
 
 class TrainingProgramCRUD(BaseCRUD[TrainingProgram]):
@@ -62,5 +63,71 @@ class TrainingProgramCRUD(BaseCRUD[TrainingProgram]):
         total = (await db.exec(count_stmt)).one()
         return items, total
 
+    # ---- Program-Course association ----
+
+    async def get_courses_by_program(
+        self, db: AsyncSession, program_id: int
+    ) -> list[TrainingProgramCourse]:
+        """Get all course associations for a training program."""
+        result = await db.exec(
+            select(TrainingProgramCourse).where(
+                TrainingProgramCourse.program_id == program_id
+            )
+        )
+        return list(result.all())
+
+    async def add_courses_to_program(
+        self, db: AsyncSession, program_id: int, course_ids: list[int]
+    ) -> list[TrainingProgramCourse]:
+        """Add course associations to a program (skip duplicates)."""
+        created: list[TrainingProgramCourse] = []
+        for course_id in course_ids:
+            assoc = TrainingProgramCourse(program_id=program_id, course_id=course_id)
+            db.add(assoc)
+            created.append(assoc)
+        await db.flush()
+        return created
+
+    async def replace_courses_for_program(
+        self, db: AsyncSession, program_id: int, course_ids: list[int]
+    ) -> list[TrainingProgramCourse]:
+        """Atomically replace all course associations for a program."""
+        # Delete existing associations (flush to emit DELETE before INSERT)
+        existing = await db.exec(
+            select(TrainingProgramCourse).where(
+                TrainingProgramCourse.program_id == program_id
+            )
+        )
+        for assoc in existing.all():
+            await db.delete(assoc)
+        await db.flush()
+
+        # Create new associations
+        created: list[TrainingProgramCourse] = []
+        for course_id in course_ids:
+            assoc = TrainingProgramCourse(program_id=program_id, course_id=course_id)
+            db.add(assoc)
+            created.append(assoc)
+        await db.flush()
+        return created
+
+    async def remove_course_from_program(
+        self, db: AsyncSession, program_id: int, course_id: int
+    ) -> bool:
+        """Remove a single course association from a program."""
+        result = await db.exec(
+            select(TrainingProgramCourse).where(
+                TrainingProgramCourse.program_id == program_id,
+                TrainingProgramCourse.course_id == course_id,
+            )
+        )
+        assoc = result.first()
+        if assoc:
+            await db.delete(assoc)
+            await db.flush()
+            return True
+        return False
+
 
 training_program_crud = TrainingProgramCRUD()
+
