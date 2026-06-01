@@ -69,7 +69,15 @@ app.add_middleware(
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     RequestLoggingMiddleware,
-    logger=get_logger("auth_service.request", service_name="auth_service"),
+    logger=get_logger(
+        "auth_service.request",
+        service_name="auth_service",
+        level=settings.log_level,
+        output=settings.log_output,
+        log_dir=settings.log_dir,
+        rotation=settings.log_rotation,
+        retention=settings.log_retention,
+    ),
 )
 
 register_error_handlers(app)
