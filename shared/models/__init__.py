@@ -1,4 +1,4 @@
-"""AuditLog model — re-exported from shared for backward compatibility."""
+"""Shared database models — used by both Auth Service and Info Service."""
 
 from shared.models.audit_log import AuditLog, DeadLetterQueue, OperationLog
 

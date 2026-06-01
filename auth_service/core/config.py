@@ -19,6 +19,7 @@ class AuthSettings(BaseSettings):
 
     # Database
     auth_database_url: str = "sqlite:///data/auth.db"
+    audit_database_url: str = "sqlite:///data/audit.db"
 
     # JWT
     token_secret_key: str = "change-me-in-production"

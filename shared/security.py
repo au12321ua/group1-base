@@ -86,3 +86,12 @@ class IdentityContext:
     def has_any_permission(self, *codes: str) -> bool:
         """Check if the current identity holds any of the given permissions."""
         return any(c in self.permissions for c in codes)
+
+
+def extract_service_operator(payload: dict) -> str:
+    """Extract the calling service client_id from a service token payload.
+
+    Used by internal endpoints to identify which service triggered an
+    operation for audit logging purposes.
+    """
+    return payload.get("client_id", payload.get("sub", "unknown_service"))

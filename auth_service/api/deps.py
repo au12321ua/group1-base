@@ -15,4 +15,13 @@ async def get_auth_db_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+async def get_audit_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Yield an Audit DB session (commits on success, rolls back on error)."""
+    from auth_service.main import get_audit_db
+
+    async for session in get_audit_db():
+        yield session
+
+
 AuthDbSession = Annotated[AsyncSession, Depends(get_auth_db_session)]
+AuditDbSession = Annotated[AsyncSession, Depends(get_audit_db_session)]

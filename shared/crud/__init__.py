@@ -1,4 +1,4 @@
-"""AuditLog CRUD — re-exported from shared for backward compatibility."""
+"""Shared CRUD modules — data access layer used by both Auth Service and Info Service."""
 
 from shared.crud.audit_log_crud import AuditLogCRUD, audit_log_crud
 

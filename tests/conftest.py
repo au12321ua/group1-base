@@ -4,8 +4,10 @@ import os
 
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from shared.database import create_tables
+from shared.models.audit_log import AUDIT_TABLE_NAMES
 
 # ---------------------------------------------------------------------------
 # Test env defaults
@@ -77,25 +79,6 @@ _INFO_TABLES: frozenset[str] = frozenset(
     }
 )
 
-_AUDIT_TABLES: frozenset[str] = frozenset(
-    {
-        "audit_logs",
-        "dead_letter_queue",
-        "operation_logs",
-    }
-)
-
-
-def _make_create_tables(table_names: frozenset[str]):
-    """返回一个同步函数，只在目标连接上创建指定名称的表。"""
-
-    def _create(sync_conn) -> None:
-        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in table_names]
-        SQLModel.metadata.create_all(sync_conn, tables=tables)
-
-    return _create
-
-
 @pytest.fixture(scope="session")
 def anyio_backend():
     """Explicitly set the async backend to asyncio."""
@@ -112,7 +95,7 @@ async def auth_db_engine():
     """In-memory SQLite engine for Auth DB — only Auth Service tables are created."""
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(_make_create_tables(_AUTH_TABLES))
+        await conn.run_sync(create_tables, _AUTH_TABLES)
     yield engine
     await engine.dispose()
 
@@ -134,7 +117,7 @@ async def info_db_engine():
     """In-memory SQLite engine for Info DB — only Info Service tables are created."""
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(_make_create_tables(_INFO_TABLES))
+        await conn.run_sync(create_tables, _INFO_TABLES)
     yield engine
     await engine.dispose()
 
@@ -151,7 +134,7 @@ async def audit_db_engine():
     """In-memory SQLite engine for Audit DB — only Audit tables are created."""
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(_make_create_tables(_AUDIT_TABLES))
+        await conn.run_sync(create_tables, AUDIT_TABLE_NAMES)
     yield engine
     await engine.dispose()
 
@@ -172,15 +155,16 @@ async def audit_db_session(audit_db_engine):
 async def async_client_auth():
     """httpx AsyncClient connected directly to the Auth Service FastAPI app."""
     from httpx import ASGITransport, AsyncClient
-    from sqlmodel import SQLModel
 
-    from auth_service.main import _AUTH_TABLES, app, engine
+    from auth_service.main import _AUTH_TABLES, app, audit_engine, engine
+    from shared.database import create_tables
+    from shared.models.audit_log import AUDIT_TABLE_NAMES
 
     async with engine.begin() as conn:
-        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _AUTH_TABLES]
-        await conn.run_sync(
-            lambda sync_conn: SQLModel.metadata.create_all(sync_conn, tables=tables)
-        )
+        await conn.run_sync(create_tables, _AUTH_TABLES)
+
+    async with audit_engine.begin() as conn:
+        await conn.run_sync(create_tables, AUDIT_TABLE_NAMES)
 
     transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -191,21 +175,14 @@ async def async_client_auth():
 async def async_client_info():
     """httpx AsyncClient connected directly to the Info Service FastAPI app."""
     from httpx import ASGITransport, AsyncClient
-    from sqlmodel import SQLModel
 
     from info_service.main import app, audit_engine, info_engine
 
     async with info_engine.begin() as conn:
-        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _INFO_TABLES]
-        await conn.run_sync(
-            lambda sync_conn: SQLModel.metadata.create_all(sync_conn, tables=tables)
-        )
+        await conn.run_sync(create_tables, _INFO_TABLES)
 
     async with audit_engine.begin() as conn:
-        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _AUDIT_TABLES]
-        await conn.run_sync(
-            lambda sync_conn: SQLModel.metadata.create_all(sync_conn, tables=tables)
-        )
+        await conn.run_sync(create_tables, AUDIT_TABLE_NAMES)
 
     transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as client:

@@ -21,15 +21,16 @@
 │                 │     │ ▪ base_info     │     │                 │
 │                 │     │ ▪ file_resources│     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-      ↑ 8001                  ↑ 8002                  ↑ (内嵌)
-   Auth Service           Info Service           Info Service
+       ↑ 8001                  ↑ 8002                ↑ 8001 + 8002
+   Auth Service           Info Service         Auth + Info Service
+                                              (共享写入)
 ```
 
 ### 1.1 分库原则
 
 - **Auth DB**：仅存认证授权相关数据，由 Auth Service 独占。
 - **Info DB**：存全部业务主数据，由 Info Service 独占。
-- **Log DB**：存审计日志与操作日志，与业务数据物理隔离，满足审计独立存储要求。
+- **Log DB**：存审计日志与操作日志，与业务数据物理隔离，满足审计独立存储要求。由 Auth Service 和 Info Service 共享写入，两个服务各自启动独立的 audit.db 引擎，共享同一个 audit.db 文件。
 - **跨库关联**：通过 `userId` 逻辑关联，不建立数据库级外键。
 
 ### 1.2 各库表清单

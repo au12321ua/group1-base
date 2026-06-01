@@ -14,23 +14,17 @@ if _project_root not in sys.path:
 from sqlmodel import SQLModel  # noqa: E402
 
 import info_service.models  # noqa: E402, F401
+import shared.models.audit_log  # noqa: E402, F401  # ensure audit models registered in metadata
+from shared.models.audit_log import AUDIT_TABLE_NAMES  # noqa: E402
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-_AUDIT_TABLES = frozenset(
-    {
-        "audit_logs",
-        "dead_letter_queue",
-        "operation_logs",
-    }
-)
-
 target_metadata = MetaData()
 for table in SQLModel.metadata.sorted_tables:
-    if table.name in _AUDIT_TABLES:
+    if table.name in AUDIT_TABLE_NAMES:
         table.tometadata(target_metadata)
 
 
