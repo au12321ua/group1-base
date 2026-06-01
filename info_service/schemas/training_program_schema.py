@@ -1,4 +1,7 @@
-"""TrainingProgram request/response schemas."""
+"""TrainingProgram request/response schemas.
+
+Required courses are stored in the TrainingProgramCourse association table
+but exposed as a list[int] in API payloads for ergonomics."""
 
 from datetime import datetime
 
@@ -13,7 +16,7 @@ class TrainingProgramResponse(BaseModel):
     major_code: str
     grade: str
     version: str = "1.0"
-    required_course_ids: str = ""
+    required_course_ids: list[int] = Field(default_factory=list)
     snapshot_time: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

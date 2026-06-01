@@ -32,6 +32,7 @@ _INFO_TABLES = frozenset(
         "teacher_course_assignments",
         "classrooms",
         "training_programs",
+        "training_program_courses",
         "academic_calendars",
         "base_info_items",
         "file_resources",
