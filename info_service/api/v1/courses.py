@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from info_service.api.deps import InfoDbSession
+from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.core.audit import AuditContext
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
@@ -13,6 +14,7 @@ from info_service.schemas.course_schema import (
     CourseUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
+from shared.exceptions import AppError
 from shared.response import (
     APIResponse,
     ListResponse,
@@ -54,11 +56,18 @@ async def list_courses(
 @router.post("/", response_model=SingleResponse[CourseResponse])
 async def create_course(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("course:create"))],
     request: CourseCreateRequest,
 ) -> SingleResponse[CourseResponse]:
     """Create a new course."""
-    course = await course_management_service.create_course(db, request)
+    audit = AuditContext(audit_db, current_user, "course", action="course_created")
+    try:
+        course = await course_management_service.create_course(db, request)
+        await audit.log_success(target_id=str(course.id))
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=CourseResponse.model_validate(course))
 
 
@@ -76,36 +85,60 @@ async def get_course(
 @router.put("/{course_id}", response_model=SingleResponse[CourseResponse])
 async def update_course(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
     course_id: int,
     request: CourseUpdateRequest,
     _admin: None = Depends(require_admin),
 ) -> SingleResponse[CourseResponse]:
     """Full update course (admin only)."""
-    course = await course_management_service.update_course(db, course_id, request)
+    audit = AuditContext(audit_db, current_user, "course",
+                         target_id=str(course_id), action="course_updated")
+    try:
+        course = await course_management_service.update_course(db, course_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=CourseResponse.model_validate(course))
 
 
 @router.patch("/{course_id}", response_model=SingleResponse[CourseResponse])
 async def patch_course(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
     course_id: int,
     request: CoursePatchRequest,
     _admin: None = Depends(require_admin),
 ) -> SingleResponse[CourseResponse]:
     """Partial update course (admin only)."""
-    course = await course_management_service.update_course(db, course_id, request)
+    audit = AuditContext(audit_db, current_user, "course",
+                         target_id=str(course_id), action="course_updated")
+    try:
+        course = await course_management_service.update_course(db, course_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=CourseResponse.model_validate(course))
 
 
 @router.delete("/{course_id}", response_model=APIResponse[None])
 async def delete_course(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("course:delete"))],
     course_id: int,
     _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Delete course (admin only)."""
-    await course_management_service.delete_course(db, course_id)
+    audit = AuditContext(audit_db, current_user, "course",
+                         target_id=str(course_id), action="course_deleted")
+    try:
+        await course_management_service.delete_course(db, course_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)

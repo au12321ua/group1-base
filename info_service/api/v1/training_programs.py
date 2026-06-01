@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from info_service.api.deps import InfoDbSession
+from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.core.audit import AuditContext
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.training_program_schema import (
     TrainingProgramCreateRequest,
@@ -13,6 +14,7 @@ from info_service.schemas.training_program_schema import (
     TrainingProgramUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
+from shared.exceptions import AppError
 from shared.response import (
     APIResponse,
     ListResponse,
@@ -50,11 +52,19 @@ async def list_training_programs(
 @router.post("/", response_model=SingleResponse[TrainingProgramResponse])
 async def create_training_program(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("training:create"))],
     request: TrainingProgramCreateRequest,
 ) -> SingleResponse[TrainingProgramResponse]:
     """Create a training program."""
-    program = await course_management_service.create_training_program(db, request)
+    audit = AuditContext(audit_db, current_user, "training_program",
+                         action="training_program_created")
+    try:
+        program = await course_management_service.create_training_program(db, request)
+        await audit.log_success(target_id=str(program.id))
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=TrainingProgramResponse.model_validate(program))
 
 
@@ -98,36 +108,60 @@ async def get_training_program(
 @router.put("/{program_id}", response_model=SingleResponse[TrainingProgramResponse])
 async def update_training_program(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("training:update"))],
     program_id: int,
     request: TrainingProgramUpdateRequest,
     _admin: None = Depends(require_admin),
 ) -> SingleResponse[TrainingProgramResponse]:
     """Full update training program (admin only)."""
-    program = await course_management_service.update_training_program(db, program_id, request)
+    audit = AuditContext(audit_db, current_user, "training_program",
+                         target_id=str(program_id), action="training_program_updated")
+    try:
+        program = await course_management_service.update_training_program(db, program_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=TrainingProgramResponse.model_validate(program))
 
 
 @router.patch("/{program_id}", response_model=SingleResponse[TrainingProgramResponse])
 async def patch_training_program(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("training:update"))],
     program_id: int,
     request: TrainingProgramPatchRequest,
     _admin: None = Depends(require_admin),
 ) -> SingleResponse[TrainingProgramResponse]:
     """Partial update training program (admin only)."""
-    program = await course_management_service.update_training_program(db, program_id, request)
+    audit = AuditContext(audit_db, current_user, "training_program",
+                         target_id=str(program_id), action="training_program_updated")
+    try:
+        program = await course_management_service.update_training_program(db, program_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=TrainingProgramResponse.model_validate(program))
 
 
 @router.delete("/{program_id}", response_model=APIResponse[None])
 async def delete_training_program(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("training:delete"))],
     program_id: int,
     _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Delete training program (admin only)."""
-    await course_management_service.delete_training_program(db, program_id)
+    audit = AuditContext(audit_db, current_user, "training_program",
+                         target_id=str(program_id), action="training_program_deleted")
+    try:
+        await course_management_service.delete_training_program(db, program_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)
