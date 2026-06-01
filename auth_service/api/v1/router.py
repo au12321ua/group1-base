@@ -9,3 +9,9 @@ router = APIRouter()
 
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
 router.include_router(internal_router, prefix="/internal", tags=["internal"])
+
+
+@router.get("/health")
+async def health() -> dict[str, str]:
+    """Health check endpoint for Docker / orchestration."""
+    return {"status": "ok"}

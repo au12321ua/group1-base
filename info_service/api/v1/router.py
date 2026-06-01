@@ -29,3 +29,9 @@ router.include_router(recycle_bin_router, prefix="/recycle-bin", tags=["recycle-
 router.include_router(files_router, prefix="/files", tags=["files"])
 router.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 router.include_router(data_provision_router, prefix="/data-provision", tags=["data-provision"])
+
+
+@router.get("/health")
+async def health() -> dict[str, str]:
+    """Health check endpoint for Docker / orchestration."""
+    return {"status": "ok"}
