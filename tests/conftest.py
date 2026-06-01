@@ -174,10 +174,16 @@ async def async_client_auth():
     from httpx import ASGITransport, AsyncClient
     from sqlmodel import SQLModel
 
-    from auth_service.main import _AUTH_TABLES, app, engine
+    from auth_service.main import _AUDIT_TABLES, _AUTH_TABLES, app, audit_engine, engine
 
     async with engine.begin() as conn:
         tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _AUTH_TABLES]
+        await conn.run_sync(
+            lambda sync_conn: SQLModel.metadata.create_all(sync_conn, tables=tables)
+        )
+
+    async with audit_engine.begin() as conn:
+        tables = [t for t in SQLModel.metadata.sorted_tables if t.name in _AUDIT_TABLES]
         await conn.run_sync(
             lambda sync_conn: SQLModel.metadata.create_all(sync_conn, tables=tables)
         )

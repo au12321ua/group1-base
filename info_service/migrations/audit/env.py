@@ -14,6 +14,7 @@ if _project_root not in sys.path:
 from sqlmodel import SQLModel  # noqa: E402
 
 import info_service.models  # noqa: E402, F401
+import shared.models.audit_log  # noqa: E402, F401  # ensure audit models registered in metadata
 
 config = context.config
 

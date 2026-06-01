@@ -137,7 +137,14 @@ project/
 │   ├── exceptions.py          # 统一异常类
 │   ├── response.py            # 统一响应格式
 │   ├── security.py            # JWT 工具（验签、身份提取）
-│   └── logging.py             # AppLogger 封装
+│   ├── logging.py             # AppLogger 封装
+│   ├── database.py            # DB session 工厂
+│   ├── models/
+│   │   └── audit_log.py       # AuditLog、DeadLetterQueue、OperationLog
+│   ├── crud/
+│   │   └── audit_log_crud.py  # AuditLogCRUD
+│   └── services/
+│       └── audit_service.py   # AuditService（共享审计写入）
 │
 ├── docker-compose.yml
 ├── .env                       # 开发环境变量
@@ -235,8 +242,8 @@ project/
 - `upload_file()` → 校验类型/大小 → 落盘 → 写元数据
 - `delete_file()` / `get_file()` / `generate_access_url()`
 
-**AuditService** — 审计日志：
-- `write_audit_log()` — 高风险操作记录
+**AuditService**（shared/services/） — 审计日志：
+- `write_audit_log()` — 高风险操作记录（Auth Service + Info Service 共享写入）
 - `search_audit_logs()` — 按时间/用户/操作类型检索
 - `export_audit_logs()` — CSV 导出
 
@@ -265,6 +272,10 @@ project/
 | `exceptions.py` | 统一异常类层次：`AppException` → `AuthenticationException`、`AuthorizationException`、`ResourceNotFoundException`、`BusinessRuleException` |
 | `response.py` | 统一响应格式：`APIResponse(code, message, data)` / `PaginatedResponse(items, pagination)` |
 | `security.py` | 身份 Header 读取、权限校验装饰器 `@require_permission("user:read")` |
+| `database.py` | DB session 工厂 `create_get_db(engine)` |
+| `models/audit_log.py` | 审计日志模型：`AuditLog`、`DeadLetterQueue`、`OperationLog`（Auth + Info 共享） |
+| `crud/audit_log_crud.py` | 审计日志 CRUD：`write()`、`search()` |
+| `services/audit_service.py` | 审计服务：`write_audit_log()`、`search_audit_logs()`、`export_audit_logs()`（Auth + Info 共享） |
 | `logging.py` | `AppLogger` 封装：JSON 格式、四级日志、X-Request-ID 自动注入 |
 
 ## 6. 模块间依赖关系
