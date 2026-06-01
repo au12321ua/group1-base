@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Query
 
-from info_service.api.deps import InfoDbSession
+from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.core.audit import AuditContext
 from info_service.core.security import check_resource_access
 from info_service.deps import require_permission
 from info_service.schemas.schedule_schema import (
@@ -16,7 +17,7 @@ from info_service.schemas.schedule_schema import (
     TeacherAssignmentResponse,
 )
 from info_service.services.course_management_service import course_management_service
-from shared.exceptions import AuthorizationError
+from shared.exceptions import AppError, AuthorizationError
 from shared.response import (
     APIResponse,
     ListResponse,
@@ -83,11 +84,18 @@ async def list_schedules(
 @router.post("/", response_model=SingleResponse[ScheduleResponse])
 async def create_schedule(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("schedule:create"))],
     request: ScheduleCreateRequest,
 ) -> SingleResponse[ScheduleResponse]:
     """Create a schedule entry (with conflict check)."""
-    schedule = await course_management_service.create_schedule(db, request)
+    audit = AuditContext(audit_db, current_user, "schedule", action="schedule_created")
+    try:
+        schedule = await course_management_service.create_schedule(db, request)
+        await audit.log_success(target_id=str(schedule.id))
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=ScheduleResponse.model_validate(schedule))
 
 
@@ -105,38 +113,62 @@ async def get_schedule(
 @router.put("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
 async def update_schedule(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     request: ScheduleUpdateRequest,
 ) -> SingleResponse[ScheduleResponse]:
     """Full update schedule (assigned teachers or admin only)."""
     await _check_schedule_access(current_user, db, schedule_id)
-    schedule = await course_management_service.update_schedule(db, schedule_id, request)
+    audit = AuditContext(audit_db, current_user, "schedule",
+                         target_id=str(schedule_id), action="schedule_updated")
+    try:
+        schedule = await course_management_service.update_schedule(db, schedule_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=ScheduleResponse.model_validate(schedule))
 
 
 @router.patch("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
 async def patch_schedule(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     request: SchedulePatchRequest,
 ) -> SingleResponse[ScheduleResponse]:
     """Partial update schedule (assigned teachers or admin only)."""
     await _check_schedule_access(current_user, db, schedule_id)
-    schedule = await course_management_service.update_schedule(db, schedule_id, request)
+    audit = AuditContext(audit_db, current_user, "schedule",
+                         target_id=str(schedule_id), action="schedule_updated")
+    try:
+        schedule = await course_management_service.update_schedule(db, schedule_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=ScheduleResponse.model_validate(schedule))
 
 
 @router.delete("/{schedule_id}", response_model=APIResponse[None])
 async def delete_schedule(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("schedule:delete"))],
     schedule_id: int,
 ) -> APIResponse[None]:
     """Delete schedule (assigned teachers or admin only)."""
     await _check_schedule_access(current_user, db, schedule_id)
-    await course_management_service.delete_schedule(db, schedule_id)
+    audit = AuditContext(audit_db, current_user, "schedule",
+                         target_id=str(schedule_id), action="schedule_deleted")
+    try:
+        await course_management_service.delete_schedule(db, schedule_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)
 
 
@@ -157,26 +189,44 @@ async def list_teachers(
 @router.put("/{schedule_id}/teachers", response_model=ListResponse[TeacherAssignmentResponse])
 async def replace_teachers(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     teacher_ids: list[str] = Body(...),
 ) -> ListResponse[TeacherAssignmentResponse]:
     """Replace all teacher assignments (assigned teachers or admin only)."""
     await _check_schedule_access(current_user, db, schedule_id)
-    items = await course_management_service.replace_teachers(db, schedule_id, teacher_ids)
+    audit = AuditContext(audit_db, current_user, "schedule",
+                         target_id=str(schedule_id), action="teachers_replaced",
+                         reason=f"teacher_ids: {','.join(teacher_ids)}")
+    try:
+        items = await course_management_service.replace_teachers(db, schedule_id, teacher_ids)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return _teacher_assignment_list_response(items)
 
 
 @router.post("/{schedule_id}/teachers", response_model=ListResponse[TeacherAssignmentResponse])
 async def add_teachers(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     teacher_ids: list[str] = Body(...),
 ) -> ListResponse[TeacherAssignmentResponse]:
     """Add teachers to schedule (assigned teachers or admin only)."""
     await _check_schedule_access(current_user, db, schedule_id)
-    items = await course_management_service.add_teachers(db, schedule_id, teacher_ids)
+    audit = AuditContext(audit_db, current_user, "schedule",
+                         target_id=str(schedule_id), action="teachers_added",
+                         reason=f"teacher_ids: {','.join(teacher_ids)}")
+    try:
+        items = await course_management_service.add_teachers(db, schedule_id, teacher_ids)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return _teacher_assignment_list_response(items)
 
 
@@ -186,6 +236,7 @@ async def add_teachers(
 )
 async def assign_teacher(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("schedule:update"))],
     schedule_id: int,
     teacher_id: str,
@@ -198,23 +249,40 @@ async def assign_teacher(
         from shared.exceptions import BusinessRuleError
 
         raise BusinessRuleError("teacher_id in path and body must match")
-    assignment = await course_management_service.assign_teacher(
-        db,
-        schedule_id,
-        normalized_teacher_id,
-        request.role_type,
-    )
+    audit = AuditContext(audit_db, current_user, "schedule",
+                         target_id=str(schedule_id), action="teacher_assigned",
+                         reason=f"teacher_id={normalized_teacher_id}, role={request.role_type}")
+    try:
+        assignment = await course_management_service.assign_teacher(
+            db,
+            schedule_id,
+            normalized_teacher_id,
+            request.role_type,
+        )
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=TeacherAssignmentResponse.model_validate(assignment))
 
 
 @router.delete("/{schedule_id}/teachers/{teacher_id}", response_model=APIResponse[None])
 async def remove_teacher(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("schedule:delete"))],
     schedule_id: int,
     teacher_id: str,
 ) -> APIResponse[None]:
     """Remove a teacher assignment (assigned teachers or admin only)."""
     await _check_schedule_access(current_user, db, schedule_id)
-    await course_management_service.remove_teacher(db, schedule_id, teacher_id)
+    audit = AuditContext(audit_db, current_user, "schedule",
+                         target_id=str(schedule_id), action="teacher_removed",
+                         reason=f"teacher_id={teacher_id}")
+    try:
+        await course_management_service.remove_teacher(db, schedule_id, teacher_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)

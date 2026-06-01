@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from info_service.api.deps import InfoDbSession
+from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.core.audit import AuditContext
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.base_info_schema import (
     BaseInfoCreateRequest,
@@ -13,6 +14,7 @@ from info_service.schemas.base_info_schema import (
     BaseInfoUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
+from shared.exceptions import AppError
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
 
@@ -43,10 +45,17 @@ async def list_base_info(
 async def create_base_info(
     request: BaseInfoCreateRequest,
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:create"))],
 ) -> APIResponse[BaseInfoResponse]:
     """Create a base info entry."""
-    item = await course_management_service.create_base_info(db, request)
+    audit = AuditContext(audit_db, current_user, "base_info", action="base_info_created")
+    try:
+        item = await course_management_service.create_base_info(db, request)
+        await audit.log_success(target_id=str(item.id))
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=BaseInfoResponse.model_validate(item))
 
 
@@ -66,11 +75,19 @@ async def update_base_info(
     item_id: int,
     request: BaseInfoUpdateRequest,
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:update"))],
     _admin: None = Depends(require_admin),
 ) -> APIResponse[BaseInfoResponse]:
     """Full update base info (admin only)."""
-    item = await course_management_service.update_base_info(db, item_id, request)
+    audit = AuditContext(audit_db, current_user, "base_info",
+                         target_id=str(item_id), action="base_info_updated")
+    try:
+        item = await course_management_service.update_base_info(db, item_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=BaseInfoResponse.model_validate(item))
 
 
@@ -79,11 +96,19 @@ async def patch_base_info(
     item_id: int,
     request: BaseInfoPatchRequest,
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:update"))],
     _admin: None = Depends(require_admin),
 ) -> APIResponse[BaseInfoResponse]:
     """Partial update base info (admin only)."""
-    item = await course_management_service.patch_base_info(db, item_id, request)
+    audit = AuditContext(audit_db, current_user, "base_info",
+                         target_id=str(item_id), action="base_info_updated")
+    try:
+        item = await course_management_service.patch_base_info(db, item_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=BaseInfoResponse.model_validate(item))
 
 
@@ -91,9 +116,17 @@ async def patch_base_info(
 async def delete_base_info(
     item_id: int,
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("base-info:delete"))],
     _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Delete base info entry (admin only)."""
-    await course_management_service.delete_base_info(db, item_id)
+    audit = AuditContext(audit_db, current_user, "base_info",
+                         target_id=str(item_id), action="base_info_deleted")
+    try:
+        await course_management_service.delete_base_info(db, item_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)

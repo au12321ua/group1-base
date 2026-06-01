@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from info_service.api.deps import InfoDbSession
+from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.core.audit import AuditContext
 from info_service.core.security import check_resource_access
 from info_service.deps import require_permission
 from info_service.models.course_offering import CourseOffering
@@ -15,7 +16,7 @@ from info_service.schemas.offering_schema import (
     OfferingUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
-from shared.exceptions import AuthorizationError
+from shared.exceptions import AppError, AuthorizationError
 from shared.response import (
     APIResponse,
     ListResponse,
@@ -75,11 +76,18 @@ async def list_offerings(
 @router.post("/", response_model=SingleResponse[OfferingResponse])
 async def create_offering(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("offering:create"))],
     request: OfferingCreateRequest,
 ) -> SingleResponse[OfferingResponse]:
     """Create a new offering."""
-    offering = await course_management_service.create_offering(db, request)
+    audit = AuditContext(audit_db, current_user, "offering", action="offering_created")
+    try:
+        offering = await course_management_service.create_offering(db, request)
+        await audit.log_success(target_id=str(offering.id))
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=OfferingResponse.model_validate(offering))
 
 
@@ -97,36 +105,60 @@ async def get_offering(
 @router.put("/{offering_id}", response_model=SingleResponse[OfferingResponse])
 async def update_offering(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("offering:update"))],
     offering_id: int,
     request: OfferingUpdateRequest,
 ) -> SingleResponse[OfferingResponse]:
     """Full update offering (assigned teachers or admin only)."""
     await _check_offering_access(current_user, db, offering_id)
-    offering = await course_management_service.update_offering(db, offering_id, request)
+    audit = AuditContext(audit_db, current_user, "offering",
+                         target_id=str(offering_id), action="offering_updated")
+    try:
+        offering = await course_management_service.update_offering(db, offering_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=OfferingResponse.model_validate(offering))
 
 
 @router.patch("/{offering_id}", response_model=SingleResponse[OfferingResponse])
 async def patch_offering(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("offering:update"))],
     offering_id: int,
     request: OfferingPatchRequest,
 ) -> SingleResponse[OfferingResponse]:
     """Partial update offering (assigned teachers or admin only)."""
     await _check_offering_access(current_user, db, offering_id)
-    offering = await course_management_service.update_offering(db, offering_id, request)
+    audit = AuditContext(audit_db, current_user, "offering",
+                         target_id=str(offering_id), action="offering_updated")
+    try:
+        offering = await course_management_service.update_offering(db, offering_id, request)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return SingleResponse(data=OfferingResponse.model_validate(offering))
 
 
 @router.delete("/{offering_id}", response_model=APIResponse[None])
 async def delete_offering(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("offering:delete"))],
     offering_id: int,
 ) -> APIResponse[None]:
     """Delete offering (assigned teachers or admin only)."""
     await _check_offering_access(current_user, db, offering_id)
-    await course_management_service.delete_offering(db, offering_id)
+    audit = AuditContext(audit_db, current_user, "offering",
+                         target_id=str(offering_id), action="offering_deleted")
+    try:
+        await course_management_service.delete_offering(db, offering_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)

@@ -5,13 +5,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import StreamingResponse
 
-from info_service.api.deps import InfoDbSession
+from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.core.audit import AuditContext
 from info_service.core.security import check_resource_access
 from info_service.crud.file_resource_crud import file_resource_crud
 from info_service.deps import require_permission
 from info_service.schemas.file_schema import FileResponse, FileUploadResponse
 from info_service.services.file_storage_service import file_storage_service
-from shared.exceptions import AuthorizationError, ResourceNotFoundError
+from shared.exceptions import AppError, AuthorizationError, ResourceNotFoundError
 from shared.response import APIResponse
 from shared.security import IdentityContext
 
@@ -21,6 +22,7 @@ router = APIRouter(tags=["files"])
 @router.post("/", status_code=201, response_model=APIResponse[FileUploadResponse])
 async def upload_file(
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("file:create"))],
     file: UploadFile = File(...),
 ) -> APIResponse[FileUploadResponse]:
@@ -28,15 +30,23 @@ async def upload_file(
     content = await file.read()
     parts = file.filename.rsplit(".", 1) if file.filename else []
     file_type = parts[-1].lower() if len(parts) == 2 else "bin"
+    file_name = file.filename or "unnamed"
 
-    result = await file_storage_service.upload_file(
-        db,
-        owner_user_id=current_user.user_id,
-        file_name=file.filename or "unnamed",
-        file_type=file_type,
-        file_size=len(content),
-        content=content,
-    )
+    audit = AuditContext(audit_db, current_user, "file",
+                         action="file_uploaded", reason=f"name={file_name}, size={len(content)}")
+    try:
+        result = await file_storage_service.upload_file(
+            db,
+            owner_user_id=current_user.user_id,
+            file_name=file_name,
+            file_type=file_type,
+            file_size=len(content),
+            content=content,
+        )
+        await audit.log_success(target_id=str(result["id"]))
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=FileUploadResponse(**result))
 
 
@@ -96,10 +106,18 @@ async def download_file(
 async def delete_file(
     file_id: int,
     db: InfoDbSession,
+    audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("file:delete"))],
 ) -> APIResponse[None]:
     """Delete a file (requires file:delete permission, owner or admin only)."""
-    await file_storage_service.delete_file(
-        db, file_id, current_user.user_id, current_user.role
-    )
+    audit = AuditContext(audit_db, current_user, "file",
+                         target_id=str(file_id), action="file_deleted")
+    try:
+        await file_storage_service.delete_file(
+            db, file_id, current_user.user_id, current_user.role
+        )
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)
