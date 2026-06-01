@@ -158,9 +158,8 @@ docker compose up -d
 ### 4.3 开发流程
 
 1. 克隆仓库 → 复制 `.env.example` 为 `.env`。
-2. 初始化数据库：`alembic upgrade head`（每个服务独立执行）。
-3. 导入种子数据（角色 + 权限 + 初始管理员）。
-4. 启动服务 → 访问 `http://localhost:8001/docs`（Auth）/ `http://localhost:8002/docs`（Info）查看 Swagger 文档。
+2. 导入种子数据（角色 + 权限 + 初始管理员）。
+3. 启动服务 → 访问 `http://localhost:8001/docs`（Auth）/ `http://localhost:8002/docs`（Info）查看 Swagger 文档。
 
 ## 5. 网络拓扑
 

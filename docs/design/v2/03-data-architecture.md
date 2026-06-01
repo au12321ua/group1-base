@@ -10,14 +10,20 @@
 │  (auth.db)      │     │  (info.db)      │     │  (audit.db)     │
 │                 │     │                 │     │                 │
 │ ▪ users (最小)  │     │ ▪ users_info    │     │ ▪ audit_logs    │
-│ ▪ credentials   │     │ ▪ user_profiles │     │ ▪ operation_logs│
-│ ▪ tokens        │     │ ▪ courses       │     │                 │
-│ ▪ sessions      │     │ ▪ offerings     │     │                 │
+│ ▪ credentials   │     │ ▪ user_profiles │     │ ▪ dead_letter   │
+│ ▪ tokens        │     │ ▪ courses       │     │   _queue        │
+│ ▪ sessions      │     │ ▪ offerings     │     │ ▪ operation_logs│
 │ ▪ roles         │     │ ▪ schedules     │     │                 │
 │ ▪ permissions   │     │ ▪ classrooms    │     │                 │
-│ ▪ user_roles    │     │ ▪ classrooms    │     │                 │
-│ ▪ role_perms    │     │ ▪ calendars     │     │                 │
+│ ▪ user_roles    │     │ ▪ teacher_      │     │                 │
+│ ▪ role_perms    │     │   assignments   │     │                 │
+│                 │     │ ▪ course_       │     │                 │
+│                 │     │   prerequisites │     │                 │
+│                 │     │ ▪ calendars     │     │                 │
 │                 │     │ ▪ training_progs│     │                 │
+│                 │     │ ▪ training_     │     │                 │
+│                 │     │   program_      │     │                 │
+│                 │     │   courses       │     │                 │
 │                 │     │ ▪ base_info     │     │                 │
 │                 │     │ ▪ file_resources│     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
@@ -52,25 +58,26 @@
 
 | 域 | 表名 | 关键字段 |
 |----|------|----------|
-| 用户 | `users_info` | id, user_no, username, role_ids, profile_id, is_deleted, deleted_at |
+| 用户 | `users_info` | id, user_no, username, is_deleted, deleted_at, created_at, updated_at |
 | 用户 | `user_profiles` | id, user_id, full_name, gender, email, phone, status, avatar_file_id |
 | 课程 | `courses` | id, course_code, course_name, credit, capacity, assessment_method, is_active, is_deleted |
-| 课程 | `course_offerings` | id, course_id, term_code, class_no, teacher_ids, capacity, status |
+| 课程 | `course_offerings` | id, course_id, term_code, class_no, capacity, status |
 | 课程 | `course_schedules` | id, offering_id, classroom_id, day_of_week, start_period, end_period, week_range |
 | 课程 | `course_prerequisites` | id, course_id, prerequisite_course_id, min_grade |
 | 教学 | `classrooms` | id, room_no, building, capacity, type |
 | 教学 | `teacher_course_assignments` | id, teacher_id, offering_id, role_type |
+| 教学 | `training_program_courses` | id, program_id, course_id |
 | 基础 | `academic_calendars` | id, term_code, term_name, start_date, end_date, version, snapshot_time |
-| 基础 | `training_programs` | id, program_code, major_code, grade, version, required_course_ids, snapshot_time |
+| 基础 | `training_programs` | id, program_code, major_code, grade, version, snapshot_time |
 | 基础 | `base_info_items` | id, category, item_code, item_name, description, is_active |
 | 文件 | `file_resources` | id, owner_user_id, file_name, file_type, file_size, storage_path, checksum |
-| 日志 | `operation_logs` | id, operator_id, target_type, target_id, action, result, request_id |
 
 #### Log DB
 
 | 表名 | 关键字段 |
 |------|----------|
 | `audit_logs` | id, operator_user_id, operator_role, target_type, target_id, action, result, reason, request_id, created_at |
+| `dead_letter_queue` | id, target_service, operation, payload, error_message, retry_count, max_retries, created_at, last_retry_at |
 | `operation_logs` | id, caller_id, query_condition, snapshot_version, created_at |
 
 ## 2. 实体关系图（ER）
@@ -78,10 +85,6 @@
 ```mermaid
 erDiagram
     UserInfo ||--|| UserProfile : "has"
-    UserInfo ||--o{ UserRole : "assigned"
-    Role ||--o{ UserRole : "grants"
-    Role ||--o{ RolePermission : "includes"
-    Permission ||--o{ RolePermission : "assigned"
     Course ||--o{ CourseOffering : "offered_as"
     CourseOffering ||--o{ CourseSchedule : "scheduled"
     CourseOffering ||--o{ TeacherCourseAssignment : "assigned"
@@ -96,9 +99,10 @@ erDiagram
         int id PK
         string user_no UK
         string username UK
-        string role_ids
-        int profile_id FK
         bool is_deleted
+        datetime deleted_at
+        datetime created_at
+        datetime updated_at
     }
 
     UserProfile {
@@ -138,6 +142,21 @@ erDiagram
         int day_of_week
         int start_period
         int end_period
+        string week_range
+    }
+
+    TeacherCourseAssignment {
+        int id PK
+        string teacher_id
+        int offering_id FK
+        string role_type
+    }
+
+    CoursePrerequisite {
+        int id PK
+        int course_id FK
+        int prerequisite_course_id FK
+        string min_grade
     }
 
     AcademicCalendar {
@@ -156,18 +175,25 @@ erDiagram
         string major_code
         string grade
         string version
-        string required_course_ids
         datetime snapshot_time
+    }
+
+    TrainingProgramCourse {
+        int id PK
+        int program_id FK
+        int course_id FK
+        datetime created_at
     }
 
     AuditLog {
         int id PK
-        int operator_user_id
+        string operator_user_id
         string operator_role
         string target_type
-        int target_id
+        string target_id
         string action
         string result
+        string reason
         string request_id
         datetime created_at
     }
@@ -199,8 +225,7 @@ Info Service（主写方）                     Auth Service（从写方）
 
 | 场景 | 主操作（Info） | 同步操作（Auth） | 补偿动作 |
 |------|---------------|-----------------|----------|
-| 用户创建 | 写 users_info + user_profiles | POST /internal/users 创建 credentials + roles | 补偿删除 Info 记录 |
-| 角色变更 | 更新 users_info.role_ids | POST /internal/users/{id}/roles 同步角色 | Info 回滚 role_ids |
+| 用户创建 | 写 users_info + user_profiles | POST /internal/users 创建 credentials | 补偿删除 Info 记录 |
 | 逻辑删除 | 标记 isDeleted=true | POST /internal/users/{id}/disable 禁用账号 | Info 清除 isDeleted |
 | 恢复用户 | 清除 isDeleted | POST /internal/users/{id}/enable 启用账号 | Info 重新标记 isDeleted |
 | 物理删除 | DELETE users_info + profiles | DELETE /internal/users/{id} 清理认证数据 | 记录失败日志，人工介入 |
@@ -212,32 +237,28 @@ Info Service（主写方）                     Auth Service（从写方）
 - 补偿操作本身失败时：写入 `dead_letter_queue` 表（Info DB），支持后续人工或自动重试。
 - 补偿失败不影响已有成功数据，宁可保留未同步状态也不丢失主数据。
 
-## 4. 数据迁移管理（Alembic）
+## 4. 数据迁移管理
 
-### 4.1 迁移链结构
+### 4.1 Model-First 模式（原型阶段）
+
+原型阶段采用 **Model-First** 模式：SQLModel 模型定义即为数据库 schema 的唯一真实来源，应用启动时通过 `SQLModel.metadata.create_all()` 自动建表。
+
+- **无迁移文件**：原型阶段不维护 Alembic migration chain，快速迭代模型定义。
+- **Alembic 配置保留**：`alembic.ini` 和 `env.py` 作为模板保留，生产切换时可随时启用。
+- **建表时机**：FastAPI lifespan 中调用 `create_all()`，确保所有注册模型对应的表已创建。
+- **表注册**：每个服务的 `models/__init__.py` 导入所有模型模块，确保 `SQLModel.metadata` 包含完整表集合。
+
+### 4.2 生产演进路径
+
+- SQLite → PostgreSQL 切换时：修改连接字符串 → 启用 Alembic → 生成初始迁移 → 后续增量迁移。
+- Alembic 配置结构（保留作为模板）：
 
 ```
-auth_service/
-└── migrations/
-    ├── versions/
-    │   ├── 001_initial_auth_schema.py
-    │   └── ...
-    └── alembic.ini
-
-info_service/
-└── migrations/
-    ├── versions/
-    │   ├── 001_initial_info_schema.py
-    │   └── ...
-    └── alembic.ini
+auth_service/migrations/    # Auth 链（alembic.ini + env.py）
+info_service/migrations/
+├── info/                   # Info 链（alembic.ini + env.py）
+└── audit/                  # Audit 链（alembic.ini + env.py）
 ```
-
-### 4.2 迁移原则
-
-- 每个服务独立维护自己的 Alembic 迁移链，互不干扰。
-- 迁移脚本纳入版本控制，与代码同步提交。
-- 初始迁移（001）包含完整建表语句，后续迁移只记录增量变更。
-- SQLite → PostgreSQL 切换时：修改连接字符串 → 重置迁移链 → 重新执行迁移。
 
 ### 4.3 索引策略
 
@@ -249,4 +270,18 @@ info_service/
 | user_profiles | user_id | 档案关联 |
 | courses | course_code, is_active | 课程检索 |
 | course_offerings | course_id, term_code | 开课查询 |
-| audit_logs | operator_user_id, target_type, created_at | 审计检索 |
+| course_offerings | (course_id, term_code, class_no) UNIQUE | 防重复开课 |
+| course_schedules | offering_id, classroom_id | 排课关联查询 |
+| course_prerequisites | course_id, prerequisite_course_id | 先修课程查询 |
+| course_prerequisites | (course_id, prerequisite_course_id) UNIQUE | 防重复先修关系 |
+| teacher_course_assignments | teacher_id, offering_id | 教师分配查询 |
+| teacher_course_assignments | (offering_id, teacher_id, role_type) UNIQUE | 防重复分配 |
+| training_program_courses | program_id, course_id | 方案课程查询 |
+| training_program_courses | (program_id, course_id) UNIQUE | 防重复关联 |
+| base_info_items | category | 基础信息分类查询 |
+| base_info_items | (category, item_code) UNIQUE | 防重复条目 |
+| training_programs | program_code, major_code | 方案检索 |
+| audit_logs | operator_user_id, target_type, action, created_at | 审计检索 |
+| audit_logs | (target_type, action, created_at) COMPOSITE | 审计组合查询 |
+| dead_letter_queue | target_service, retry_count | 死信队列查询 |
+| authentication_sessions | user_id, access_token_id, refresh_token_id | 会话关联查询 |
