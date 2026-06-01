@@ -47,7 +47,7 @@ async def login(
             target_type="auth",
             action="user_login",
             result="failed",
-            reason=str(exc.message) if hasattr(exc, "message") else type(exc).__name__,
+            reason=str(exc.message),
         )
         raise
 
@@ -80,7 +80,7 @@ async def service_login(
             target_type="auth",
             action="service_login",
             result="failed",
-            reason=str(exc.message) if hasattr(exc, "message") else type(exc).__name__,
+            reason=str(exc.message),
         )
         raise
 

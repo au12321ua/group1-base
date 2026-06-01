@@ -37,7 +37,6 @@ class AuditLogCRUD:
         )
         db.add(entry)
         await db.flush()
-        await db.refresh(entry)
         return entry
 
     async def search(

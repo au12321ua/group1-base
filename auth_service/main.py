@@ -6,15 +6,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
 
 import auth_service.models  # noqa: F401  — register tables in SQLModel.metadata
 import shared.models.audit_log  # noqa: F401  — register audit tables in SQLModel.metadata
 from auth_service.api.v1.router import router as v1_router
 from auth_service.core.config import get_auth_settings
-from shared.database import create_get_db
+from shared.database import create_get_db, create_tables
 from shared.error_handlers import register_error_handlers
 from shared.logging import RequestIDMiddleware, RequestLoggingMiddleware, get_logger
+from shared.models.audit_log import AUDIT_TABLE_NAMES
 
 settings = get_auth_settings()
 engine = create_async_engine(settings.auth_database_url, echo=False)
@@ -37,28 +37,14 @@ _AUTH_TABLES = frozenset(
     }
 )
 
-_AUDIT_TABLES = frozenset(
-    {
-        "audit_logs",
-        "dead_letter_queue",
-        "operation_logs",
-    }
-)
-
-
-def _create_tables(conn, table_names: frozenset[str]) -> None:
-    tables = [t for t in SQLModel.metadata.sorted_tables if t.name in table_names]
-    SQLModel.metadata.create_all(conn, tables=tables)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Create Auth + Audit DB tables and runtime dirs on startup, dispose engines on shutdown."""
     os.makedirs("data", exist_ok=True)
     async with engine.begin() as conn:
-        await conn.run_sync(_create_tables, _AUTH_TABLES)
+        await conn.run_sync(create_tables, _AUTH_TABLES)
     async with audit_engine.begin() as conn:
-        await conn.run_sync(_create_tables, _AUDIT_TABLES)
+        await conn.run_sync(create_tables, AUDIT_TABLE_NAMES)
     yield
     await engine.dispose()
     await audit_engine.dispose()

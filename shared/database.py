@@ -7,7 +7,9 @@ its own AsyncEngine, keeping auth.db / info.db / audit.db independent.
 
 from collections.abc import AsyncGenerator, Callable
 
+from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 
@@ -40,3 +42,15 @@ def create_get_db(engine: AsyncEngine) -> Callable[[], AsyncGenerator[AsyncSessi
                 raise
 
     return get_db
+
+
+def create_tables(conn: Connection, table_names: frozenset[str]) -> None:
+    """Create a filtered subset of SQLModel metadata tables.
+
+    Usage in lifespan / test fixtures::
+
+        async with engine.begin() as conn:
+            await conn.run_sync(create_tables, _AUTH_TABLES)
+    """
+    tables = [t for t in SQLModel.metadata.sorted_tables if t.name in table_names]
+    SQLModel.metadata.create_all(conn, tables=tables)

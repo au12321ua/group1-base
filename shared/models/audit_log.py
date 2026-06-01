@@ -8,6 +8,14 @@ from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
+AUDIT_TABLE_NAMES: frozenset[str] = frozenset(
+    {
+        "audit_logs",
+        "dead_letter_queue",
+        "operation_logs",
+    }
+)
+
 
 class AuditLog(SQLModel, table=True):
     """Immutable audit trail record."""
