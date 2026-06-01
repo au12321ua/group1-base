@@ -18,8 +18,8 @@ class InfoSettings(BaseSettings):
     env: str = "development"
 
     # Database
-    info_database_url: str = "sqlite:///data/info.db"
-    audit_database_url: str = "sqlite:///logs/audit.db"
+    info_database_url: str = "sqlite+aiosqlite:///./data/info.db"
+    audit_database_url: str = "sqlite+aiosqlite:///./data/audit.db"
 
     # Auth Service (cross-service calls)
     auth_service_url: str = "http://localhost:8001"
@@ -42,6 +42,10 @@ class InfoSettings(BaseSettings):
 
     # Logging
     log_level: str = "DEBUG"
+    log_output: str = "console"
+    log_dir: str = "./logs"
+    log_rotation: str = "daily"
+    log_retention: int = 30
 
 
 @lru_cache

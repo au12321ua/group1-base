@@ -154,22 +154,22 @@ class AppLogger:
 def get_logger(
     name: str,
     service_name: str = "",
-    level: str | None = None,
+    level: str = "INFO",
+    output: str = "console",
+    log_dir: str = "./logs",
+    rotation: str = "daily",
+    retention: int = 30,
 ) -> AppLogger:
     """Factory for creating AppLogger instances.
 
-    Reads LOG_LEVEL, LOG_OUTPUT, LOG_DIR, LOG_ROTATION, LOG_RETENTION
-    from environment variables (or .env via python-dotenv).
+    All log configuration is passed explicitly by the caller (typically from
+    the service's Pydantic Settings object). This avoids scattered os.getenv()
+    calls and keeps log configuration in one place.
     """
-    resolved_level = level or os.getenv("LOG_LEVEL", "INFO")
-    output = os.getenv("LOG_OUTPUT", "console")
-    log_dir = os.getenv("LOG_DIR", "/var/log/stss/")
-    rotation = os.getenv("LOG_ROTATION", "daily")
-    retention = int(os.getenv("LOG_RETENTION", "30"))
 
     return AppLogger(
         name=name,
-        level=resolved_level,
+        level=level,
         service_name=service_name,
         output=output,
         log_dir=log_dir,

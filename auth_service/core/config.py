@@ -18,8 +18,8 @@ class AuthSettings(BaseSettings):
     env: str = "development"
 
     # Database
-    auth_database_url: str = "sqlite:///data/auth.db"
-    audit_database_url: str = "sqlite:///data/audit.db"
+    auth_database_url: str = "sqlite+aiosqlite:///./data/auth.db"
+    audit_database_url: str = "sqlite+aiosqlite:///./data/audit.db"
 
     # JWT
     token_secret_key: str = "change-me-in-production"
@@ -41,6 +41,10 @@ class AuthSettings(BaseSettings):
 
     # Logging
     log_level: str = "DEBUG"
+    log_output: str = "console"
+    log_dir: str = "./logs"
+    log_rotation: str = "daily"
+    log_retention: int = 30
 
     # Internal user provisioning (Info Service → POST /internal/users)
     default_initial_password: str = "ChangeMe123"
