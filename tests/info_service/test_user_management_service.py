@@ -1,9 +1,4 @@
-"""Unit tests for UserManagementService — Info DB operations.
-
-Auth-syncing methods are mocked to avoid requiring a running Auth Service.
-"""
-
-from unittest.mock import AsyncMock, patch
+"""Unit tests for UserManagementService — Info DB operations."""
 
 import pytest
 
@@ -22,7 +17,7 @@ from shared.exceptions import ResourceNotFoundError
 async def _setup_user(db, user_no="S001", username="alice", full_name="测试用户"):
     """Helper: create a user + profile for testing."""
     user = await user_crud.create(
-        db, UserInfo(user_no=user_no, username=username, role_ids="1")
+        db, UserInfo(user_no=user_no, username=username)
     )
     await user_profile_crud.create(
         db,
@@ -39,7 +34,7 @@ async def _setup_user(db, user_no="S001", username="alice", full_name="测试用
 
 @pytest.mark.unit
 class TestUserManagementService:
-    """User management service unit tests (Info DB only, Auth mocked)."""
+    """User management service unit tests (Info DB only)."""
 
     async def test_get_user(self, info_db_session):
         user = await _setup_user(info_db_session)
@@ -83,15 +78,12 @@ class TestUserManagementService:
             phone="13800000000",
             status="ACTIVE",
         )
-        with patch.object(
-            user_management_service, "_sync_roles_to_auth", new_callable=AsyncMock
-        ):
-            result = await user_management_service.update_user(
-                info_db_session, user.id, req
-            )
+        result = await user_management_service.update_user(
+            info_db_session, user.id, req
+        )
         assert result.user_no == "S001-NEW"
         assert result.username == "alice_new"
-        assert result.role_ids == "1,2"
+        assert result.role_ids == ""
         assert result.profile.full_name == "新名称"
 
     async def test_patch_user(self, info_db_session):

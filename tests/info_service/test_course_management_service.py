@@ -17,10 +17,15 @@ from shared.exceptions import ResourceNotFoundError
 class TestCourseManagementService:
     """Verify service-layer orchestration for course domain updates."""
 
-    async def test_update_offering_skips_identity_check_when_identity_unchanged(
-        self, info_db_session, monkeypatch: pytest.MonkeyPatch
+    async def test_update_offering_updates_non_identity_fields(
+        self, info_db_session
     ) -> None:
-        """Updating non-identity fields should not re-run duplicate identity validation."""
+        """Updating non-identity fields (e.g. status, capacity) should succeed
+        without triggering a uniqueness violation.
+
+        Uniqueness of (course_id, term_code, class_no) is enforced at the
+        database level via UniqueConstraint — no service-layer check needed.
+        """
         course = await course_crud.create(
             info_db_session,
             Course(course_code="CS701", course_name="Service Test Course"),
@@ -31,28 +36,20 @@ class TestCourseManagementService:
                 course_id=course.id,
                 term_code="2026-FALL",
                 class_no="01",
-                teacher_ids="t-1",
                 status="ACTIVE",
             ),
         )
         await info_db_session.commit()
 
-        identity_check = AsyncMock()
-        monkeypatch.setattr(
-            course_management_service,
-            "_ensure_unique_offering_identity",
-            identity_check,
-        )
-
         updated = await course_management_service.update_offering(
             info_db_session,
             offering.id,
-            OfferingPatchRequest(teacher_ids=["t-2", "t-3"], status="COMPLETED"),
+            OfferingPatchRequest(status="COMPLETED"),
         )
 
-        identity_check.assert_not_awaited()
-        assert updated.teacher_ids == "t-2,t-3"
         assert updated.status == "COMPLETED"
+        assert updated.term_code == "2026-FALL"
+        assert updated.class_no == "01"
 
     async def test_ensure_required_courses_exist_uses_bulk_lookup(
         self, info_db_session, monkeypatch: pytest.MonkeyPatch

@@ -33,7 +33,7 @@ class TestTrainingProgramAPI:
 
         created = assert_status_and_data(create_resp)
         assert created["program_code"] == "CS-AI-2026"
-        assert created["required_course_ids"] == str(course_id)
+        assert created["required_course_ids"] == [course_id]
         program_id = created["id"]
 
         list_resp = await async_client_info.get(
@@ -66,7 +66,7 @@ class TestTrainingProgramAPI:
         assert patch_resp.status_code == 200
         patched = patch_resp.json()["data"]
         assert patched["version"] == "2.0"
-        assert patched["required_course_ids"] == str(course_id)
+        assert patched["required_course_ids"] == [course_id]
 
         delete_resp = await async_client_info.delete(
             f"/api/v1/training-programs/{program_id}", headers=auth_headers

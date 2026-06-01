@@ -6,6 +6,7 @@ to the same audit.db without cross-service HTTP calls.
 
 from datetime import UTC, datetime
 
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 AUDIT_TABLE_NAMES: frozenset[str] = frozenset(
@@ -21,6 +22,9 @@ class AuditLog(SQLModel, table=True):
     """Immutable audit trail record."""
 
     __tablename__: str = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_query", "target_type", "action", "created_at"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     operator_user_id: str = Field(max_length=64, index=True)
@@ -42,11 +46,11 @@ class DeadLetterQueue(SQLModel, table=True):
     __tablename__: str = "dead_letter_queue"
 
     id: int | None = Field(default=None, primary_key=True)
-    target_service: str = Field(max_length=64)  # auth_service
+    target_service: str = Field(max_length=64, index=True)  # auth_service
     operation: str = Field(max_length=128)  # e.g. POST /internal/users
     payload: str = Field(max_length=4096)  # JSON serialized request
     error_message: str = Field(default="", max_length=1024)
-    retry_count: int = Field(default=0)
+    retry_count: int = Field(default=0, index=True)
     max_retries: int = Field(default=3)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_retry_at: datetime | None = Field(default=None)

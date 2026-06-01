@@ -52,7 +52,6 @@ async def create_offering(
     course_id: int,
     term_code: str,
     class_no: str,
-    teacher_ids: list[str] | None = None,
     capacity: int = 60,
     auth_headers: dict[str, str] | None = None,
 ) -> int:
@@ -65,7 +64,6 @@ async def create_offering(
             "course_id": course_id,
             "term_code": term_code,
             "class_no": class_no,
-            "teacher_ids": teacher_ids or [],
             "capacity": capacity,
         },
         headers=auth_headers,

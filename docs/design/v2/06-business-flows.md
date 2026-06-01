@@ -18,9 +18,8 @@ sequenceDiagram
     Info->>InfoDB: INSERT user_profiles
     Info->>InfoDB: COMMIT
 
-    Info->>Auth: POST /internal/users {userId, username, roleIds}
+    Info->>Auth: POST /internal/users {userId, username}
     Auth->>AuthDB: INSERT credentials (初始密码)
-    Auth->>AuthDB: INSERT user_roles
 
     alt Auth 创建成功
         Auth-->>Info: 201 Created
@@ -87,8 +86,7 @@ sequenceDiagram
     Info->>Info: DELETE FROM users_info
     Info->>Info: DELETE FROM user_profiles
     Info->>Auth: DELETE /internal/users/{id}
-    Auth->>Auth: DELETE credentials, tokens, sessions
-    Auth->>Auth: DELETE user_roles
+    Auth->>Auth: DELETE credentials, tokens, sessions, user_roles
     Auth-->>Info: 204 No Content
     Info->>Audit: 写审计日志 (action=user_deleted_permanent)
     Info-->>Admin: 204 用户已永久删除
@@ -143,33 +141,7 @@ sequenceDiagram
     Gateway-->>B: 教师名单（含版本）
 ```
 
-## 5. 角色变更流程
-
-```mermaid
-sequenceDiagram
-    actor Admin as 管理员
-    participant Info as Info Service
-    participant Auth as Auth Service
-    participant Audit as 审计日志
-
-    Admin->>Info: PATCH /users/{id} {role_ids: [...]}
-    Info->>Info: 校验操作者权限
-    Info->>Info: UPDATE users_info SET role_ids
-    Info->>Auth: POST /internal/users/{id}/roles {role_ids}
-    Auth->>Auth: 删除旧 user_roles
-    Auth->>Auth: 插入新 user_roles
-    alt 成功
-        Auth-->>Info: 200 OK
-        Info->>Audit: 写审计日志 (action=role_changed)
-        Info-->>Admin: 200 角色更新成功
-    else 失败
-        Auth-->>Info: 500
-        Info->>Info: 回滚 role_ids
-        Info-->>Admin: 500 角色更新失败
-    end
-```
-
-## 6. 与 data_flow 的 L2 对齐
+## 5. 与 data_flow 的 L2 对齐
 
 本系统对应 [data_flow](../../require-spec/data_flow/group_bus_L0_L1_L2_integrated.md) 中 **子系统 A（P2 信息管理）** 的 L2 分解：
 
@@ -178,7 +150,7 @@ sequenceDiagram
 | P2.1 请求解析与鉴权上下文 | Router + shared/security.py | 读取 Gateway 透传的身份 Header（X-User-Id、X-User-Role、X-User-Permissions），构建鉴权上下文 |
 | P2.2 用户与档案维护 | UserManagementService | CRUD + 跨服务同步 |
 | P2.3 课程校历培养方案维护 | CourseManagementService | 课程/开课/排课/校历/方案 CRUD |
-| P2.4 权限变更与回收站处理 | UserManagementService + RecycleBinService | 角色同步 + 逻辑/物理删除 |
+| P2.4 回收站处理 | UserManagementService + RecycleBinService | 逻辑/物理删除 |
 | P2.5 主数据快照发布与审计 | DataProvisionService + AuditService | HTTP 快照提供 + 审计写入 |
 
 > L2 数据流图中使用事件总线（MQ）发布主数据快照。原型阶段改为 HTTP 同步提供（`/data-provision/*`），但预留 `EventPublisher` 接口（Python Protocol），后续可替换为 MQ 实现。

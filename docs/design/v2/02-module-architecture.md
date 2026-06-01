@@ -121,6 +121,7 @@ project/
 │   │   ├── course_prerequisite.py
 │   │   ├── academic_calendar.py
 │   │   ├── training_program.py
+│   │   ├── training_program_course.py
 │   │   ├── base_info_item.py
 │   │   ├── file_resource.py
 │   │   └── audit_log.py
@@ -168,7 +169,6 @@ project/
 | `/internal/users` | POST | `AuthService.create_internal_user()` |
 | `/internal/users/{id}/disable` | POST | `AuthService.disable_user()` |
 | `/internal/users/{id}/enable` | POST | `AuthService.enable_user()` |
-| `/internal/users/{id}/roles` | POST | `AuthService.sync_user_roles()` |
 | `/internal/users/{id}` | DELETE | `AuthService.delete_user()` |
 
 ### 3.2 Service 层
@@ -207,8 +207,8 @@ project/
 |------|----------|
 | User（最小集） | userId, username, status |
 | Credential | userId, username, passwordHash, passwordSalt, failedLoginCount, lockedUntil |
-| Token | userId, type(ACCESS/REFRESH), tokenValue, issuedAt, expiresAt, revokedAt |
-| AuthenticationSession | userId, accessTokenId, refreshTokenId, status(ACTIVE/ENDED/EXPIRED) |
+| Token | userId, type(ACCESS/REFRESH/SERVICE), tokenValue, issuedAt, expiresAt, revokedAt |
+| AuthenticationSession | userId, accessTokenId(FK→tokens), refreshTokenId(FK→tokens), status(ACTIVE/ENDED/EXPIRED) |
 | Role | code, name, description, isActive |
 | Permission | code(resource:action), name, resource, action |
 | UserRole | userId, roleId |
@@ -224,6 +224,7 @@ project/
 - `logical_delete_user()` → 标记 isDeleted → HTTP 禁用 Auth 账号
 - `restore_user()` → 清除 isDeleted → HTTP 启用 Auth 账号
 - `batch_import_users()` → CSV 解析 → 逐条创建 → 汇总结果
+- 角色管理由 Auth Service 独立负责，Info Service 通过 Gateway 透传的 `X-User-Role` Header 获取角色信息
 
 **CourseManagementService** — 课程与教学资源：
 - 课程 CRUD、开课 CRUD、排课 CRUD
@@ -258,7 +259,7 @@ project/
 | ScheduleCRUD | CourseSchedule | 排课记录 |
 | ClassroomCRUD | Classroom | 教室资源 |
 | CalendarCRUD | AcademicCalendar | 校历数据 |
-| TrainingProgramCRUD | TrainingProgram | 培养方案 |
+| TrainingProgramCRUD | TrainingProgram, TrainingProgramCourse | 培养方案 + 关联课程 |
 | BaseInfoCRUD | BaseInfoItem | 通用基础信息 |
 | FileResourceCRUD | FileResource | 文件元数据 |
 | AuditLogCRUD | AuditLog | 审计日志读写 |

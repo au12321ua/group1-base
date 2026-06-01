@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.audit import AuditContext
+from info_service.crud.training_program_crud import training_program_crud
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.training_program_schema import (
     TrainingProgramCreateRequest,
@@ -27,6 +28,21 @@ from shared.security import IdentityContext
 router = APIRouter(tags=["training-programs"])
 
 
+async def _build_program_response(
+    db, program, course_ids: list[int] | None = None
+) -> TrainingProgramResponse:
+    """Assemble response with required_course_ids from the association table.
+
+    If *course_ids* is provided the DB query is skipped (batch path).
+    """
+    if course_ids is None:
+        associations = await training_program_crud.get_courses_by_program(db, program.id)
+        course_ids = [assoc.course_id for assoc in associations]
+    resp = TrainingProgramResponse.model_validate(program)
+    resp.required_course_ids = course_ids
+    return resp
+
+
 @router.get("/", response_model=ListResponse[TrainingProgramResponse])
 async def list_training_programs(
     db: InfoDbSession,
@@ -41,9 +57,12 @@ async def list_training_programs(
         skip=skip,
         limit=page_size,
     )
+    # Batch-fetch course associations for all programs in one query
+    program_ids = [p.id for p in items]
+    course_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
     return ListResponse(
         data=PaginatedData(
-            items=[TrainingProgramResponse.model_validate(item) for item in items],
+            items=[await _build_program_response(db, p, course_map.get(p.id, [])) for p in items],
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
@@ -65,7 +84,7 @@ async def create_training_program(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=TrainingProgramResponse.model_validate(program))
+    return SingleResponse(data=await _build_program_response(db, program))
 
 
 @router.get("/by-major", response_model=ListResponse[TrainingProgramResponse])
@@ -86,9 +105,11 @@ async def get_by_major(
         major_code=major_code,
         grade=grade,
     )
+    program_ids = [p.id for p in items]
+    course_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
     return ListResponse(
         data=PaginatedData(
-            items=[TrainingProgramResponse.model_validate(item) for item in items],
+            items=[await _build_program_response(db, p, course_map.get(p.id, [])) for p in items],
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
@@ -102,7 +123,7 @@ async def get_training_program(
 ) -> SingleResponse[TrainingProgramResponse]:
     """Get training program detail."""
     program = await course_management_service.get_training_program(db, program_id)
-    return SingleResponse(data=TrainingProgramResponse.model_validate(program))
+    return SingleResponse(data=await _build_program_response(db, program))
 
 
 @router.put("/{program_id}", response_model=SingleResponse[TrainingProgramResponse])
@@ -123,7 +144,7 @@ async def update_training_program(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=TrainingProgramResponse.model_validate(program))
+    return SingleResponse(data=await _build_program_response(db, program))
 
 
 @router.patch("/{program_id}", response_model=SingleResponse[TrainingProgramResponse])
@@ -144,7 +165,7 @@ async def patch_training_program(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=TrainingProgramResponse.model_validate(program))
+    return SingleResponse(data=await _build_program_response(db, program))
 
 
 @router.delete("/{program_id}", response_model=APIResponse[None])

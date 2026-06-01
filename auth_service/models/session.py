@@ -19,8 +19,8 @@ class AuthenticationSession(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: str = Field(max_length=64, index=True)
-    access_token_id: int
-    refresh_token_id: int
+    access_token_id: int = Field(foreign_key="tokens.id", index=True)
+    refresh_token_id: int = Field(foreign_key="tokens.id", index=True)
     status: SessionStatus = Field(default=SessionStatus.ACTIVE)
     client_ip: str | None = Field(default=None, max_length=45)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

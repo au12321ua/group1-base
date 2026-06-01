@@ -86,23 +86,6 @@ class UserManagementService:
             logger.exception("Failed to sync enable user %s to Auth", user_id)
             raise
 
-    async def _sync_roles_to_auth(
-        self, user_id: int, role_ids: list[int]
-    ) -> None:
-        """POST /internal/users/{id}/roles. Raises on failure."""
-        settings = self._settings
-        try:
-            async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
-                resp = await client.post(
-                    self._auth_url(f"/users/{user_id}/roles"),
-                    json={"role_ids": role_ids},
-                )
-                if resp.status_code != 200:
-                    raise RuntimeError(f"Auth role sync returned {resp.status_code}")
-        except Exception:
-            logger.exception("Failed to sync roles for user %s to Auth", user_id)
-            raise
-
     # ------------------------------------------------------------------
     # Response assembly
     # ------------------------------------------------------------------
@@ -110,7 +93,13 @@ class UserManagementService:
     async def _build_response(
         self, db: AsyncSession, user: UserInfo
     ) -> UserResponse:
-        """Assemble UserResponse from UserInfo + UserProfile."""
+        """Assemble UserResponse from UserInfo + UserProfile.
+
+        Role information is not stored in Info Service — it comes from
+        Auth Service via the Gateway (X-User-Role header). The response
+        sets role_ids to an empty string; the frontend should obtain
+        role information from the Auth Service or the current session.
+        """
         profile = await user_profile_crud.get_by_user_id(db, user.id)
         profile_schema = None
         if profile:
@@ -126,7 +115,6 @@ class UserManagementService:
             id=user.id,
             user_no=user.user_no,
             username=user.username,
-            role_ids=user.role_ids,
             is_deleted=user.is_deleted,
             profile=profile_schema,
             created_at=user.created_at,
@@ -144,7 +132,12 @@ class UserManagementService:
         current_user: object = None,
     ) -> UserResponse:
         """Create a user: write Info DB → HTTP call Auth /internal/users
-        → compensate on failure."""
+        → compensate on failure.
+
+        Role information is passed to Auth Service but not stored in the
+        Info Service UserInfo model — roles are Auth Service's
+        responsibility.
+        """
         role_ids = request.role_ids  # list[int]
 
         # Check uniqueness
@@ -155,16 +148,15 @@ class UserManagementService:
         if existing:
             raise BusinessRuleError(f"User with username {request.username} already exists")
 
-        # Write Info DB
+        # Write Info DB — no role_ids stored locally
         user = await user_crud.create(
             db,
             UserInfo(
                 user_no=request.user_no,
                 username=request.username,
-                role_ids=",".join(str(r) for r in role_ids),
             ),
         )
-        profile = await user_profile_crud.create(
+        await user_profile_crud.create(
             db,
             UserProfile(
                 user_id=user.id,
@@ -175,7 +167,6 @@ class UserManagementService:
                 status="ACTIVE",
             ),
         )
-        user.profile_id = profile.id
         await db.flush()
 
         # Cross-service sync — Auth
@@ -206,7 +197,6 @@ class UserManagementService:
         page_size: int = 20,
         keyword: str | None = None,
         status: str | None = None,
-        role: str | None = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[UserResponse], int]:
@@ -218,7 +208,6 @@ class UserManagementService:
             limit=page_size,
             keyword=keyword,
             status=status,
-            role=role,
             include_deleted=False,
             sort_by=sort_by,
             sort_order=sort_order,
@@ -234,14 +223,14 @@ class UserManagementService:
         request: UserUpdateRequest,
         current_user: object = None,
     ) -> UserResponse:
-        """Full update user info and profile. Compensates on Auth sync failure."""
+        """Full update user info and profile.
+
+        Role information is managed by Auth Service — Info Service
+        does not store or sync roles.
+        """
         user = await user_crud.get_by_id(db, user_id)
         if not user:
             raise ResourceNotFoundError("User", str(user_id))
-
-        new_role_ids = request.role_ids  # list[int]
-        old_role_ids_str = user.role_ids
-        old_role_ids = [int(r) for r in old_role_ids_str.split(",") if r.strip()]
 
         # Check uniqueness if changing user_no or username
         if request.user_no != user.user_no:
@@ -253,14 +242,12 @@ class UserManagementService:
             if existing and existing.id != user_id:
                 raise BusinessRuleError(f"User with username {request.username} already exists")
 
-        # Update UserInfo
-        new_role_ids_str = ",".join(str(r) for r in new_role_ids)
+        # Update UserInfo — no role_ids stored locally
         await user_crud.update(
             db,
             user,
             user_no=request.user_no,
             username=request.username,
-            role_ids=new_role_ids_str,
         )
 
         # Update / create UserProfile
@@ -276,7 +263,7 @@ class UserManagementService:
                 status=request.status,
             )
         else:
-            profile = await user_profile_crud.create(
+            await user_profile_crud.create(
                 db,
                 UserProfile(
                     user_id=user.id,
@@ -288,18 +275,6 @@ class UserManagementService:
                 ),
             )
 
-        # Sync roles if changed — with compensation
-        if new_role_ids != old_role_ids:
-            try:
-                await self._sync_roles_to_auth(user_id, new_role_ids)
-            except Exception:
-                # Compensate: restore old role_ids in Info DB
-                await user_crud.update(db, user, role_ids=old_role_ids_str)
-                await db.flush()
-                raise BusinessRuleError(
-                    "Failed to sync roles to Auth Service; Info DB rolled back"
-                )
-
         return await self._build_response(db, user)
 
     async def patch_user(
@@ -309,24 +284,26 @@ class UserManagementService:
         request: UserPatchRequest,
         current_user: object = None,
     ) -> UserResponse:
-        """Partial update user info and profile. Compensates on Auth sync failure."""
+        """Partial update user info and profile.
+
+        Role information is managed by Auth Service — Info Service
+        does not store or sync roles.
+        """
         user = await user_crud.get_by_id(db, user_id)
         if not user:
             raise ResourceNotFoundError("User", str(user_id))
 
         patch_data = request.model_dump(exclude_unset=True)
-        role_ids_changed = False
-        new_role_ids = None
-        old_role_ids_str = user.role_ids
 
         # Split fields between UserInfo and UserProfile
         user_fields = {}
         profile_fields = {}
         for field, value in patch_data.items():
-            if field == "role_ids" and value is not None:
-                new_role_ids = value  # list[int]
-                user_fields["role_ids"] = ",".join(str(r) for r in value)
-                role_ids_changed = True
+            if field == "role_ids":
+                # role_ids is accepted in the request for backward
+                # compatibility but ignored by Info Service — roles are
+                # managed exclusively by Auth Service.
+                continue
             elif field in ("user_no", "username"):
                 # Check uniqueness
                 if field == "user_no" and value != user.user_no:
@@ -352,18 +329,6 @@ class UserManagementService:
                 await user_profile_crud.create(
                     db,
                     UserProfile(user_id=user.id, **profile_fields),
-                )
-
-        # Sync roles if changed — with compensation
-        if role_ids_changed and new_role_ids is not None:
-            try:
-                await self._sync_roles_to_auth(user_id, new_role_ids)
-            except Exception:
-                # Compensate: restore old role_ids
-                await user_crud.update(db, user, role_ids=old_role_ids_str)
-                await db.flush()
-                raise BusinessRuleError(
-                    "Failed to sync roles to Auth Service; Info DB rolled back"
                 )
 
         return await self._build_response(db, user)

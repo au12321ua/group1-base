@@ -84,7 +84,6 @@ class RecycleBinService:
                 "user_no": u.user_no,
                 "username": u.username,
                 "full_name": full_name,
-                "role_ids": u.role_ids,
                 "is_deleted": u.is_deleted,
                 "deleted_at": u.deleted_at,
             })

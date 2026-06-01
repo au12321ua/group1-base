@@ -2,6 +2,7 @@
 
 
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -47,29 +48,6 @@ from shared.exceptions import BusinessRuleError, ResourceNotFoundError
 class CourseManagementService:
     """Business logic for courses, offerings, schedules, classrooms, calendars,
     training programs, and base info items."""
-
-    @staticmethod
-    def _serialize_string_list(values: list[str]) -> str:
-        """Store list-like fields as stable comma-separated text."""
-        items: list[str] = []
-        seen: set[str] = set()
-        for value in values:
-            normalized = value.strip()
-            if normalized and normalized not in seen:
-                seen.add(normalized)
-                items.append(normalized)
-        return ",".join(items)
-
-    @staticmethod
-    def _serialize_int_list(values: list[int]) -> str:
-        """Store integer list fields as comma-separated text."""
-        items: list[str] = []
-        seen: set[int] = set()
-        for value in values:
-            if value not in seen:
-                seen.add(value)
-                items.append(str(value))
-        return ",".join(items)
 
     async def _ensure_course_exists(self, db: AsyncSession, course_id: int) -> Course:
         """Resolve a visible course or raise not found."""
@@ -135,26 +113,6 @@ class CourseManagementService:
             return
         raise BusinessRuleError(f"Course code already exists: {course_code}")
 
-    async def _ensure_unique_offering_identity(
-        self,
-        db: AsyncSession,
-        *,
-        course_id: int,
-        term_code: str,
-        class_no: str,
-        exclude_id: int | None = None,
-    ) -> None:
-        """Reject duplicate offerings for the same course, term, and class number."""
-        existing = await offering_crud.get_by_course_and_term(db, course_id, term_code)
-        for offering in existing:
-            if exclude_id is not None and offering.id == exclude_id:
-                continue
-            if offering.class_no == class_no:
-                raise BusinessRuleError(
-                    "Offering already exists for course "
-                    f"{course_id} in {term_code} class {class_no}"
-                )
-
     async def _ensure_unique_program_code(
         self,
         db: AsyncSession,
@@ -211,22 +169,25 @@ class CourseManagementService:
     async def create_offering(
         self, db: AsyncSession, data: OfferingCreateRequest
     ) -> CourseOffering:
-        """Create a course offering."""
+        """Create a course offering.
+
+        Uniqueness of (course_id, term_code, class_no) is enforced by
+        the DB-level UniqueConstraint — IntegrityError is raised on duplicate.
+        """
         await self._ensure_course_exists(db, data.course_id)
-        await self._ensure_unique_offering_identity(
-            db,
-            course_id=data.course_id,
-            term_code=data.term_code,
-            class_no=data.class_no,
-        )
         offering = CourseOffering(
             course_id=data.course_id,
             term_code=data.term_code,
             class_no=data.class_no,
-            teacher_ids=self._serialize_string_list(data.teacher_ids),
             capacity=data.capacity,
         )
-        return await offering_crud.create(db, offering)
+        try:
+            return await offering_crud.create(db, offering)
+        except IntegrityError:
+            raise BusinessRuleError(
+                f"Offering already exists for course {data.course_id} "
+                f"in {data.term_code} class {data.class_no}"
+            )
 
     async def update_offering(
         self,
@@ -234,7 +195,11 @@ class CourseManagementService:
         offering_id: int,
         data: OfferingUpdateRequest | OfferingPatchRequest,
     ) -> CourseOffering:
-        """Update a course offering."""
+        """Update a course offering.
+
+        Uniqueness of (course_id, term_code, class_no) is enforced by
+        the DB-level UniqueConstraint — IntegrityError is raised on duplicate.
+        """
         offering = await offering_crud.get(db, offering_id)
         if offering is None:
             raise ResourceNotFoundError("Offering", str(offering_id))
@@ -244,28 +209,18 @@ class CourseManagementService:
         else:
             payload = data.model_dump(exclude_unset=True)
         target_course_id = payload.get("course_id", offering.course_id)
-        target_term_code = payload.get("term_code", offering.term_code)
-        target_class_no = payload.get("class_no", offering.class_no)
-        identity_changed = (
-            target_course_id != offering.course_id
-            or target_term_code != offering.term_code
-            or target_class_no != offering.class_no
-        )
 
-        if identity_changed:
+        if target_course_id != offering.course_id:
             await self._ensure_course_exists(db, target_course_id)
-            await self._ensure_unique_offering_identity(
-                db,
-                course_id=target_course_id,
-                term_code=target_term_code,
-                class_no=target_class_no,
-                exclude_id=offering_id,
+
+        try:
+            return await offering_crud.update(db, offering, **payload)
+        except IntegrityError:
+            raise BusinessRuleError(
+                f"Offering already exists for course {target_course_id} "
+                f"in {payload.get('term_code', offering.term_code)} "
+                f"class {payload.get('class_no', offering.class_no)}"
             )
-
-        if "teacher_ids" in payload and payload["teacher_ids"] is not None:
-            payload["teacher_ids"] = self._serialize_string_list(payload["teacher_ids"])
-
-        return await offering_crud.update(db, offering, **payload)
 
     async def delete_offering(self, db: AsyncSession, offering_id: int) -> None:
         """Delete a course offering."""
@@ -395,21 +350,22 @@ class CourseManagementService:
 
     # ---- Teacher assignments ----
 
+    @staticmethod
+    def _normalize_teacher_ids(teacher_ids: list[str]) -> list[str]:
+        """Deduplicate and strip whitespace from a list of teacher IDs."""
+        seen: set[str] = set()
+        normalized: list[str] = []
+        for tid in teacher_ids:
+            tid = tid.strip()
+            if tid and tid not in seen:
+                seen.add(tid)
+                normalized.append(tid)
+        return normalized
+
     async def _get_schedule_offering_id(self, db: AsyncSession, schedule_id: int) -> int:
         """Resolve the offering behind a schedule sub-resource."""
         schedule = await self._ensure_schedule_exists(db, schedule_id)
         return schedule.offering_id
-
-    async def _sync_offering_teacher_snapshot(
-        self, db: AsyncSession, offering_id: int
-    ) -> CourseOffering:
-        """Keep the offering.teacher_ids snapshot aligned with assignment rows."""
-        offering = await self._ensure_offering_exists(db, offering_id)
-        assignments = await teacher_assignment_crud.get_by_offering(db, offering_id)
-        teacher_ids = self._serialize_string_list(
-            [assignment.teacher_id for assignment in assignments]
-        )
-        return await offering_crud.update(db, offering, teacher_ids=teacher_ids)
 
     async def list_teachers_for_schedule(
         self, db: AsyncSession, schedule_id: int
@@ -423,20 +379,18 @@ class CourseManagementService:
     ) -> list[TeacherCourseAssignment]:
         """Replace all teacher assignments for a schedule."""
         offering_id = await self._get_schedule_offering_id(db, schedule_id)
-        normalized_ids = self._serialize_string_list(teacher_ids).split(",")
-        normalized_ids = [teacher_id for teacher_id in normalized_ids if teacher_id]
+        normalized = self._normalize_teacher_ids(teacher_ids)
 
         await teacher_assignment_crud.delete_by_offering(db, offering_id)
 
         created: list[TeacherCourseAssignment] = []
-        for teacher_id in normalized_ids:
+        for teacher_id in normalized:
             assignment = TeacherCourseAssignment(
                 teacher_id=teacher_id,
                 offering_id=offering_id,
                 role_type="instructor",
             )
             created.append(await teacher_assignment_crud.create(db, assignment))
-        await self._sync_offering_teacher_snapshot(db, offering_id)
         return created
 
     async def add_teachers(
@@ -444,13 +398,12 @@ class CourseManagementService:
     ) -> list[TeacherCourseAssignment]:
         """Add teacher assignments to a schedule."""
         offering_id = await self._get_schedule_offering_id(db, schedule_id)
-        normalized_ids = self._serialize_string_list(teacher_ids).split(",")
-        normalized_ids = [teacher_id for teacher_id in normalized_ids if teacher_id]
+        normalized = self._normalize_teacher_ids(teacher_ids)
 
         existing = await teacher_assignment_crud.get_by_offering(db, offering_id)
         existing_by_teacher = {assignment.teacher_id: assignment for assignment in existing}
 
-        for teacher_id in normalized_ids:
+        for teacher_id in normalized:
             if teacher_id in existing_by_teacher:
                 continue
             assignment = TeacherCourseAssignment(
@@ -460,7 +413,6 @@ class CourseManagementService:
             )
             existing_by_teacher[teacher_id] = await teacher_assignment_crud.create(db, assignment)
 
-        await self._sync_offering_teacher_snapshot(db, offering_id)
         return list(existing_by_teacher.values())
 
     async def assign_teacher(
@@ -490,7 +442,6 @@ class CourseManagementService:
                 role_type=normalized_role_type,
             )
 
-        await self._sync_offering_teacher_snapshot(db, offering_id)
         return assignment
 
     async def remove_teacher(self, db: AsyncSession, schedule_id: int, teacher_id: str) -> None:
@@ -507,7 +458,6 @@ class CourseManagementService:
                 "TeacherAssignment",
                 f"schedule={schedule_id}, teacher={normalized_teacher_id}",
             )
-        await self._sync_offering_teacher_snapshot(db, offering_id)
 
     # ---- Calendars ----
 
@@ -596,7 +546,7 @@ class CourseManagementService:
     async def create_training_program(
         self, db: AsyncSession, data: TrainingProgramCreateRequest
     ) -> TrainingProgram:
-        """Create a training program."""
+        """Create a training program with required courses via association table."""
         await self._ensure_unique_program_code(db, data.program_code)
         await self._ensure_required_courses_exist(db, data.required_course_ids)
         program = TrainingProgram(
@@ -604,9 +554,16 @@ class CourseManagementService:
             major_code=data.major_code,
             grade=data.grade,
             version=data.version,
-            required_course_ids=self._serialize_int_list(data.required_course_ids),
         )
-        return await training_program_crud.create(db, program)
+        program = await training_program_crud.create(db, program)
+
+        # Create course associations
+        if data.required_course_ids:
+            await training_program_crud.add_courses_to_program(
+                db, program.id, data.required_course_ids
+            )
+
+        return program
 
     async def update_training_program(
         self,
@@ -614,7 +571,7 @@ class CourseManagementService:
         program_id: int,
         data: TrainingProgramUpdateRequest | TrainingProgramPatchRequest,
     ) -> TrainingProgram:
-        """Update a training program."""
+        """Update a training program with required courses via association table."""
         program = await training_program_crud.get(db, program_id)
         if program is None:
             raise ResourceNotFoundError("TrainingProgram", str(program_id))
@@ -623,11 +580,16 @@ class CourseManagementService:
         program_code = payload.get("program_code")
         if program_code:
             await self._ensure_unique_program_code(db, program_code, exclude_id=program_id)
-        if "required_course_ids" in payload and payload["required_course_ids"] is not None:
-            await self._ensure_required_courses_exist(db, payload["required_course_ids"])
-            payload["required_course_ids"] = self._serialize_int_list(
-                payload["required_course_ids"]
+
+        # Handle required_course_ids separately — remove from payload for model update
+        required_course_ids = payload.pop("required_course_ids", None)
+        if required_course_ids is not None:
+            await self._ensure_required_courses_exist(db, required_course_ids)
+            # Replace all course associations atomically
+            await training_program_crud.replace_courses_for_program(
+                db, program_id, required_course_ids
             )
+
         return await training_program_crud.update(db, program, **payload)
 
     async def delete_training_program(self, db: AsyncSession, program_id: int) -> None:
@@ -652,9 +614,19 @@ class CourseManagementService:
     # ---- Base Info ----
 
     async def create_base_info(self, db: AsyncSession, data: BaseModel) -> BaseInfoItem:
-        """Create a base info item from a Pydantic schema."""
+        """Create a base info item from a Pydantic schema.
+
+        Uniqueness of (category, item_code) is enforced by the DB-level
+        UniqueConstraint — IntegrityError is caught and translated.
+        """
         item = BaseInfoItem(**data.model_dump())
-        return await base_info_crud.create(db, item)
+        try:
+            return await base_info_crud.create(db, item)
+        except IntegrityError:
+            raise BusinessRuleError(
+                f"Base info item already exists: "
+                f"category={item.category}, item_code={item.item_code}"
+            )
 
     async def update_base_info(
         self, db: AsyncSession, item_id: int, data: BaseModel

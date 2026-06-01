@@ -12,7 +12,7 @@
 | 框架 | FastAPI | async |
 | ORM | SQLModel | Pydantic v2 + SQLAlchemy |
 | 数据库 | SQLite → PostgreSQL | 原型 → 生产 |
-| 迁移 | Alembic | — |
+| 迁移 | Model-First（create_all） | 原型阶段；Alembic 配置保留 |
 | 认证 | JWT HS256 | 预留 RS256 扩展 |
 | 包管理 | uv | — |
 | Lint | ruff | — |
@@ -101,13 +101,14 @@ Gateway → Auth Service /internal/verify → X-User-Id, X-User-Role, X-User-Per
 - 3 个独立数据库：`auth.db`（Auth Service）、`info.db`（Info Service）、`audit.db`（审计日志）
 - 跨库操作需**补偿机制**：主写成功 → 跨服务调用 → 失败则补偿回滚
 
-### 数据库迁移（Alembic）
-- **3 条独立迁移链**，每条链有独立的 `alembic.ini`、`env.py`、`versions/`
-- **Alembic 使用同步驱动**（`sqlite:///`），与运行时异步驱动（`sqlite+aiosqlite:///`）不同但指向同一数据库文件
-- **info_service 有两条链**：info 链和 audit 链。因为所有表共用一个 `SQLModel.metadata`，env.py 通过 `table.tometadata()` 将目标表复制到独立 `MetaData` 实例来隔离 autogenerate
-- **`alembic.ini` 中 `script_location = %(here)s`**：确保从任意工作目录通过 `-c` 指定配置文件时都能正确找到 env.py
-- **所有迁移命令从项目根目录运行**，使用 `-c` 指定配置文件路径
-- 迁移文件纳入版本控制，ruff 对 versions 目录豁免 E501（行长度）
+### 数据库迁移（Model-First）
+
+- **原型阶段采用 Model-First 模式**：SQLModel 模型定义是数据库 schema 的唯一真实来源。
+- **应用启动时自动建表**：FastAPI lifespan 中调用 `SQLModel.metadata.create_all()`，无需手动执行迁移命令。
+- **所有模型必须在 `models/__init__.py` 中导入**，确保 `SQLModel.metadata` 注册完整。
+- **Alembic 配置保留为模板**：`alembic.ini` 和 `env.py` 文件保留在 `migrations/` 目录中，生产切换时启用。
+  - 3 条独立迁移链：auth、info、audit
+  - 所有迁移命令从项目根目录运行，使用 `-c` 指定配置文件路径
 - 完整指南见 `docs/alembic-guide.md`
 
 ### 权限模型
@@ -149,7 +150,7 @@ Gateway → Auth Service /internal/verify → X-User-Id, X-User-Role, X-User-Per
    - 按标记运行：`uv run pytest -m smoke`、`uv run pytest -m unit`
    - 覆盖率报告：`uv run pytest --cov=. --cov-report=term-missing`
    - 前端类型检查：`cd frontend && npx vue-tsc --noEmit`
-   - 数据库迁移（如需）：`uv run python -m alembic -c <service>/migrations/<chain>/alembic.ini upgrade head`
+   - 数据库重置（如需）：删除 `*.db` 文件后重启服务，create_all 自动重建
 5. 提交 PR（`gh pr create`）
 6. CI 自动 lint + test，至少 1 人 Review
 7. Squash Merge 到 main
@@ -179,7 +180,7 @@ uv run pytest
 | CRUD 接口 | `docs/design/v2/05-api-architecture.md`、`03-data-architecture.md` |
 | 业务流程 | `docs/design/v2/06-business-flows.md` |
 | 部署/环境 | `docs/design/v2/08-deployment.md` |
-| 数据库迁移 | `docs/alembic-guide.md` |
+| 数据库 | `docs/alembic-guide.md` |
 | 前端开发 | `docs/frontend/README.md`、`docs/frontend/development-guide.md` |
 | 全部 | `docs/design/v2/README.md`（索引入口） |
 

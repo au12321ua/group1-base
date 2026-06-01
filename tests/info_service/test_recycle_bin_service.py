@@ -15,7 +15,7 @@ from shared.exceptions import BusinessRuleError, ResourceNotFoundError
 async def _setup_deleted_user(db, user_no="S001", username="deleted_user"):
     """Helper: create and soft-delete a user."""
     user = await user_crud.create(
-        db, UserInfo(user_no=user_no, username=username, role_ids="1")
+        db, UserInfo(user_no=user_no, username=username)
     )
     await user_profile_crud.create(
         db, UserProfile(user_id=user.id, full_name="已删除用户")

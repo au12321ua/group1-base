@@ -171,7 +171,7 @@ sequenceDiagram
 
 | 规则 | 适用角色 | 校验逻辑 |
 |------|----------|----------|
-| 教师只能操作自己的授课 | TEACHER | `offering.teacher_ids` 包含当前 userId |
+| 教师只能操作自己的授课 | TEACHER | 查询 `teacher_course_assignments` 表，校验当前 userId 是否已分配到关联开课 |
 | 用户只能编辑自己的信息 | ALL | `user_id == current_user_id` |
 | 管理员不受资源级限制 | ACADEMIC_ADMIN, SYS_ADMIN | 跳过资源级校验 |
 
@@ -277,7 +277,7 @@ SERVICE_TOKEN_EXPIRE_HOURS = 8              # Service Token
 
 以下操作必须写入审计日志：
 - 用户创建 / 删除（含批量）
-- 角色变更 / 权限调整
+- 权限调整
 - 密码重置
 - 物理删除（回收站）
 - 批量导入

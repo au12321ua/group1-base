@@ -31,7 +31,6 @@ class TestScheduleAPI:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=[],
             capacity=50,
         )
 
@@ -92,12 +91,6 @@ class TestScheduleAPI:
         replaced = assert_status_and_data(replace_resp)["items"]
         assert [item["teacher_id"] for item in replaced] == ["t-1", "t-2"]
 
-        offering_snapshot_resp = await async_client_info.get(
-            f"/api/v1/offerings/{offering_id}", headers=auth_headers
-        )
-        offering_data = assert_status_and_data(offering_snapshot_resp)
-        assert offering_data["teacher_ids"] == "t-1,t-2"
-
         add_resp = await async_client_info.post(
             f"/api/v1/schedules/{schedule_id}/teachers",
             json=["t-2", "t-3"],
@@ -106,12 +99,6 @@ class TestScheduleAPI:
         added = assert_status_and_data(add_resp)["items"]
         assert [item["teacher_id"] for item in added] == ["t-1", "t-2", "t-3"]
 
-        offering_snapshot_resp = await async_client_info.get(
-            f"/api/v1/offerings/{offering_id}", headers=auth_headers
-        )
-        offering_data = assert_status_and_data(offering_snapshot_resp)
-        assert offering_data["teacher_ids"] == "t-1,t-2,t-3"
-
         assign_resp = await async_client_info.put(
             f"/api/v1/schedules/{schedule_id}/teachers/t-4",
             json={"teacher_id": "t-4", "role_type": "assistant"},
@@ -119,12 +106,6 @@ class TestScheduleAPI:
         )
         assigned = assert_status_and_data(assign_resp)
         assert assigned["role_type"] == "assistant"
-
-        offering_snapshot_resp = await async_client_info.get(
-            f"/api/v1/offerings/{offering_id}", headers=auth_headers
-        )
-        offering_data = assert_status_and_data(offering_snapshot_resp)
-        assert offering_data["teacher_ids"] == "t-1,t-2,t-3,t-4"
 
         teacher_list_resp = await async_client_info.get(
             f"/api/v1/schedules/{schedule_id}/teachers", headers=auth_headers
@@ -142,12 +123,6 @@ class TestScheduleAPI:
         )
         teacher_items = assert_status_and_data(teacher_list_resp)["items"]
         assert [item["teacher_id"] for item in teacher_items] == ["t-1", "t-3", "t-4"]
-
-        offering_snapshot_resp = await async_client_info.get(
-            f"/api/v1/offerings/{offering_id}", headers=auth_headers
-        )
-        offering_data = assert_status_and_data(offering_snapshot_resp)
-        assert offering_data["teacher_ids"] == "t-1,t-3,t-4"
 
         delete_resp = await async_client_info.delete(
             f"/api/v1/schedules/{schedule_id}", headers=auth_headers
@@ -175,7 +150,6 @@ class TestScheduleAPI:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="02",
-            teacher_ids=[],
             capacity=40,
         )
 
@@ -213,7 +187,6 @@ class TestScheduleAPI:
             course_id=first_course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=[],
             capacity=40,
         )
         second_offering_id = await create_offering(
@@ -221,7 +194,6 @@ class TestScheduleAPI:
             course_id=second_course_id,
             term_code="2026-FALL",
             class_no="02",
-            teacher_ids=[],
             capacity=35,
         )
 
@@ -258,7 +230,6 @@ class TestScheduleAPI:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="04",
-            teacher_ids=[],
             capacity=20,
         )
         schedule_id = await create_schedule(
@@ -304,7 +275,6 @@ class TestScheduleResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=["t-auth-1"],
             capacity=50,
         )
         schedule_id = await create_schedule(
@@ -314,6 +284,12 @@ class TestScheduleResourceAccess:
             day_of_week=1,
             start_period=1,
             end_period=2,
+        )
+        # Assign the teacher to the schedule (creates TeacherCourseAssignment)
+        await async_client_info.put(
+            f"/api/v1/schedules/{schedule_id}/teachers/t-auth-1",
+            json={"teacher_id": "t-auth-1", "role_type": "instructor"},
+            headers=auth_headers,
         )
         teacher_headers = build_identity_headers(
             user_id="t-auth-1", role="TEACHER", permissions=["schedule:update"]
@@ -338,7 +314,6 @@ class TestScheduleResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=["t-auth-2"],
             capacity=50,
         )
         schedule_id = await create_schedule(
@@ -372,7 +347,6 @@ class TestScheduleResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=[],
             capacity=40,
         )
         schedule_id = await create_schedule(
@@ -404,7 +378,6 @@ class TestScheduleResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=["t-assigned"],
             capacity=50,
         )
         schedule_id = await create_schedule(
@@ -438,7 +411,6 @@ class TestScheduleResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=[],
             capacity=40,
         )
         schedule_id = await create_schedule(

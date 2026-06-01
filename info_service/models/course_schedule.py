@@ -12,7 +12,7 @@ class CourseSchedule(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     offering_id: int = Field(foreign_key="course_offerings.id", index=True)
-    classroom_id: int = Field(foreign_key="classrooms.id")
+    classroom_id: int = Field(foreign_key="classrooms.id", index=True)
     day_of_week: int = Field(ge=1, le=7)  # 1=Mon, 7=Sun
     start_period: int = Field(ge=1, le=12)
     end_period: int = Field(ge=1, le=12)

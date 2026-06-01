@@ -97,8 +97,8 @@ A（信息管理）
 |------|------|----------|
 | 框架 | Python FastAPI | 异步高性能、自动 OpenAPI 文档、类型安全（Pydantic） |
 | ORM | SQLModel | 与 FastAPI/Pydantic 原生适配，减少 Schema 重复定义 |
-| 数据库 | SQLite（原型）→ PostgreSQL | 原型阶段零配置部署；Alembic 管理迁移，切换仅需改连接串 |
-| 迁移工具 | Alembic | 支持 SQLite → PostgreSQL 平滑切换 |
+| 数据库 | SQLite（原型）→ PostgreSQL | 原型阶段零配置部署；Model-First 模式（create_all 自动建表），生产切换时启用 Alembic |
+| 迁移工具 | Alembic（生产预留） | 原型阶段使用 SQLModel.metadata.create_all()，Alembic 配置保留为模板 |
 | 认证 | JWT（HS256） | 对称密钥，原型阶段简单可靠；预留 RS256 + JWKS 扩展点 |
 | 跨服务通信 | HTTP 同步 + 补偿重试 | 原型阶段不引入 MQ，但预留事件发布接口 |
 | 容器化 | Docker + Docker Compose | 环境一致性，一键启动 |
@@ -117,7 +117,7 @@ A（信息管理）
 
 ### 4.3 为什么不引入 MQ
 
-- 原型阶段跨服务调用频次低（用户创建、角色变更等管理操作）。
+- 原型阶段跨服务调用频次低（用户创建、删除等管理操作）。
 - HTTP 同步调用 + 补偿重试足够覆盖当前一致性需求。
 - 预留事件发布接口（Python `Protocol` 定义），后期可替换为 Redis Pub/Sub 或 RabbitMQ 实现。
 

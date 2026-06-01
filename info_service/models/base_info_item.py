@@ -2,13 +2,19 @@
 
 from datetime import UTC, datetime
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
 class BaseInfoItem(SQLModel, table=True):
     """Generic lookup / reference data entry."""
 
     __tablename__: str = "base_info_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "category", "item_code",
+            name="uq_base_info_category_item",
+        ),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     category: str = Field(max_length=64, index=True)  # e.g. "department", "title"

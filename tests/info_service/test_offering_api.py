@@ -4,8 +4,10 @@ import pytest
 
 from tests.info_service.api_helpers import (
     assert_status_and_data,
+    create_classroom,
     create_course,
     create_offering,
+    create_schedule,
 )
 from tests.utils import build_identity_headers
 
@@ -29,7 +31,6 @@ class TestOfferingAPI:
                 "course_id": course_id,
                 "term_code": "2026-FALL",
                 "class_no": "01",
-                "teacher_ids": ["t-1", "t-2"],
                 "capacity": 80,
             },
             headers=auth_headers,
@@ -37,7 +38,6 @@ class TestOfferingAPI:
 
         created = assert_status_and_data(create_resp)
         assert created["course_id"] == course_id
-        assert created["teacher_ids"] == "t-1,t-2"
         offering_id = created["id"]
 
         list_resp = await async_client_info.get(
@@ -58,12 +58,11 @@ class TestOfferingAPI:
 
         patch_resp = await async_client_info.patch(
             f"/api/v1/offerings/{offering_id}",
-            json={"teacher_ids": ["t-2", "t-3"], "status": "COMPLETED"},
+            json={"status": "COMPLETED"},
             headers=auth_headers,
         )
         assert patch_resp.status_code == 200
         patched = patch_resp.json()["data"]
-        assert patched["teacher_ids"] == "t-2,t-3"
         assert patched["status"] == "COMPLETED"
 
         delete_resp = await async_client_info.delete(
@@ -93,7 +92,6 @@ class TestOfferingAPI:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=[],
             capacity=60,
         )
         assert first_offering_id > 0
@@ -104,7 +102,6 @@ class TestOfferingAPI:
                 "course_id": course_id,
                 "term_code": "2026-FALL",
                 "class_no": "01",
-                "teacher_ids": [],
                 "capacity": 60,
             },
             headers=auth_headers,
@@ -127,7 +124,6 @@ class TestOfferingAPI:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="02",
-            teacher_ids=["t-9"],
             capacity=88,
         )
 
@@ -142,7 +138,6 @@ class TestOfferingAPI:
         )
 
         updated = assert_status_and_data(put_resp)
-        assert updated["teacher_ids"] == ""
         assert updated["capacity"] == 0
         assert updated["status"] == "ACTIVE"
 
@@ -155,6 +150,7 @@ class TestOfferingResourceAccess:
         self, async_client_info, auth_headers
     ) -> None:
         """分配到此开课的教师可以更新开课信息。"""
+        classroom_id = await create_classroom(room_no="C-601")
         course_id = await create_course(
             async_client_info,
             course_code="CS601",
@@ -165,8 +161,21 @@ class TestOfferingResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=["t-100"],
             capacity=60,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=1,
+            start_period=3,
+            end_period=4,
+        )
+        # Assign teacher t-100 via the schedule (creates TeacherCourseAssignment)
+        await async_client_info.put(
+            f"/api/v1/schedules/{schedule_id}/teachers/t-100",
+            json={"teacher_id": "t-100", "role_type": "instructor"},
+            headers=auth_headers,
         )
         teacher_headers = build_identity_headers(
             user_id="t-100", role="TEACHER", permissions=["offering:update"]
@@ -182,6 +191,7 @@ class TestOfferingResourceAccess:
         self, async_client_info, auth_headers
     ) -> None:
         """未分配到该开课的教师更新开课应返回 403。"""
+        classroom_id = await create_classroom(room_no="C-602")
         course_id = await create_course(
             async_client_info,
             course_code="CS602",
@@ -192,8 +202,21 @@ class TestOfferingResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=["t-200"],
             capacity=60,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=1,
+            start_period=5,
+            end_period=6,
+        )
+        # Assign teacher t-200 to the offering via schedule, then try to update as t-999
+        await async_client_info.post(
+            f"/api/v1/schedules/{schedule_id}/teachers/t-200",
+            json={"teacher_id": "t-200", "role_type": "instructor"},
+            headers=auth_headers,
         )
         other_teacher_headers = build_identity_headers(
             user_id="t-999", role="TEACHER", permissions=["offering:update"]
@@ -219,7 +242,6 @@ class TestOfferingResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=[],
             capacity=60,
         )
         student_headers = build_identity_headers(
@@ -244,7 +266,6 @@ class TestOfferingResourceAccess:
             course_id=course_id,
             term_code="2026-FALL",
             class_no="01",
-            teacher_ids=["t-300"],
             capacity=60,
         )
         admin_delete_headers = build_identity_headers(
