@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, UploadFile
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.core.audit import AuditContext
 from info_service.core.security import check_resource_access
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.user_schema import (
@@ -17,7 +18,7 @@ from info_service.schemas.user_schema import (
 )
 from info_service.services.audit_service import audit_service
 from info_service.services.user_management_service import user_management_service
-from shared.exceptions import AuthorizationError
+from shared.exceptions import AppError, AuthorizationError
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
 
@@ -59,18 +60,13 @@ async def create_user(
     current_user: Annotated[IdentityContext, Depends(require_permission("user:create"))],
 ) -> APIResponse[UserResponse]:
     """Create a new user (cross-service sync with Auth Service)."""
-    user = await user_management_service.create_user(db, request, current_user)
-    # Audit log
-    await audit_service.write_audit_log(
-        audit_db,
-        operator_user_id=current_user.user_id,
-        operator_role=current_user.role,
-        target_type="user",
-        target_id=str(user.id),
-        action="user_created",
-        result="success",
-        request_id=current_user.request_id,
-    )
+    audit = AuditContext(audit_db, current_user, "user", action="user_created")
+    try:
+        user = await user_management_service.create_user(db, request, current_user)
+        await audit.log_success(target_id=str(user.id))
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=user)
 
 
@@ -108,20 +104,26 @@ async def update_user(
     old_user = await user_management_service.get_user(db, user_id)
     old_roles = old_user.role_ids
 
-    user = await user_management_service.update_user(db, user_id, request, current_user)
-
-    # Audit log for role change
-    if user.role_ids != old_roles:
-        await audit_service.write_audit_log(
-            audit_db,
-            operator_user_id=current_user.user_id,
-            operator_role=current_user.role,
-            target_type="user",
-            target_id=str(user_id),
-            action="role_changed",
-            result="success",
-            request_id=current_user.request_id,
-        )
+    audit = AuditContext(audit_db, current_user, "user",
+                         target_id=str(user_id), action="user_updated")
+    try:
+        user = await user_management_service.update_user(db, user_id, request, current_user)
+        await audit.log_success()
+        # Additional audit log for role change
+        if user.role_ids != old_roles:
+            await audit_service.write_audit_log(
+                audit_db,
+                operator_user_id=current_user.user_id,
+                operator_role=current_user.role,
+                target_type="user",
+                target_id=str(user_id),
+                action="role_changed",
+                result="success",
+                request_id=current_user.request_id,
+            )
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=user)
 
 
@@ -142,20 +144,26 @@ async def patch_user(
     old_user = await user_management_service.get_user(db, user_id)
     old_roles = old_user.role_ids
 
-    user = await user_management_service.patch_user(db, user_id, request, current_user)
-
-    # Audit log for role change
-    if user.role_ids != old_roles:
-        await audit_service.write_audit_log(
-            audit_db,
-            operator_user_id=current_user.user_id,
-            operator_role=current_user.role,
-            target_type="user",
-            target_id=str(user_id),
-            action="role_changed",
-            result="success",
-            request_id=current_user.request_id,
-        )
+    audit = AuditContext(audit_db, current_user, "user",
+                         target_id=str(user_id), action="user_updated")
+    try:
+        user = await user_management_service.patch_user(db, user_id, request, current_user)
+        await audit.log_success()
+        # Additional audit log for role change
+        if user.role_ids != old_roles:
+            await audit_service.write_audit_log(
+                audit_db,
+                operator_user_id=current_user.user_id,
+                operator_role=current_user.role,
+                target_type="user",
+                target_id=str(user_id),
+                action="role_changed",
+                result="success",
+                request_id=current_user.request_id,
+            )
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=user)
 
 
@@ -168,17 +176,14 @@ async def delete_user(
     _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Logical delete user → recycle bin (admin only)."""
-    await user_management_service.logical_delete_user(db, user_id, current_user)
-    await audit_service.write_audit_log(
-        audit_db,
-        operator_user_id=current_user.user_id,
-        operator_role=current_user.role,
-        target_type="user",
-        target_id=str(user_id),
-        action="user_deleted_logical",
-        result="success",
-        request_id=current_user.request_id,
-    )
+    audit = AuditContext(audit_db, current_user, "user",
+                         target_id=str(user_id), action="user_deleted_logical")
+    try:
+        await user_management_service.logical_delete_user(db, user_id, current_user)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)
 
 
@@ -191,18 +196,18 @@ async def batch_import_users(
 ) -> APIResponse[UserImportResult]:
     """CSV batch import users."""
     content = await file.read()
-    result = await user_management_service.batch_import_users(db, content)
-    await audit_service.write_audit_log(
-        audit_db,
-        operator_user_id=current_user.user_id,
-        operator_role=current_user.role,
-        target_type="user",
-        action="user_batch_imported",
-        result="success" if result.failed_count == 0 else "partial",
-        reason=(
-            f"total={result.total}, success={result.success_count}, "
-            f"failed={result.failed_count}"
-        ),
-        request_id=current_user.request_id,
-    )
+    audit = AuditContext(audit_db, current_user, "user", action="user_batch_imported")
+    try:
+        result = await user_management_service.batch_import_users(db, content)
+        is_partial = result.failed_count > 0
+        await audit.log_success(
+            result="partial" if is_partial else "success",
+            reason=(
+                f"total={result.total}, success={result.success_count}, "
+                f"failed={result.failed_count}"
+            ),
+        )
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=result)

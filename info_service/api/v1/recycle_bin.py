@@ -5,13 +5,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.core.audit import AuditContext
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.recycle_bin_schema import (
     BatchDeleteRequest,
     RecycleBinItemResponse,
 )
-from info_service.services.audit_service import audit_service
 from info_service.services.recycle_bin_service import recycle_bin_service
+from shared.exceptions import AppError
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
 
@@ -47,17 +48,14 @@ async def restore_user(
     _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Restore a user from recycle bin (admin only, cross-service enable Auth account)."""
-    await recycle_bin_service.restore_user(db, user_id)
-    await audit_service.write_audit_log(
-        audit_db,
-        operator_user_id=current_user.user_id,
-        operator_role=current_user.role,
-        target_type="user",
-        target_id=str(user_id),
-        action="user_restored",
-        result="success",
-        request_id=current_user.request_id,
-    )
+    audit = AuditContext(audit_db, current_user, "user",
+                         target_id=str(user_id), action="user_restored")
+    try:
+        await recycle_bin_service.restore_user(db, user_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)
 
 
@@ -70,17 +68,14 @@ async def physical_delete_user(
     _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Permanently delete user (admin only, requires confirmation)."""
-    await recycle_bin_service.physical_delete_user(db, user_id)
-    await audit_service.write_audit_log(
-        audit_db,
-        operator_user_id=current_user.user_id,
-        operator_role=current_user.role,
-        target_type="user",
-        target_id=str(user_id),
-        action="user_deleted_permanent",
-        result="success",
-        request_id=current_user.request_id,
-    )
+    audit = AuditContext(audit_db, current_user, "user",
+                         target_id=str(user_id), action="user_deleted_permanent")
+    try:
+        await recycle_bin_service.physical_delete_user(db, user_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)
 
 
@@ -93,15 +88,15 @@ async def batch_physical_delete(
     _admin: None = Depends(require_admin),
 ) -> APIResponse[None]:
     """Batch permanent delete users (admin only)."""
-    await recycle_bin_service.batch_physical_delete(db, request.user_ids)
-    await audit_service.write_audit_log(
-        audit_db,
-        operator_user_id=current_user.user_id,
-        operator_role=current_user.role,
-        target_type="user",
+    audit = AuditContext(
+        audit_db, current_user, "user",
         action="user_batch_deleted",
-        result="success",
         reason=f"deleted {len(request.user_ids)} users",
-        request_id=current_user.request_id,
     )
+    try:
+        await recycle_bin_service.batch_physical_delete(db, request.user_ids)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
     return APIResponse(data=None)
