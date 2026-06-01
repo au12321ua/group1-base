@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, Depends, Query
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.audit import AuditContext
 from info_service.core.security import check_resource_access
+from info_service.crud.teacher_assignment_crud import teacher_assignment_crud
 from info_service.deps import require_permission
 from info_service.schemas.schedule_schema import (
     ScheduleCreateRequest,
@@ -46,8 +47,9 @@ def _teacher_assignment_list_response(items) -> ListResponse[TeacherAssignmentRe
 async def _check_schedule_access(current_user: IdentityContext, db, schedule_id: int) -> None:
     """Verify the current user can modify the schedule (assigned teacher or admin)."""
     schedule = await course_management_service.get_schedule(db, schedule_id)
-    offering = await course_management_service.get_offering(db, schedule.offering_id)
-    teacher_ids = [t for t in offering.teacher_ids.split(",") if t]
+    # Teachers are stored in TeacherCourseAssignment, not inline on the offering
+    assignments = await teacher_assignment_crud.get_by_offering(db, schedule.offering_id)
+    teacher_ids = [a.teacher_id for a in assignments]
     if not check_resource_access(
         current_user.user_id, current_user.role,
         resource_teacher_ids=teacher_ids,

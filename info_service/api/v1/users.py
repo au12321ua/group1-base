@@ -16,7 +16,6 @@ from info_service.schemas.user_schema import (
     UserResponse,
     UserUpdateRequest,
 )
-from info_service.services.audit_service import audit_service
 from info_service.services.user_management_service import user_management_service
 from shared.exceptions import AppError, AuthorizationError
 from shared.response import APIResponse, PaginatedData, PaginationMeta
@@ -100,27 +99,12 @@ async def update_user(
         resource_owner_id=str(user_id),
     ):
         raise AuthorizationError("Access denied: can only update own profile")
-    # Check if role changed
-    old_user = await user_management_service.get_user(db, user_id)
-    old_roles = old_user.role_ids
 
     audit = AuditContext(audit_db, current_user, "user",
                          target_id=str(user_id), action="user_updated")
     try:
         user = await user_management_service.update_user(db, user_id, request, current_user)
         await audit.log_success()
-        # Additional audit log for role change
-        if user.role_ids != old_roles:
-            await audit_service.write_audit_log(
-                audit_db,
-                operator_user_id=current_user.user_id,
-                operator_role=current_user.role,
-                target_type="user",
-                target_id=str(user_id),
-                action="role_changed",
-                result="success",
-                request_id=current_user.request_id,
-            )
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
@@ -135,32 +119,18 @@ async def patch_user(
     audit_db: AuditDbSession,
     current_user: Annotated[IdentityContext, Depends(require_permission("user:update"))],
 ) -> APIResponse[UserResponse]:
-    """Partial update user (own profile or admin only, may trigger role sync with Auth)."""
+    """Partial update user (own profile or admin only)."""
     if not check_resource_access(
         current_user.user_id, current_user.role,
         resource_owner_id=str(user_id),
     ):
         raise AuthorizationError("Access denied: can only update own profile")
-    old_user = await user_management_service.get_user(db, user_id)
-    old_roles = old_user.role_ids
 
     audit = AuditContext(audit_db, current_user, "user",
                          target_id=str(user_id), action="user_updated")
     try:
         user = await user_management_service.patch_user(db, user_id, request, current_user)
         await audit.log_success()
-        # Additional audit log for role change
-        if user.role_ids != old_roles:
-            await audit_service.write_audit_log(
-                audit_db,
-                operator_user_id=current_user.user_id,
-                operator_role=current_user.role,
-                target_type="user",
-                target_id=str(user_id),
-                action="role_changed",
-                result="success",
-                request_id=current_user.request_id,
-            )
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.audit import AuditContext
 from info_service.core.security import check_resource_access
+from info_service.crud.teacher_assignment_crud import teacher_assignment_crud
 from info_service.deps import require_permission
 from info_service.models.course_offering import CourseOffering
 from info_service.schemas.offering_schema import (
@@ -34,7 +35,9 @@ async def _check_offering_access(
 ) -> CourseOffering:
     """Verify the current user can modify the offering, returning it for reuse."""
     offering = await course_management_service.get_offering(db, offering_id)
-    teacher_ids = [t for t in offering.teacher_ids.split(",") if t]
+    # Teachers are stored in TeacherCourseAssignment, not inline on the offering
+    assignments = await teacher_assignment_crud.get_by_offering(db, offering_id)
+    teacher_ids = [a.teacher_id for a in assignments]
     if not check_resource_access(
         current_user.user_id, current_user.role,
         resource_teacher_ids=teacher_ids,

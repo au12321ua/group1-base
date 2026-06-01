@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.audit import AuditContext
+from info_service.crud.training_program_crud import training_program_crud
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.training_program_schema import (
     TrainingProgramCreateRequest,
@@ -27,6 +28,23 @@ from shared.security import IdentityContext
 router = APIRouter(tags=["training-programs"])
 
 
+async def _build_program_response(db, program) -> TrainingProgramResponse:
+    """Assemble response with required_course_ids from the association table."""
+    associations = await training_program_crud.get_courses_by_program(db, program.id)
+    course_ids = [assoc.course_id for assoc in associations]
+    return TrainingProgramResponse(
+        id=program.id,
+        program_code=program.program_code,
+        major_code=program.major_code,
+        grade=program.grade,
+        version=program.version,
+        required_course_ids=course_ids,
+        snapshot_time=program.snapshot_time,
+        created_at=program.created_at,
+        updated_at=program.updated_at,
+    )
+
+
 @router.get("/", response_model=ListResponse[TrainingProgramResponse])
 async def list_training_programs(
     db: InfoDbSession,
@@ -43,7 +61,7 @@ async def list_training_programs(
     )
     return ListResponse(
         data=PaginatedData(
-            items=[TrainingProgramResponse.model_validate(item) for item in items],
+            items=[await _build_program_response(db, item) for item in items],
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
@@ -65,7 +83,7 @@ async def create_training_program(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=TrainingProgramResponse.model_validate(program))
+    return SingleResponse(data=await _build_program_response(db, program))
 
 
 @router.get("/by-major", response_model=ListResponse[TrainingProgramResponse])
@@ -88,7 +106,7 @@ async def get_by_major(
     )
     return ListResponse(
         data=PaginatedData(
-            items=[TrainingProgramResponse.model_validate(item) for item in items],
+            items=[await _build_program_response(db, item) for item in items],
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
@@ -102,7 +120,7 @@ async def get_training_program(
 ) -> SingleResponse[TrainingProgramResponse]:
     """Get training program detail."""
     program = await course_management_service.get_training_program(db, program_id)
-    return SingleResponse(data=TrainingProgramResponse.model_validate(program))
+    return SingleResponse(data=await _build_program_response(db, program))
 
 
 @router.put("/{program_id}", response_model=SingleResponse[TrainingProgramResponse])
@@ -123,7 +141,7 @@ async def update_training_program(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=TrainingProgramResponse.model_validate(program))
+    return SingleResponse(data=await _build_program_response(db, program))
 
 
 @router.patch("/{program_id}", response_model=SingleResponse[TrainingProgramResponse])
@@ -144,7 +162,7 @@ async def patch_training_program(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=TrainingProgramResponse.model_validate(program))
+    return SingleResponse(data=await _build_program_response(db, program))
 
 
 @router.delete("/{program_id}", response_model=APIResponse[None])
