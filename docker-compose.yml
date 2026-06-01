@@ -7,8 +7,18 @@ services:
       - "8001:8001"
     env_file:
       - .env
+    environment:
+      - AUDIT_DATABASE_URL=sqlite+aiosqlite:////app/data/audit.db
     volumes:
       - auth_data:/app/auth_service/data
+      - audit_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/v1/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
 
   info_service:
     build:
@@ -20,10 +30,40 @@ services:
       - .env
     environment:
       - AUTH_SERVICE_URL=http://auth_service:8001
+      - AUDIT_DATABASE_URL=sqlite+aiosqlite:////app/data/audit.db
     volumes:
       - info_data:/app/info_service/data
       - uploads:/app/info_service/uploads
-      - logs:/app/info_service/logs
+      - audit_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/api/v1/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      - auth_service
+
+  seed:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - AUTH_DATABASE_URL=sqlite+aiosqlite:////app/auth_service/data/auth.db
+      - INFO_DATABASE_URL=sqlite+aiosqlite:////app/info_service/data/info.db
+      - AUDIT_DATABASE_URL=sqlite+aiosqlite:////app/data/audit.db
+    volumes:
+      - auth_data:/app/auth_service/data
+      - info_data:/app/info_service/data
+      - audit_data:/app/data
+    depends_on:
+      auth_service:
+        condition: service_healthy
+      info_service:
+        condition: service_healthy
 
   frontend:
     build:
@@ -42,4 +82,4 @@ volumes:
   auth_data:
   info_data:
   uploads:
-  logs:
+  audit_data:
