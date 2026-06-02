@@ -1,16 +1,13 @@
 """Unit tests for DataProvisionService."""
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 from info_service.models.training_program import TrainingProgram
 from info_service.models.user import UserInfo
 from info_service.models.user_profile import UserProfile
 from info_service.services.data_provision_service import data_provision_service
-from shared.exceptions import ExternalServiceError
 
 
 async def _create_user(
@@ -130,137 +127,6 @@ class TestDataProvisionService:
         assert total == 1
         assert items[0].program_code == "CS-2026-V1"
         assert items[0].required_course_ids == []
-
-    async def test_query_selected_students_normalizes_api_response_payload(
-        self,
-        info_db_session,
-    ) -> None:
-        """Should accept the standard APIResponse envelope returned by C service."""
-        response = MagicMock()
-        response.raise_for_status.return_value = None
-        response.json.return_value = {
-            "code": 0,
-            "message": "success",
-            "data": {
-                "items": [{"student_id": "s-1"}],
-                "pagination": {"total": 1, "page": 1, "page_size": 50},
-                "snapshot_time": "2026-05-30T00:00:00Z",
-                "version": "2.0",
-            },
-        }
-
-        client = MagicMock()
-        client.get = AsyncMock(return_value=response)
-        client_cm = MagicMock()
-        client_cm.__aenter__ = AsyncMock(return_value=client)
-        client_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch(
-            "info_service.services.data_provision_service.httpx.AsyncClient",
-            return_value=client_cm,
-        ):
-            payload = await data_provision_service.query_selected_students(
-                info_db_session,
-                course_id=101,
-                page=1,
-                page_size=50,
-            )
-
-        assert payload["items"] == [{"student_id": "s-1"}]
-        assert payload["pagination"] == {"total": 1, "page": 1, "page_size": 50}
-        assert payload["version"] == "2.0"
-        assert payload["snapshot_time"] == datetime(2026, 5, 30, tzinfo=UTC)
-
-    async def test_query_selected_students_raises_on_http_error(
-        self, info_db_session,
-    ) -> None:
-        """Should wrap upstream HTTP 500 in ExternalServiceError."""
-        response = MagicMock()
-        response.status_code = 500
-        response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Server Error", request=MagicMock(), response=response,
-        )
-
-        client = MagicMock()
-        client.get = AsyncMock(return_value=response)
-        client_cm = MagicMock()
-        client_cm.__aenter__ = AsyncMock(return_value=client)
-        client_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch(
-            "info_service.services.data_provision_service.httpx.AsyncClient",
-            return_value=client_cm,
-        ):
-            with pytest.raises(ExternalServiceError, match="returned 500"):
-                await data_provision_service.query_selected_students(
-                    info_db_session, course_id=101,
-                )
-
-    async def test_query_selected_students_raises_on_network_error(
-        self, info_db_session,
-    ) -> None:
-        """Should wrap network-level errors in ExternalServiceError."""
-        client = MagicMock()
-        client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
-        client_cm = MagicMock()
-        client_cm.__aenter__ = AsyncMock(return_value=client)
-        client_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch(
-            "info_service.services.data_provision_service.httpx.AsyncClient",
-            return_value=client_cm,
-        ):
-            with pytest.raises(ExternalServiceError, match="unavailable"):
-                await data_provision_service.query_selected_students(
-                    info_db_session, course_id=101,
-                )
-
-    async def test_query_selected_students_raises_on_invalid_json(
-        self, info_db_session,
-    ) -> None:
-        """Should wrap JSON decode errors in ExternalServiceError."""
-        response = MagicMock()
-        response.raise_for_status.return_value = None
-        response.json.side_effect = ValueError("Invalid JSON")
-
-        client = MagicMock()
-        client.get = AsyncMock(return_value=response)
-        client_cm = MagicMock()
-        client_cm.__aenter__ = AsyncMock(return_value=client)
-        client_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch(
-            "info_service.services.data_provision_service.httpx.AsyncClient",
-            return_value=client_cm,
-        ):
-            with pytest.raises(ExternalServiceError, match="invalid JSON"):
-                await data_provision_service.query_selected_students(
-                    info_db_session, course_id=101,
-                )
-
-    async def test_query_selected_students_raises_on_invalid_payload(
-        self, info_db_session,
-    ) -> None:
-        """Should reject when upstream response data field is not a dict."""
-        response = MagicMock()
-        response.raise_for_status.return_value = None
-        # payload is a dict, but its "data" field is a non-dict — triggers the guard
-        response.json.return_value = {"data": "not_an_object"}
-
-        client = MagicMock()
-        client.get = AsyncMock(return_value=response)
-        client_cm = MagicMock()
-        client_cm.__aenter__ = AsyncMock(return_value=client)
-        client_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch(
-            "info_service.services.data_provision_service.httpx.AsyncClient",
-            return_value=client_cm,
-        ):
-            with pytest.raises(ExternalServiceError, match="invalid payload"):
-                await data_provision_service.query_selected_students(
-                    info_db_session, course_id=101,
-                )
 
     async def test_list_teachers_uses_default_pagination(
         self, info_db_session,

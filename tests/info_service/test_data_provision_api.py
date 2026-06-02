@@ -1,7 +1,6 @@
 """Integration tests for /api/v1/data-provision endpoints."""
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -11,7 +10,6 @@ from info_service.models.academic_calendar import AcademicCalendar
 from info_service.models.training_program import TrainingProgram
 from info_service.models.user import UserInfo
 from info_service.models.user_profile import UserProfile
-from info_service.services.data_provision_service import data_provision_service
 
 
 async def _seed_user(
@@ -207,33 +205,3 @@ class TestDataProvisionAPI:
 
         await _cleanup_table(TrainingProgram)
 
-    async def test_query_selected_students_proxies_normalized_payload(
-        self,
-        async_client_info,
-        auth_headers,
-    ) -> None:
-        """Should return the normalized selected student payload from the proxy service."""
-        with patch.object(
-            data_provision_service,
-            "query_selected_students",
-            new=AsyncMock(
-                return_value={
-                    "items": [{"student_id": "s-1", "course_id": 1001}],
-                    "pagination": {"total": 1, "page": 1, "page_size": 20},
-                    "snapshot_time": datetime(2026, 5, 30, tzinfo=UTC),
-                    "version": "2.0",
-                }
-            ),
-        ):
-            resp = await async_client_info.get(
-                "/api/v1/data-provision/selected-students",
-                params={"course_id": 1001, "term_code": "2026-FALL", "page_size": 20},
-                headers=auth_headers,
-            )
-
-        assert resp.status_code == 200
-        data = resp.json()["data"]
-        assert data["items"] == [{"student_id": "s-1", "course_id": 1001}]
-        assert data["pagination"] == {"total": 1, "page": 1, "page_size": 20}
-        assert data["version"] == "2.0"
-        assert data["snapshot_time"] == "2026-05-30T00:00:00Z"

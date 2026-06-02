@@ -64,11 +64,12 @@ class TestAuthAPI:
     async def test_service_login(self, async_client_auth, auth_service_credentials) -> None:
         """POST /auth/sys/login 在正确凭据下应成功。"""
         settings = get_auth_settings()
+        cfg = list(settings.service_client_configs.values())[0]
         resp = await async_client_auth.post(
             "/api/v1/auth/sys/login",
             json={
-                "client_id": settings.service_client_id,
-                "client_secret": settings.service_client_secret,
+                "client_id": cfg["id"],
+                "client_secret": cfg["secret"],
             },
         )
         assert resp.status_code == 200
