@@ -22,6 +22,8 @@ from info_service.models.course_offering import CourseOffering
 from info_service.models.course_schedule import CourseSchedule
 from info_service.models.teacher_assignment import TeacherCourseAssignment
 from info_service.models.training_program import TrainingProgram
+from info_service.models.user import UserInfo
+from info_service.models.user_profile import UserProfile
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
     CoursePatchRequest,
@@ -127,6 +129,64 @@ class CourseManagementService:
         if exclude_id is not None and existing.id == exclude_id:
             return
         raise BusinessRuleError(f"Training program code already exists: {program_code}")
+
+    # ------------------------------------------------------------------
+    # Batch enrichment helpers
+    # ------------------------------------------------------------------
+
+    async def batch_get_courses(
+        self, db: AsyncSession, course_ids: set[int]
+    ) -> dict[int, Course]:
+        """Batch-fetch courses by IDs, returning {id: Course} map."""
+        if not course_ids:
+            return {}
+        stmt = select(Course).where(Course.id.in_(course_ids))
+        result = await db.exec(stmt)
+        return {c.id: c for c in result.all()}
+
+    async def batch_get_offerings(
+        self, db: AsyncSession, offering_ids: set[int]
+    ) -> dict[int, CourseOffering]:
+        """Batch-fetch offerings by IDs, returning {id: CourseOffering} map."""
+        if not offering_ids:
+            return {}
+        stmt = select(CourseOffering).where(CourseOffering.id.in_(offering_ids))
+        result = await db.exec(stmt)
+        return {o.id: o for o in result.all()}
+
+    async def batch_get_classrooms(
+        self, db: AsyncSession, classroom_ids: set[int]
+    ) -> dict[int, Classroom]:
+        """Batch-fetch classrooms by IDs, returning {id: Classroom} map."""
+        if not classroom_ids:
+            return {}
+        stmt = select(Classroom).where(Classroom.id.in_(classroom_ids))
+        result = await db.exec(stmt)
+        return {c.id: c for c in result.all()}
+
+    async def batch_get_teacher_names(
+        self, db: AsyncSession, teacher_ids: set[str]
+    ) -> dict[str, str]:
+        """Batch-fetch teacher names by user_no, returning {user_no: full_name} map."""
+        if not teacher_ids:
+            return {}
+        stmt = select(UserInfo.id, UserInfo.user_no).where(
+            UserInfo.user_no.in_(teacher_ids)
+        )
+        result = await db.exec(stmt)
+        user_no_to_info_id = {row[1]: row[0] for row in result.all()}
+        if not user_no_to_info_id:
+            return {}
+        info_ids = list(user_no_to_info_id.values())
+        stmt2 = select(UserProfile.user_id, UserProfile.full_name).where(
+            UserProfile.user_id.in_(info_ids)
+        )
+        result2 = await db.exec(stmt2)
+        info_id_to_name = {row[0]: row[1] for row in result2.all()}
+        return {
+            user_no: info_id_to_name.get(info_id, "")
+            for user_no, info_id in user_no_to_info_id.items()
+        }
 
     # ---- Courses ----
 

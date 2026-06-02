@@ -14,6 +14,8 @@ class OfferingResponse(BaseModel):
 
     id: int
     course_id: int
+    course_code: str | None = None
+    course_name: str | None = None
     term_code: str
     class_no: str
     capacity: int = 0

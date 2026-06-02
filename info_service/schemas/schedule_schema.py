@@ -11,6 +11,9 @@ class ScheduleResponse(BaseModel):
     id: int
     offering_id: int
     classroom_id: int
+    course_name: str | None = None
+    offering_term_code: str | None = None
+    classroom_name: str | None = None
     day_of_week: int
     start_period: int
     end_period: int
@@ -51,6 +54,7 @@ class TeacherAssignmentResponse(BaseModel):
 
     id: int
     teacher_id: str
+    teacher_name: str | None = None
     offering_id: int
     role_type: str = "instructor"
     created_at: datetime | None = None
