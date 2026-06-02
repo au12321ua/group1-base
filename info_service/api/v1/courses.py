@@ -150,19 +150,6 @@ async def delete_course(
 # ---- Prerequisites (sub-resource of courses) ----
 
 
-async def _enrich_prerequisite(db, prereq) -> CoursePrerequisiteResponse:
-    """Enrich a prerequisite with course code/name."""
-    resp = CoursePrerequisiteResponse.model_validate(prereq)
-    course_map = await course_crud.batch_get_by_ids(
-        db, {prereq.prerequisite_course_id}
-    )
-    course = course_map.get(prereq.prerequisite_course_id)
-    if course:
-        resp.prerequisite_course_code = course.course_code
-        resp.prerequisite_course_name = course.course_name
-    return resp
-
-
 @router.get("/{course_id}/prerequisites", response_model=ListResponse[CoursePrerequisiteResponse])
 async def list_prerequisites(
     db: InfoDbSession,
@@ -170,7 +157,6 @@ async def list_prerequisites(
     course_id: int,
 ) -> ListResponse[CoursePrerequisiteResponse]:
     """List prerequisites for a course."""
-    await course_management_service.get_course(db, course_id)  # ensure exists
     items = await course_crud.list_prerequisites(db, course_id)
     course_ids = {p.prerequisite_course_id for p in items}
     course_map = await course_crud.batch_get_by_ids(db, course_ids)
@@ -218,7 +204,14 @@ async def add_prerequisite(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=await _enrich_prerequisite(db, prereq))
+    # Enrich with prerequisite course code/name
+    course_map = await course_crud.batch_get_by_ids(db, {prereq.prerequisite_course_id})
+    resp = CoursePrerequisiteResponse.model_validate(prereq)
+    course = course_map.get(prereq.prerequisite_course_id)
+    if course:
+        resp.prerequisite_course_code = course.course_code
+        resp.prerequisite_course_name = course.course_name
+    return SingleResponse(data=resp)
 
 
 @router.delete(

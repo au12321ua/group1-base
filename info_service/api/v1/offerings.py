@@ -72,14 +72,10 @@ async def list_offerings(
     # Enrich with course info
     course_ids = {item.course_id for item in items}
     course_map = await course_crud.batch_get_by_ids(db, course_ids)
-    result = []
-    for item in items:
-        resp = OfferingResponse.model_validate(item)
-        course = course_map.get(item.course_id)
-        if course:
-            resp.course_code = course.course_code
-            resp.course_name = course.course_name
-        result.append(resp)
+    result = [
+        await _enrich_offering(db, item, course_map=course_map)
+        for item in items
+    ]
     return ListResponse(
         data=PaginatedData(
             items=result,
@@ -89,11 +85,16 @@ async def list_offerings(
 
 
 async def _enrich_offering(
-    db, offering: CourseOffering,
+    db, offering: CourseOffering, course_map: dict | None = None,
 ) -> OfferingResponse:
-    """Enrich a single offering response with course info."""
+    """Enrich a single offering response with course info.
+
+    Accepts an optional pre-fetched *course_map* so list endpoints can
+    pass the result of a single batch query.
+    """
     resp = OfferingResponse.model_validate(offering)
-    course_map = await course_crud.batch_get_by_ids(db, {offering.course_id})
+    if course_map is None:
+        course_map = await course_crud.batch_get_by_ids(db, {offering.course_id})
     course = course_map.get(offering.course_id)
     if course:
         resp.course_code = course.course_code
