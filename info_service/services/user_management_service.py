@@ -20,6 +20,7 @@ from info_service.schemas.user_schema import (
     UserResponse,
     UserUpdateRequest,
 )
+from info_service.services.auth_client import batch_fetch_role_names
 from shared.exceptions import BusinessRuleError, ResourceNotFoundError
 
 logger = logging.getLogger("user_management_service")
@@ -71,33 +72,6 @@ class UserManagementService:
         except Exception:
             logger.exception("Failed to sync disable user %s to Auth", user_id)
             raise
-
-    async def _batch_fetch_roles_from_auth(
-        self, user_ids: list[int]
-    ) -> dict[int, list[str]]:
-        """POST /internal/users/roles/batch — get role_names for multiple users.
-
-        Returns {user_id: [role_name, ...]} mapping.
-        """
-        if not user_ids:
-            return {}
-        settings = self._settings
-        try:
-            async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
-                resp = await client.post(
-                    self._auth_url("/users/roles/batch"),
-                    json={"user_ids": [str(uid) for uid in user_ids]},
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    users = data.get("data", {}).get("users", [])
-                    return {
-                        int(u["user_id"]): u.get("role_names", [])
-                        for u in users
-                    }
-        except Exception:
-            logger.exception("Failed to batch fetch roles from Auth")
-        return {}
 
     async def _sync_enable_to_auth(self, user_id: int) -> None:
         """POST /internal/users/{id}/enable. Raises on failure."""
@@ -244,7 +218,7 @@ class UserManagementService:
         # Batch-fetch profiles and roles
         user_info_ids = [u.id for u in users]
         profile_map = await user_profile_crud.get_by_user_ids(db, user_info_ids)
-        role_map = await self._batch_fetch_roles_from_auth(user_info_ids)
+        role_map = await batch_fetch_role_names(self._settings, user_info_ids)
 
         items = [
             await self._build_response(

@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from info_service.core.config import get_info_settings
 from info_service.crud.user_crud import user_crud
 from info_service.crud.user_profile_crud import user_profile_crud
+from info_service.services.auth_client import batch_fetch_role_names
 from shared.exceptions import BusinessRuleError, ResourceNotFoundError
 
 logger = logging.getLogger("recycle_bin_service")
@@ -36,31 +37,6 @@ class RecycleBinService:
         except Exception:
             logger.exception("Failed to enable user %s in Auth", user_id)
             raise
-
-    async def _batch_fetch_roles_from_auth(
-        self, user_ids: list[int]
-    ) -> dict[int, list[str]]:
-        """POST /internal/users/roles/batch — get role_names for multiple users."""
-        if not user_ids:
-            return {}
-        try:
-            async with httpx.AsyncClient(
-                timeout=self._settings.auth_service_timeout
-            ) as client:
-                resp = await client.post(
-                    self._auth_url("/users/roles/batch"),
-                    json={"user_ids": [str(uid) for uid in user_ids]},
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    users = data.get("data", {}).get("users", [])
-                    return {
-                        int(u["user_id"]): u.get("role_names", [])
-                        for u in users
-                    }
-        except Exception:
-            logger.exception("Failed to batch fetch roles from Auth")
-        return {}
 
     async def _call_auth_delete(self, user_id: int) -> None:
         """DELETE /internal/users/{id}. Raises on failure."""
@@ -104,7 +80,7 @@ class RecycleBinService:
         profile_map = await user_profile_crud.get_by_user_ids(db, user_info_ids)
 
         # Batch-fetch roles from Auth
-        role_map = await self._batch_fetch_roles_from_auth(user_info_ids)
+        role_map = await batch_fetch_role_names(self._settings, user_info_ids)
 
         result = []
         for u in items:
