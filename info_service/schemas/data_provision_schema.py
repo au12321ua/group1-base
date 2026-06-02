@@ -54,12 +54,3 @@ class DataProvisionWrapper(BaseModel):
     pagination: dict
     snapshot_time: datetime
     version: str = "1.0"
-
-
-class SelectedStudentsResponse(BaseModel):
-    """Normalized selected student response from C system."""
-
-    items: list
-    pagination: dict
-    snapshot_time: datetime
-    version: str = "1.0"
