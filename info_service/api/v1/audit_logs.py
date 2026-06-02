@@ -5,10 +5,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
+from info_service.crud.user_profile_crud import user_profile_crud
 from info_service.deps import require_permission
 from info_service.schemas.audit_log_schema import AuditLogResponse
 from info_service.services.audit_service import audit_service
-from info_service.services.course_management_service import course_management_service
 from shared.response import APIResponse, PaginatedData, PaginationMeta
 from shared.security import IdentityContext
 
@@ -43,7 +43,7 @@ async def search_audit_logs(
     )
     # Batch-fetch operator names from Info DB
     operator_ids = {item.operator_user_id for item in items if item.operator_user_id}
-    name_map = await course_management_service.batch_get_user_names(info_db, operator_ids)
+    name_map = await user_profile_crud.batch_get_display_names(info_db, operator_ids)
     result_items = []
     for a in items:
         resp = AuditLogResponse.model_validate(a)

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.audit import AuditContext
 from info_service.core.security import check_resource_access
+from info_service.crud.course_crud import course_crud
 from info_service.crud.teacher_assignment_crud import teacher_assignment_crud
 from info_service.deps import require_permission
 from info_service.models.course_offering import CourseOffering
@@ -70,7 +71,7 @@ async def list_offerings(
     )
     # Enrich with course info
     course_ids = {item.course_id for item in items}
-    course_map = await course_management_service.batch_get_courses(db, course_ids)
+    course_map = await course_crud.batch_get_by_ids(db, course_ids)
     result = []
     for item in items:
         resp = OfferingResponse.model_validate(item)
@@ -92,7 +93,7 @@ async def _enrich_offering(
 ) -> OfferingResponse:
     """Enrich a single offering response with course info."""
     resp = OfferingResponse.model_validate(offering)
-    course_map = await course_management_service.batch_get_courses(db, {offering.course_id})
+    course_map = await course_crud.batch_get_by_ids(db, {offering.course_id})
     course = course_map.get(offering.course_id)
     if course:
         resp.course_code = course.course_code

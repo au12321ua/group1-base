@@ -352,15 +352,17 @@ class AuthService:
     async def batch_get_user_roles(
         self, db: AsyncSession, user_ids: list[str]
     ) -> dict[str, tuple[list[str], list[str]]]:
-        """Batch query roles for multiple users.
+        """Batch query roles for multiple users using a single DB query.
 
         Returns {user_id: (role_codes, role_names)}.
         """
-        result: dict[str, tuple[list[str], list[str]]] = {}
-        for uid in user_ids:
-            roles = await role_crud.get_user_roles(db, uid)
-            result[uid] = ([r.code for r in roles], [r.name for r in roles])
-        return result
+        if not user_ids:
+            return {}
+        role_map = await role_crud.get_user_roles_batch(db, user_ids)
+        return {
+            uid: ([r.code for r in roles], [r.name for r in roles])
+            for uid, roles in role_map.items()
+        }
 
     async def delete_user(self, db: AsyncSession, user_id: str) -> None:
         """Physical delete: credentials, tokens, sessions, roles — full cleanup."""

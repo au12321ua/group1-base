@@ -29,6 +29,26 @@ class RoleCRUD:
         result = await db.exec(stmt)
         return list(result.all())
 
+    async def get_user_roles_batch(
+        self, db: AsyncSession, user_ids: list[str]
+    ) -> dict[str, list[Role]]:
+        """Batch get roles for multiple users in a single query.
+
+        Returns {user_id: [Role, ...]} mapping.
+        """
+        if not user_ids:
+            return {}
+        stmt = (
+            select(UserRole.user_id, Role)
+            .join(Role, UserRole.role_id == Role.id)
+            .where(UserRole.user_id.in_(user_ids))
+        )
+        result = await db.exec(stmt)
+        role_map: dict[str, list[Role]] = {uid: [] for uid in user_ids}
+        for user_id, role in result.all():
+            role_map[user_id].append(role)
+        return role_map
+
     async def assign_roles(self, db: AsyncSession, user_id: str, role_ids: list[int]) -> None:
         """Replace all role assignments for a user (delete old, insert new)."""
         existing = await db.exec(select(UserRole).where(UserRole.user_id == user_id))

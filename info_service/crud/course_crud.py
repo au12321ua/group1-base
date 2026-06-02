@@ -18,6 +18,16 @@ class CourseCRUD(BaseCRUD[Course]):
     def __init__(self) -> None:
         super().__init__(Course)
 
+    async def batch_get_by_ids(
+        self, db: AsyncSession, ids: set[int]
+    ) -> dict[int, Course]:
+        """Batch-fetch courses by IDs in a single query, returning {id: Course} map."""
+        if not ids:
+            return {}
+        stmt = select(Course).where(Course.id.in_(ids))
+        result = await db.exec(stmt)
+        return {c.id: c for c in result.all()}
+
     async def get_by_course_code(
         self, db: AsyncSession, code: str, *, include_deleted: bool = False
     ) -> Course | None:

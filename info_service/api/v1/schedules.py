@@ -7,7 +7,11 @@ from fastapi import APIRouter, Body, Depends, Query
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.audit import AuditContext
 from info_service.core.security import check_resource_access
+from info_service.crud.classroom_crud import classroom_crud
+from info_service.crud.course_crud import course_crud
+from info_service.crud.offering_crud import offering_crud
 from info_service.crud.teacher_assignment_crud import teacher_assignment_crud
+from info_service.crud.user_profile_crud import user_profile_crud
 from info_service.deps import require_permission
 from info_service.schemas.schedule_schema import (
     ScheduleCreateRequest,
@@ -40,21 +44,21 @@ async def _enrich_schedule(
     """Enrich a schedule response with course/offering/classroom names."""
     resp = ScheduleResponse.model_validate(schedule)
     if offering_map is None:
-        offering_map = await course_management_service.batch_get_offerings(
+        offering_map = await offering_crud.batch_get_by_ids(
             db, {schedule.offering_id}
         )
     offering = offering_map.get(schedule.offering_id)
     if offering:
         resp.offering_term_code = offering.term_code
         if course_map is None:
-            course_map = await course_management_service.batch_get_courses(
+            course_map = await course_crud.batch_get_by_ids(
                 db, {offering.course_id}
             )
         course = course_map.get(offering.course_id)
         if course:
             resp.course_name = course.course_name
     if classroom_map is None:
-        classroom_map = await course_management_service.batch_get_classrooms(
+        classroom_map = await classroom_crud.batch_get_by_ids(
             db, {schedule.classroom_id}
         )
     classroom = classroom_map.get(schedule.classroom_id)
@@ -69,8 +73,8 @@ async def _enrich_teacher_assignment(
     """Enrich a teacher assignment with teacher name."""
     resp = TeacherAssignmentResponse.model_validate(assignment)
     if teacher_name_map is None:
-        teacher_name_map = await course_management_service.batch_get_teacher_names(
-            db, {assignment.teacher_id}
+        teacher_name_map = await user_profile_crud.batch_get_display_names(
+            db, {assignment.teacher_id}, fallback_to_username=False,
         )
     resp.teacher_name = teacher_name_map.get(assignment.teacher_id, "")
     return resp
@@ -125,10 +129,10 @@ async def list_schedules(
     # Batch-fetch related data
     offering_ids = {item.offering_id for item in items}
     classroom_ids = {item.classroom_id for item in items}
-    offering_map = await course_management_service.batch_get_offerings(db, offering_ids)
+    offering_map = await offering_crud.batch_get_by_ids(db, offering_ids)
     course_ids = {o.course_id for o in offering_map.values()}
-    course_map = await course_management_service.batch_get_courses(db, course_ids)
-    classroom_map = await course_management_service.batch_get_classrooms(db, classroom_ids)
+    course_map = await course_crud.batch_get_by_ids(db, course_ids)
+    classroom_map = await classroom_crud.batch_get_by_ids(db, classroom_ids)
     # Enrich
     result = []
     for item in items:
@@ -251,7 +255,9 @@ async def list_teachers(
     """List teachers assigned to a schedule."""
     items = await course_management_service.list_teachers_for_schedule(db, schedule_id)
     teacher_ids = {item.teacher_id for item in items}
-    teacher_name_map = await course_management_service.batch_get_teacher_names(db, teacher_ids)
+    teacher_name_map = await user_profile_crud.batch_get_display_names(
+        db, teacher_ids, fallback_to_username=False,
+    )
     enriched = [
         await _enrich_teacher_assignment(db, item, teacher_name_map=teacher_name_map)
         for item in items
@@ -279,7 +285,9 @@ async def replace_teachers(
         await audit.log_failure(str(exc.message))
         raise
     all_teacher_ids = {item.teacher_id for item in items}
-    teacher_name_map = await course_management_service.batch_get_teacher_names(db, all_teacher_ids)
+    teacher_name_map = await user_profile_crud.batch_get_display_names(
+        db, all_teacher_ids, fallback_to_username=False,
+    )
     enriched = [
         await _enrich_teacher_assignment(db, item, teacher_name_map=teacher_name_map)
         for item in items
@@ -307,7 +315,9 @@ async def add_teachers(
         await audit.log_failure(str(exc.message))
         raise
     all_teacher_ids = {item.teacher_id for item in items}
-    teacher_name_map = await course_management_service.batch_get_teacher_names(db, all_teacher_ids)
+    teacher_name_map = await user_profile_crud.batch_get_display_names(
+        db, all_teacher_ids, fallback_to_username=False,
+    )
     enriched = [
         await _enrich_teacher_assignment(db, item, teacher_name_map=teacher_name_map)
         for item in items

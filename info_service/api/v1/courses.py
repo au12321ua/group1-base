@@ -153,7 +153,7 @@ async def delete_course(
 async def _enrich_prerequisite(db, prereq) -> CoursePrerequisiteResponse:
     """Enrich a prerequisite with course code/name."""
     resp = CoursePrerequisiteResponse.model_validate(prereq)
-    course_map = await course_management_service.batch_get_courses(
+    course_map = await course_crud.batch_get_by_ids(
         db, {prereq.prerequisite_course_id}
     )
     course = course_map.get(prereq.prerequisite_course_id)
@@ -173,7 +173,7 @@ async def list_prerequisites(
     await course_management_service.get_course(db, course_id)  # ensure exists
     items = await course_crud.list_prerequisites(db, course_id)
     course_ids = {p.prerequisite_course_id for p in items}
-    course_map = await course_management_service.batch_get_courses(db, course_ids)
+    course_map = await course_crud.batch_get_by_ids(db, course_ids)
     result = []
     for p in items:
         resp = CoursePrerequisiteResponse.model_validate(p)
