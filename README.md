@@ -16,13 +16,11 @@ STSS 大组 P2-A 子系统 — 教务信息管理系统，负责认证授权（A
 | Lint | ruff | — |
 | 测试 | pytest + pytest-asyncio | — |
 | 容器 | Docker + Compose | — |
-| 前端 | Vue 3 + TS + Element Plus + Pinia | Node 18+ |
 
 ## 前置条件
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)（Python 包管理器）
-- Node.js 18+ / npm（前端）
 - Docker & Docker Compose（可选，用于容器化运行）
 
 ## 快速开始
@@ -39,31 +37,19 @@ uv sync --group dev
 cp .env.example .env
 # 编辑 .env，将 TOKEN_SECRET_KEY 改为随机字符串
 
-# 4. 初始化 Auth 数据库（角色/权限种子 + 初始管理员）
-mkdir -p data
-uv run alembic -c auth_service/migrations/alembic.ini upgrade b2c3d4e5f6a7
-# SQLite 原型：002 含 schema + 种子；003 约束迁移在 SQLite 上需 batch 模式（见 docs/alembic-guide.md）
-# 种子管理员 admin，密码 ChangeMe123（002 硬编码，与 DEFAULT_INITIAL_PASSWORD 默认相同；改 .env 不影响已跑过的种子）
-# 全新库执行 002 后稳定 role_id：1=STUDENT, 2=TEACHER, 3=ACADEMIC_ADMIN, 4=SYS_ADMIN（供 Info 联调传 role_ids）
-
 # 5. 启动服务
 # 方式一：本地运行
-uv run uvicorn auth_service.main:app --port 8001 --reload &
-uv run uvicorn info_service.main:app --port 8002 --reload &
+uv run uvicorn auth_service.main:app --port 8001 --reload
+uv run uvicorn info_service.main:app --port 8002 --reload
+uv run python -m scripts.seed_data
 
 # 方式二：Docker Compose
 docker-compose up -d
 
-# 6. 启动前端
-cd frontend
-npm install
-npm run dev          # http://localhost:5173
-
-# 7. 验证
+# 6. 验证
 # 浏览器访问 Swagger 文档
 # http://localhost:8001/docs  (Auth Service)
 # http://localhost:8002/docs  (Info Service)
-# http://localhost:5173       (前端管理界面)
 ```
 
 ## 运行测试
@@ -77,12 +63,6 @@ uv run pytest -m smoke
 
 # 覆盖率报告
 uv run pytest --cov
-
-# Lint 检查
-uv run ruff check .
-
-# 前端类型检查
-cd frontend && npx vue-tsc --noEmit
 ```
 
 ## 项目结构
@@ -104,22 +84,12 @@ group1-base/
 │   ├── models/            # 13 个实体
 │   ├── schemas/           # 12 个 Schema 模块
 │   └── main.py            # 入口
+├── scripts/               # 数据库初始化脚本仓库
 ├── shared/                # 共用库（异常、响应、安全工具、日志）
 ├── tests/                 # 测试代码
 ├── docs/
 │   ├── design/v2/         # 架构设计文档（9 份）
 │   └── require-spec/      # 需求规格 + 验证矩阵
-├── frontend/              # Vue 3 管理后台（端口 5173）
-│   ├── src/
-│   │   ├── api/           # Axios 客户端 + API 模块
-│   │   ├── components/    # 共享组件
-│   │   ├── directives/    # 自定义指令（v-permission）
-│   │   ├── layouts/       # 布局（AdminLayout）
-│   │   ├── router/        # 路由 + 导航守卫
-│   │   ├── stores/        # Pinia Store（auth）
-│   │   └── views/         # 12 个管理页面（占位）
-│   ├── package.json
-│   └── vite.config.ts     # Vite + API 代理
 ├── data/                  # SQLite 数据库文件（运行时生成）
 ├── logs/                  # 日志文件
 ├── uploads/               # 上传文件存储（运行时生成）
@@ -145,7 +115,6 @@ group1-base/
 | [CLAUDE.md](CLAUDE.md) | Agent 编码入口，含架构约束、代码规范 |
 | [TEAM_GUIDE.md](TEAM_GUIDE.md) | 团队协作流程，含分支策略、PR 模板、任务分工 |
 | [docs/BRANCH_STRATEGY.md](docs/BRANCH_STRATEGY.md) | 分支管理详细规范 |
-| [docs/frontend/README.md](docs/frontend/README.md) | 前端开发说明 + 开发指南 |
 | [docs/design/v2/README.md](docs/design/v2/README.md) | 架构设计文档索引 |
 | [docs/require-spec/](docs/require-spec/) | 需求规格 + 验证矩阵 |
 

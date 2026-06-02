@@ -30,6 +30,7 @@ group1-base/
 │   ├── tests/                  ← 测试文档：README 概览 + 完整编写指南
 │   ├── BRANCH_STRATEGY.md      ← 分支管理策略（GitHub Flow）
 │   └── TASK_BREAKDOWN.md       ← 任务分工建议（4 Dev + 1 QA）
+├── scripts/                    # 数据库初始化脚本仓库
 ├── shared/                     ← 共用库（异常、响应、安全工具、日志）
 ├── auth_service/               ← 认证授权服务（端口 8001）
 │   ├── api/v1/                 # 端点：auth.py、internal.py
@@ -54,19 +55,6 @@ group1-base/
 │   ├── auth_service/           # Auth Service 测试
 │   ├── info_service/           # Info Service 测试
 │   └── shared/                 # 共用库测试（数据库、错误处理、应用 wiring）
-├── frontend/                   ← Vue 3 管理后台（端口 5173）
-│   ├── src/
-│   │   ├── api/client.ts       # Axios 实例（拦截器、Token 续期）
-│   │   ├── components/         # 共享组件（StatusTag 等）
-│   │   ├── directives/         # 自定义指令（v-permission）
-│   │   ├── layouts/            # 布局组件（AdminLayout）
-│   │   ├── router/             # 路由表 + beforeEach 导航守卫
-│   │   ├── stores/auth.ts      # Pinia 认证 Store
-│   │   └── views/              # 页面组件（12 个占位页 — 无业务逻辑）
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── tsconfig.node.json
-│   └── vite.config.ts          # Vite 配置（@ 别名、API 代理）
 ├── .github/
 │   └── workflows/
 │       └── ci.yml              # CI：ruff check + pytest（PR / push to main）
@@ -149,7 +137,6 @@ Gateway → Auth Service /internal/verify → X-User-Id, X-User-Role, X-User-Per
    - 快速检查（跳过集成测试）：`uv run pytest -m "not integration"`
    - 按标记运行：`uv run pytest -m smoke`、`uv run pytest -m unit`
    - 覆盖率报告：`uv run pytest --cov=. --cov-report=term-missing`
-   - 前端类型检查：`cd frontend && npx vue-tsc --noEmit`
    - 数据库重置（如需）：删除 `*.db` 文件后重启服务，create_all 自动重建
 5. 提交 PR（`gh pr create`）
 6. CI 自动 lint + test，至少 1 人 Review
@@ -162,9 +149,6 @@ git clone <repo-url> && cd group1-base
 uv sync --group dev
 cp .env.example .env   # 填入开发用密钥
 docker-compose up -d    # 或手动 uvicorn auth_service.main:app --port 8001 & info_service...
-
-# 前端
-cd frontend && npm install && npm run dev   # http://localhost:5173
 
 # 测试
 uv run pytest

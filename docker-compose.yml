@@ -65,19 +65,6 @@ services:
       info_service:
         condition: service_healthy
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "5173:5173"
-    environment:
-      - AUTH_SERVICE_URL=http://auth_service:8001
-      - API_SERVICE_URL=http://info_service:8002
-    depends_on:
-      - auth_service
-      - info_service
-
 volumes:
   auth_data:
   info_data:
