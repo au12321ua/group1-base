@@ -6,9 +6,8 @@ Info Service modules don't duplicate httpx boilerplate.
 
 import logging
 
-import httpx
-
 from info_service.core.config import InfoSettings
+from info_service.services.auth_http_client import get_auth_service_client
 
 logger = logging.getLogger(__name__)
 
@@ -24,18 +23,18 @@ async def batch_fetch_role_names(
     if not user_ids:
         return {}
     try:
-        async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
-            resp = await client.post(
-                f"{settings.auth_service_url}/api/v1/internal/users/roles/batch",
-                json={"user_ids": [str(uid) for uid in user_ids]},
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                users = data.get("data", {}).get("users", [])
-                return {
-                    int(u["user_id"]): u.get("role_names", [])
-                    for u in users
-                }
+        client = get_auth_service_client()
+        resp = await client.post_internal(
+            "/users/roles/batch",
+            json={"user_ids": [str(uid) for uid in user_ids]},
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            users = data.get("data", {}).get("users", [])
+            return {
+                int(u["user_id"]): u.get("role_names", [])
+                for u in users
+            }
     except Exception:
         logger.exception("Failed to batch fetch roles from Auth")
     return {}

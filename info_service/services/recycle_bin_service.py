@@ -2,7 +2,6 @@
 
 import logging
 
-import httpx
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.core.config import get_info_settings
@@ -20,20 +19,19 @@ class RecycleBinService:
     def __init__(self) -> None:
         self._settings = get_info_settings()
 
-    def _auth_url(self, path: str) -> str:
-        return f"{self._settings.auth_service_url}/api/v1/internal{path}"
+    @staticmethod
+    def _get_client():
+        from info_service.services.auth_http_client import get_auth_service_client
+        return get_auth_service_client()
 
     async def _call_auth_enable(self, user_id: int) -> None:
         """POST /internal/users/{id}/enable. Raises on failure."""
         try:
-            async with httpx.AsyncClient(
-                timeout=self._settings.auth_service_timeout
-            ) as client:
-                resp = await client.post(
-                    self._auth_url(f"/users/{user_id}/enable")
-                )
-                if resp.status_code != 200:
-                    raise RuntimeError(f"Auth enable returned {resp.status_code}")
+            resp = await self._get_client().post_internal(
+                f"/users/{user_id}/enable"
+            )
+            if resp.status_code != 200:
+                raise RuntimeError(f"Auth enable returned {resp.status_code}")
         except Exception:
             logger.exception("Failed to enable user %s in Auth", user_id)
             raise
@@ -41,14 +39,11 @@ class RecycleBinService:
     async def _call_auth_delete(self, user_id: int) -> None:
         """DELETE /internal/users/{id}. Raises on failure."""
         try:
-            async with httpx.AsyncClient(
-                timeout=self._settings.auth_service_timeout
-            ) as client:
-                resp = await client.delete(
-                    self._auth_url(f"/users/{user_id}")
-                )
-                if resp.status_code != 204:
-                    raise RuntimeError(f"Auth delete returned {resp.status_code}")
+            resp = await self._get_client().delete_internal(
+                f"/users/{user_id}"
+            )
+            if resp.status_code != 204:
+                raise RuntimeError(f"Auth delete returned {resp.status_code}")
         except Exception:
             logger.exception("Failed to delete user %s in Auth", user_id)
             raise
