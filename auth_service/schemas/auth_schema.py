@@ -18,6 +18,7 @@ class LoginResponse(BaseModel):
     user_id: str
     username: str
     role: str
+    permissions: list[str] = Field(default_factory=list)
 
 
 class ServiceLoginRequest(BaseModel):

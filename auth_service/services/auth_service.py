@@ -167,6 +167,7 @@ class AuthService:
             user_id=user.user_id,
             username=user.username,
             role=primary_role,
+            permissions=permissions,
         )
 
     async def service_login(
@@ -258,12 +259,17 @@ class AuthService:
         )
 
     async def get_current_user(self, db: AsyncSession, user_id: str) -> AuthUserResponse:
-        """Return minimal user info for /auth/me."""
+        """Return user info with role and permissions for /auth/me."""
         user = await self._get_user(db, user_id)
+        role_codes = await self._role_codes(db, user_id)
+        primary_role = role_codes[0] if role_codes else "STUDENT"
+        permissions = await permission_crud.get_user_permissions(db, user_id)
         return AuthUserResponse(
             user_id=user.user_id,
             username=user.username,
             status=user.status.value,
+            role=primary_role,
+            permissions=permissions,
             created_at=user.created_at,
         )
 
