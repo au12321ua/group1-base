@@ -9,6 +9,7 @@ from info_service.core.audit import AuditContext
 from info_service.crud.training_program_crud import training_program_crud
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.training_program_schema import (
+    CourseBrief,
     TrainingProgramCreateRequest,
     TrainingProgramPatchRequest,
     TrainingProgramResponse,
@@ -29,17 +30,29 @@ router = APIRouter(tags=["training-programs"])
 
 
 async def _build_program_response(
-    db, program, course_ids: list[int] | None = None
+    db, program, course_ids: list[int] | None = None,
+    course_map: dict | None = None,
 ) -> TrainingProgramResponse:
-    """Assemble response with required_course_ids from the association table.
+    """Assemble response with required_course_ids and required_courses from the association table.
 
     If *course_ids* is provided the DB query is skipped (batch path).
+    If *course_map* is provided, builds CourseBrief entries (batch path).
     """
     if course_ids is None:
         associations = await training_program_crud.get_courses_by_program(db, program.id)
         course_ids = [assoc.course_id for assoc in associations]
     resp = TrainingProgramResponse.model_validate(program)
     resp.required_course_ids = course_ids
+    # Build enriched course list
+    if course_ids:
+        if course_map is None:
+            course_map = await course_management_service.batch_get_courses(db, set(course_ids))
+
+        resp.required_courses = [
+            CourseBrief(id=cid, course_code=c.course_code, course_name=c.course_name)
+            for cid in course_ids
+            if (c := course_map.get(cid))
+        ]
     return resp
 
 
@@ -59,10 +72,20 @@ async def list_training_programs(
     )
     # Batch-fetch course associations for all programs in one query
     program_ids = [p.id for p in items]
-    course_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
+    course_id_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
+    # Batch-fetch course details for enrichment
+    all_course_ids: set[int] = set()
+    for cids in course_id_map.values():
+        all_course_ids.update(cids)
+    course_map = await course_management_service.batch_get_courses(db, all_course_ids)
     return ListResponse(
         data=PaginatedData(
-            items=[await _build_program_response(db, p, course_map.get(p.id, [])) for p in items],
+            items=[
+                await _build_program_response(
+                    db, p, course_id_map.get(p.id, []), course_map=course_map
+                )
+                for p in items
+            ],
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
@@ -106,10 +129,19 @@ async def get_by_major(
         grade=grade,
     )
     program_ids = [p.id for p in items]
-    course_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
+    course_id_map = await training_program_crud.get_course_ids_by_programs(db, program_ids)
+    all_course_ids: set[int] = set()
+    for cids in course_id_map.values():
+        all_course_ids.update(cids)
+    course_map = await course_management_service.batch_get_courses(db, all_course_ids)
     return ListResponse(
         data=PaginatedData(
-            items=[await _build_program_response(db, p, course_map.get(p.id, [])) for p in items],
+            items=[
+                await _build_program_response(
+                    db, p, course_id_map.get(p.id, []), course_map=course_map
+                )
+                for p in items
+            ],
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )

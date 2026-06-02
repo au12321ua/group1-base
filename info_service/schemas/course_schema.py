@@ -44,3 +44,20 @@ class CoursePatchRequest(BaseModel):
     capacity: int | None = Field(default=None, ge=0)
     assessment_method: str | None = Field(default=None, max_length=128)
     is_active: bool | None = None
+
+
+class CoursePrerequisiteResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    course_id: int
+    prerequisite_course_id: int
+    prerequisite_course_code: str | None = None
+    prerequisite_course_name: str | None = None
+    min_grade: str = ""
+    created_at: datetime | None = None
+
+
+class CoursePrerequisiteCreateRequest(BaseModel):
+    prerequisite_course_id: int
+    min_grade: str = Field(default="", max_length=16)

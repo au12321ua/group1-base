@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from info_service.core.config import get_info_settings
 from info_service.crud.user_crud import user_crud
 from info_service.crud.user_profile_crud import user_profile_crud
+from info_service.services.auth_client import batch_fetch_role_names
 from shared.exceptions import BusinessRuleError, ResourceNotFoundError
 
 logger = logging.getLogger("recycle_bin_service")
@@ -74,16 +75,24 @@ class RecycleBinService:
             only_deleted=True,
         )
 
-        # Enrich with full_name from profile
+        # Batch-fetch profiles (fix N+1)
+        user_info_ids = [u.id for u in items]
+        profile_map = await user_profile_crud.get_by_user_ids(db, user_info_ids)
+
+        # Batch-fetch roles from Auth
+        role_map = await batch_fetch_role_names(self._settings, user_info_ids)
+
         result = []
         for u in items:
-            profile = await user_profile_crud.get_by_user_id(db, u.id)
+            profile = profile_map.get(u.id)
             full_name = profile.full_name if profile else ""
             result.append({
                 "id": u.id,
                 "user_no": u.user_no,
                 "username": u.username,
                 "full_name": full_name,
+                "role_ids": "",
+                "role_names": role_map.get(u.id, []),
                 "is_deleted": u.is_deleted,
                 "deleted_at": u.deleted_at,
             })

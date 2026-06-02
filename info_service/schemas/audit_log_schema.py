@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class AuditLogResponse(BaseModel):
     id: int
     operator_user_id: str
+    operator_name: str | None = None
     operator_role: str
     target_type: str
     target_id: str = ""

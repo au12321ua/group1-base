@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from info_service.api.v1.audit_logs import router as audit_logs_router
 from info_service.api.v1.base_info import router as base_info_router
 from info_service.api.v1.calendars import router as calendars_router
+from info_service.api.v1.classrooms import router as classrooms_router
 from info_service.api.v1.courses import router as courses_router
 from info_service.api.v1.data_provision import router as data_provision_router
 from info_service.api.v1.files import router as files_router
@@ -21,6 +22,7 @@ router.include_router(courses_router, prefix="/courses", tags=["courses"])
 router.include_router(offerings_router, prefix="/offerings", tags=["offerings"])
 router.include_router(schedules_router, prefix="/schedules", tags=["schedules"])
 router.include_router(calendars_router, prefix="/calendars", tags=["calendars"])
+router.include_router(classrooms_router, prefix="/classrooms", tags=["classrooms"])
 router.include_router(
     training_programs_router, prefix="/training-programs", tags=["training-programs"]
 )

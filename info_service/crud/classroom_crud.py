@@ -14,6 +14,16 @@ class ClassroomCRUD(BaseCRUD[Classroom]):
     def __init__(self) -> None:
         super().__init__(Classroom)
 
+    async def batch_get_by_ids(
+        self, db: AsyncSession, ids: set[int]
+    ) -> dict[int, Classroom]:
+        """Batch-fetch classrooms by IDs in a single query, returning {id: Classroom} map."""
+        if not ids:
+            return {}
+        stmt = select(Classroom).where(Classroom.id.in_(ids))
+        result = await db.exec(stmt)
+        return {c.id: c for c in result.all()}
+
     async def get_by_room_no(self, db: AsyncSession, room_no: str) -> Classroom | None:
         """Get classroom by unique room number."""
         result = await db.exec(select(Classroom).where(Classroom.room_no == room_no))

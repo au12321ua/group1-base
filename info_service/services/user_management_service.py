@@ -20,6 +20,7 @@ from info_service.schemas.user_schema import (
     UserResponse,
     UserUpdateRequest,
 )
+from info_service.services.auth_client import batch_fetch_role_names
 from shared.exceptions import BusinessRuleError, ResourceNotFoundError
 
 logger = logging.getLogger("user_management_service")
@@ -91,16 +92,16 @@ class UserManagementService:
     # ------------------------------------------------------------------
 
     async def _build_response(
-        self, db: AsyncSession, user: UserInfo
+        self, db: AsyncSession, user: UserInfo,
+        role_names: list[str] | None = None,
+        profile: UserProfile | None = None,
     ) -> UserResponse:
         """Assemble UserResponse from UserInfo + UserProfile.
 
-        Role information is not stored in Info Service — it comes from
-        Auth Service via the Gateway (X-User-Role header). The response
-        sets role_ids to an empty string; the frontend should obtain
-        role information from the Auth Service or the current session.
+        Role information is fetched from Auth Service via batch endpoint.
         """
-        profile = await user_profile_crud.get_by_user_id(db, user.id)
+        if profile is None:
+            profile = await user_profile_crud.get_by_user_id(db, user.id)
         profile_schema = None
         if profile:
             profile_schema = UserProfileSchema(
@@ -115,6 +116,7 @@ class UserManagementService:
             id=user.id,
             user_no=user.user_no,
             username=user.username,
+            role_names=role_names or [],
             is_deleted=user.is_deleted,
             profile=profile_schema,
             created_at=user.created_at,
@@ -213,7 +215,19 @@ class UserManagementService:
             sort_order=sort_order,
         )
 
-        items = [await self._build_response(db, u) for u in users]
+        # Batch-fetch profiles and roles
+        user_info_ids = [u.id for u in users]
+        profile_map = await user_profile_crud.get_by_user_ids(db, user_info_ids)
+        role_map = await batch_fetch_role_names(self._settings, user_info_ids)
+
+        items = [
+            await self._build_response(
+                db, u,
+                role_names=role_map.get(u.id, []),
+                profile=profile_map.get(u.id),
+            )
+            for u in users
+        ]
         return items, total
 
     async def update_user(

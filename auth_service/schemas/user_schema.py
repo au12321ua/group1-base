@@ -2,13 +2,15 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AuthUserResponse(BaseModel):
     user_id: str
     username: str
     status: str
+    role: str = ""
+    permissions: list[str] = Field(default_factory=list)
     created_at: datetime | None = None
 
 

@@ -11,6 +11,7 @@ class RecycleBinItemResponse(BaseModel):
     username: str
     full_name: str = ""
     role_ids: str = ""
+    role_names: list[str] = Field(default_factory=list)
     deleted_at: datetime | None = None
 
 

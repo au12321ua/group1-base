@@ -167,6 +167,7 @@ class AuthService:
             user_id=user.user_id,
             username=user.username,
             role=primary_role,
+            permissions=permissions,
         )
 
     async def service_login(
@@ -258,12 +259,17 @@ class AuthService:
         )
 
     async def get_current_user(self, db: AsyncSession, user_id: str) -> AuthUserResponse:
-        """Return minimal user info for /auth/me."""
+        """Return user info with role and permissions for /auth/me."""
         user = await self._get_user(db, user_id)
+        role_codes = await self._role_codes(db, user_id)
+        primary_role = role_codes[0] if role_codes else "STUDENT"
+        permissions = await permission_crud.get_user_permissions(db, user_id)
         return AuthUserResponse(
             user_id=user.user_id,
             username=user.username,
             status=user.status.value,
+            role=primary_role,
+            permissions=permissions,
             created_at=user.created_at,
         )
 
@@ -342,6 +348,21 @@ class AuthService:
         await self._validate_role_ids(db, role_ids)
         await role_crud.assign_roles(db, user_id, role_ids)
         return role_ids
+
+    async def batch_get_user_roles(
+        self, db: AsyncSession, user_ids: list[str]
+    ) -> dict[str, tuple[list[str], list[str]]]:
+        """Batch query roles for multiple users using a single DB query.
+
+        Returns {user_id: (role_codes, role_names)}.
+        """
+        if not user_ids:
+            return {}
+        role_map = await role_crud.get_user_roles_batch(db, user_ids)
+        return {
+            uid: ([r.code for r in roles], [r.name for r in roles])
+            for uid, roles in role_map.items()
+        }
 
     async def delete_user(self, db: AsyncSession, user_id: str) -> None:
         """Physical delete: credentials, tokens, sessions, roles — full cleanup."""

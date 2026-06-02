@@ -31,14 +31,61 @@ from shared.security import IdentityContext
 router = APIRouter(tags=["schedules"])
 
 
+# ---- Enrichment helpers ----
+
+
+async def _enrich_schedule(
+    db, schedule, offering_map=None, course_map=None, classroom_map=None
+) -> ScheduleResponse:
+    """Enrich a schedule response with course/offering/classroom names."""
+    resp = ScheduleResponse.model_validate(schedule)
+    if offering_map is None:
+        offering_map = await course_management_service.batch_get_offerings(
+            db, {schedule.offering_id}
+        )
+    offering = offering_map.get(schedule.offering_id)
+    if offering:
+        resp.offering_term_code = offering.term_code
+        if course_map is None:
+            course_map = await course_management_service.batch_get_courses(
+                db, {offering.course_id}
+            )
+        course = course_map.get(offering.course_id)
+        if course:
+            resp.course_name = course.course_name
+    if classroom_map is None:
+        classroom_map = await course_management_service.batch_get_classrooms(
+            db, {schedule.classroom_id}
+        )
+    classroom = classroom_map.get(schedule.classroom_id)
+    if classroom:
+        resp.classroom_name = f"{classroom.building} {classroom.room_no}".strip()
+    return resp
+
+
+async def _enrich_teacher_assignment(
+    db, assignment, teacher_name_map=None
+) -> TeacherAssignmentResponse:
+    """Enrich a teacher assignment with teacher name."""
+    resp = TeacherAssignmentResponse.model_validate(assignment)
+    if teacher_name_map is None:
+        teacher_name_map = await course_management_service.batch_get_teacher_names(
+            db, {assignment.teacher_id},
+        )
+    resp.teacher_name = teacher_name_map.get(assignment.teacher_id, "")
+    return resp
+
+
 # ---- Schedule CRUD ----
 
 
-def _teacher_assignment_list_response(items) -> ListResponse[TeacherAssignmentResponse]:
+def _teacher_assignment_list_response(
+    items, teacher_name_map=None
+) -> ListResponse[TeacherAssignmentResponse]:
     """Wrap teacher assignments in the common paginated response shape."""
     return ListResponse(
         data=PaginatedData(
-            items=[TeacherAssignmentResponse.model_validate(item) for item in items],
+            items=items,
             pagination=PaginationMeta(total=len(items), page=1, page_size=len(items)),
         )
     )
@@ -75,9 +122,27 @@ async def list_schedules(
         limit=page_size,
         offering_id=offering_id,
     )
+    # Batch-fetch related data
+    offering_ids = {item.offering_id for item in items}
+    classroom_ids = {item.classroom_id for item in items}
+    offering_map = await course_management_service.batch_get_offerings(db, offering_ids)
+    course_ids = {o.course_id for o in offering_map.values()}
+    course_map = await course_management_service.batch_get_courses(db, course_ids)
+    classroom_map = await course_management_service.batch_get_classrooms(db, classroom_ids)
+    # Enrich
+    result = []
+    for item in items:
+        result.append(
+            await _enrich_schedule(
+                db, item,
+                offering_map=offering_map,
+                course_map=course_map,
+                classroom_map=classroom_map,
+            )
+        )
     return ListResponse(
         data=PaginatedData(
-            items=[ScheduleResponse.model_validate(item) for item in items],
+            items=result,
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
@@ -98,7 +163,7 @@ async def create_schedule(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=ScheduleResponse.model_validate(schedule))
+    return SingleResponse(data=await _enrich_schedule(db, schedule))
 
 
 @router.get("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
@@ -109,7 +174,7 @@ async def get_schedule(
 ) -> SingleResponse[ScheduleResponse]:
     """Get schedule detail."""
     schedule = await course_management_service.get_schedule(db, schedule_id)
-    return SingleResponse(data=ScheduleResponse.model_validate(schedule))
+    return SingleResponse(data=await _enrich_schedule(db, schedule))
 
 
 @router.put("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
@@ -130,7 +195,7 @@ async def update_schedule(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=ScheduleResponse.model_validate(schedule))
+    return SingleResponse(data=await _enrich_schedule(db, schedule))
 
 
 @router.patch("/{schedule_id}", response_model=SingleResponse[ScheduleResponse])
@@ -151,7 +216,7 @@ async def patch_schedule(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=ScheduleResponse.model_validate(schedule))
+    return SingleResponse(data=await _enrich_schedule(db, schedule))
 
 
 @router.delete("/{schedule_id}", response_model=APIResponse[None])
@@ -185,7 +250,15 @@ async def list_teachers(
 ) -> ListResponse[TeacherAssignmentResponse]:
     """List teachers assigned to a schedule."""
     items = await course_management_service.list_teachers_for_schedule(db, schedule_id)
-    return _teacher_assignment_list_response(items)
+    teacher_ids = {item.teacher_id for item in items}
+    teacher_name_map = await course_management_service.batch_get_teacher_names(
+        db, teacher_ids,
+    )
+    enriched = [
+        await _enrich_teacher_assignment(db, item, teacher_name_map=teacher_name_map)
+        for item in items
+    ]
+    return _teacher_assignment_list_response(enriched)
 
 
 @router.put("/{schedule_id}/teachers", response_model=ListResponse[TeacherAssignmentResponse])
@@ -207,7 +280,15 @@ async def replace_teachers(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return _teacher_assignment_list_response(items)
+    all_teacher_ids = {item.teacher_id for item in items}
+    teacher_name_map = await course_management_service.batch_get_teacher_names(
+        db, all_teacher_ids,
+    )
+    enriched = [
+        await _enrich_teacher_assignment(db, item, teacher_name_map=teacher_name_map)
+        for item in items
+    ]
+    return _teacher_assignment_list_response(enriched)
 
 
 @router.post("/{schedule_id}/teachers", response_model=ListResponse[TeacherAssignmentResponse])
@@ -229,7 +310,15 @@ async def add_teachers(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return _teacher_assignment_list_response(items)
+    all_teacher_ids = {item.teacher_id for item in items}
+    teacher_name_map = await course_management_service.batch_get_teacher_names(
+        db, all_teacher_ids,
+    )
+    enriched = [
+        await _enrich_teacher_assignment(db, item, teacher_name_map=teacher_name_map)
+        for item in items
+    ]
+    return _teacher_assignment_list_response(enriched)
 
 
 @router.put(
@@ -265,7 +354,7 @@ async def assign_teacher(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=TeacherAssignmentResponse.model_validate(assignment))
+    return SingleResponse(data=await _enrich_teacher_assignment(db, assignment))
 
 
 @router.delete("/{schedule_id}/teachers/{teacher_id}", response_model=APIResponse[None])

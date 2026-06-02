@@ -68,12 +68,37 @@ async def list_offerings(
         term_code=term_code,
         status=status,
     )
+    # Enrich with course info
+    course_ids = {item.course_id for item in items}
+    course_map = await course_management_service.batch_get_courses(db, course_ids)
+    result = [
+        await _enrich_offering(db, item, course_map=course_map)
+        for item in items
+    ]
     return ListResponse(
         data=PaginatedData(
-            items=[OfferingResponse.model_validate(item) for item in items],
+            items=result,
             pagination=PaginationMeta(total=total, page=page, page_size=page_size),
         )
     )
+
+
+async def _enrich_offering(
+    db, offering: CourseOffering, course_map: dict | None = None,
+) -> OfferingResponse:
+    """Enrich a single offering response with course info.
+
+    Accepts an optional pre-fetched *course_map* so list endpoints can
+    pass the result of a single batch query.
+    """
+    resp = OfferingResponse.model_validate(offering)
+    if course_map is None:
+        course_map = await course_management_service.batch_get_courses(db, {offering.course_id})
+    course = course_map.get(offering.course_id)
+    if course:
+        resp.course_code = course.course_code
+        resp.course_name = course.course_name
+    return resp
 
 
 @router.post("/", response_model=SingleResponse[OfferingResponse])
@@ -91,7 +116,7 @@ async def create_offering(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=OfferingResponse.model_validate(offering))
+    return SingleResponse(data=await _enrich_offering(db, offering))
 
 
 @router.get("/{offering_id}", response_model=SingleResponse[OfferingResponse])
@@ -102,7 +127,7 @@ async def get_offering(
 ) -> SingleResponse[OfferingResponse]:
     """Get offering detail."""
     offering = await course_management_service.get_offering(db, offering_id)
-    return SingleResponse(data=OfferingResponse.model_validate(offering))
+    return SingleResponse(data=await _enrich_offering(db, offering))
 
 
 @router.put("/{offering_id}", response_model=SingleResponse[OfferingResponse])
@@ -123,7 +148,7 @@ async def update_offering(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=OfferingResponse.model_validate(offering))
+    return SingleResponse(data=await _enrich_offering(db, offering))
 
 
 @router.patch("/{offering_id}", response_model=SingleResponse[OfferingResponse])
@@ -144,7 +169,7 @@ async def patch_offering(
     except AppError as exc:
         await audit.log_failure(str(exc.message))
         raise
-    return SingleResponse(data=OfferingResponse.model_validate(offering))
+    return SingleResponse(data=await _enrich_offering(db, offering))
 
 
 @router.delete("/{offering_id}", response_model=APIResponse[None])

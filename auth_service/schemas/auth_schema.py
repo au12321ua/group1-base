@@ -18,6 +18,7 @@ class LoginResponse(BaseModel):
     user_id: str
     username: str
     role: str
+    permissions: list[str] = Field(default_factory=list)
 
 
 class ServiceLoginRequest(BaseModel):
@@ -100,3 +101,17 @@ class InternalRoleSyncResponse(BaseModel):
     user_id: str
     role_ids: list[int]
     synced_at: datetime
+
+
+class InternalBatchRolesRequest(BaseModel):
+    user_ids: list[str] = Field(..., min_length=1)
+
+
+class InternalUserRoleItem(BaseModel):
+    user_id: str
+    role_codes: list[str]
+    role_names: list[str]
+
+
+class InternalBatchRolesResponse(BaseModel):
+    users: list[InternalUserRoleItem]

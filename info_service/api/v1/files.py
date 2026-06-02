@@ -11,6 +11,7 @@ from info_service.core.security import check_resource_access
 from info_service.crud.file_resource_crud import file_resource_crud
 from info_service.deps import require_permission
 from info_service.schemas.file_schema import FileResponse, FileUploadResponse
+from info_service.services.course_management_service import course_management_service
 from info_service.services.file_storage_service import file_storage_service
 from shared.exceptions import AppError, AuthorizationError, ResourceNotFoundError
 from shared.response import APIResponse
@@ -65,10 +66,19 @@ async def get_file_metadata(
         resource_owner_id=resource.owner_user_id,
     ):
         raise AuthorizationError("Access denied: not the file owner")
+    # Look up owner name
+    owner_name = None
+    if resource.owner_user_id:
+        name_map = await course_management_service.batch_get_user_names(
+            db, {resource.owner_user_id}
+        )
+        owner_name = name_map.get(resource.owner_user_id)
+
     return APIResponse(
         data=FileResponse(
             id=resource.id,
             owner_user_id=resource.owner_user_id,
+            owner_name=owner_name,
             file_name=resource.file_name,
             file_type=resource.file_type,
             file_size=resource.file_size,
