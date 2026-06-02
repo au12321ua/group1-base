@@ -8,10 +8,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from auth_service.api.deps import AuditDbSession, AuthDbSession
 from auth_service.deps import ServiceTokenPayload
 from auth_service.schemas.auth_schema import (
+    InternalBatchRolesRequest,
+    InternalBatchRolesResponse,
     InternalCreateUserRequest,
     InternalRoleSyncResponse,
     InternalSyncRolesRequest,
     InternalUserResponse,
+    InternalUserRoleItem,
     InternalVerifyRequest,
     InternalVerifyResponse,
 )
@@ -119,6 +122,21 @@ async def sync_user_roles(
         synced_at=datetime.now(UTC),
     )
     return APIResponse(data=data)
+
+
+@router.post("/users/roles/batch", response_model=APIResponse[InternalBatchRolesResponse])
+async def batch_get_user_roles(
+    request: InternalBatchRolesRequest,
+    db: AuthDbSession,
+    _service_auth: ServiceTokenPayload,
+) -> APIResponse[InternalBatchRolesResponse]:
+    """Batch query roles for multiple users (called by Info Service)."""
+    role_map = await auth_service.batch_get_user_roles(db, request.user_ids)
+    users = [
+        InternalUserRoleItem(user_id=uid, role_codes=codes, role_names=names)
+        for uid, (codes, names) in role_map.items()
+    ]
+    return APIResponse(data=InternalBatchRolesResponse(users=users))
 
 
 @router.delete("/users/{user_id}", status_code=204)

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class FileResponse(BaseModel):
     id: int
     owner_user_id: str
+    owner_name: str | None = None
     file_name: str
     file_type: str
     file_size: int

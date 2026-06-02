@@ -37,6 +37,31 @@ class RecycleBinService:
             logger.exception("Failed to enable user %s in Auth", user_id)
             raise
 
+    async def _batch_fetch_roles_from_auth(
+        self, user_ids: list[int]
+    ) -> dict[int, list[str]]:
+        """POST /internal/users/roles/batch — get role_names for multiple users."""
+        if not user_ids:
+            return {}
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._settings.auth_service_timeout
+            ) as client:
+                resp = await client.post(
+                    self._auth_url("/users/roles/batch"),
+                    json={"user_ids": [str(uid) for uid in user_ids]},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    users = data.get("data", {}).get("users", [])
+                    return {
+                        int(u["user_id"]): u.get("role_names", [])
+                        for u in users
+                    }
+        except Exception:
+            logger.exception("Failed to batch fetch roles from Auth")
+        return {}
+
     async def _call_auth_delete(self, user_id: int) -> None:
         """DELETE /internal/users/{id}. Raises on failure."""
         try:
@@ -74,16 +99,24 @@ class RecycleBinService:
             only_deleted=True,
         )
 
-        # Enrich with full_name from profile
+        # Batch-fetch profiles (fix N+1)
+        user_info_ids = [u.id for u in items]
+        profile_map = await user_profile_crud.get_by_user_ids(db, user_info_ids)
+
+        # Batch-fetch roles from Auth
+        role_map = await self._batch_fetch_roles_from_auth(user_info_ids)
+
         result = []
         for u in items:
-            profile = await user_profile_crud.get_by_user_id(db, u.id)
+            profile = profile_map.get(u.id)
             full_name = profile.full_name if profile else ""
             result.append({
                 "id": u.id,
                 "user_no": u.user_no,
                 "username": u.username,
                 "full_name": full_name,
+                "role_ids": "",
+                "role_names": role_map.get(u.id, []),
                 "is_deleted": u.is_deleted,
                 "deleted_at": u.deleted_at,
             })

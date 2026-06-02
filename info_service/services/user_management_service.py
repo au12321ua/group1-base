@@ -72,6 +72,33 @@ class UserManagementService:
             logger.exception("Failed to sync disable user %s to Auth", user_id)
             raise
 
+    async def _batch_fetch_roles_from_auth(
+        self, user_ids: list[int]
+    ) -> dict[int, list[str]]:
+        """POST /internal/users/roles/batch — get role_names for multiple users.
+
+        Returns {user_id: [role_name, ...]} mapping.
+        """
+        if not user_ids:
+            return {}
+        settings = self._settings
+        try:
+            async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
+                resp = await client.post(
+                    self._auth_url("/users/roles/batch"),
+                    json={"user_ids": [str(uid) for uid in user_ids]},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    users = data.get("data", {}).get("users", [])
+                    return {
+                        int(u["user_id"]): u.get("role_names", [])
+                        for u in users
+                    }
+        except Exception:
+            logger.exception("Failed to batch fetch roles from Auth")
+        return {}
+
     async def _sync_enable_to_auth(self, user_id: int) -> None:
         """POST /internal/users/{id}/enable. Raises on failure."""
         settings = self._settings
@@ -91,16 +118,16 @@ class UserManagementService:
     # ------------------------------------------------------------------
 
     async def _build_response(
-        self, db: AsyncSession, user: UserInfo
+        self, db: AsyncSession, user: UserInfo,
+        role_names: list[str] | None = None,
+        profile: UserProfile | None = None,
     ) -> UserResponse:
         """Assemble UserResponse from UserInfo + UserProfile.
 
-        Role information is not stored in Info Service — it comes from
-        Auth Service via the Gateway (X-User-Role header). The response
-        sets role_ids to an empty string; the frontend should obtain
-        role information from the Auth Service or the current session.
+        Role information is fetched from Auth Service via batch endpoint.
         """
-        profile = await user_profile_crud.get_by_user_id(db, user.id)
+        if profile is None:
+            profile = await user_profile_crud.get_by_user_id(db, user.id)
         profile_schema = None
         if profile:
             profile_schema = UserProfileSchema(
@@ -115,6 +142,7 @@ class UserManagementService:
             id=user.id,
             user_no=user.user_no,
             username=user.username,
+            role_names=role_names or [],
             is_deleted=user.is_deleted,
             profile=profile_schema,
             created_at=user.created_at,
@@ -213,7 +241,19 @@ class UserManagementService:
             sort_order=sort_order,
         )
 
-        items = [await self._build_response(db, u) for u in users]
+        # Batch-fetch profiles and roles
+        user_info_ids = [u.id for u in users]
+        profile_map = await user_profile_crud.get_by_user_ids(db, user_info_ids)
+        role_map = await self._batch_fetch_roles_from_auth(user_info_ids)
+
+        items = [
+            await self._build_response(
+                db, u,
+                role_names=role_map.get(u.id, []),
+                profile=profile_map.get(u.id),
+            )
+            for u in users
+        ]
         return items, total
 
     async def update_user(

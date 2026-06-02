@@ -20,6 +20,7 @@ class UserResponse(BaseModel):
     user_no: str
     username: str
     role_ids: str = ""
+    role_names: list[str] = Field(default_factory=list)
     is_deleted: bool = False
     profile: UserProfileSchema | None = None
     created_at: datetime | None = None

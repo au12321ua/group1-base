@@ -18,6 +18,17 @@ class UserProfileCRUD:
         )
         return result.first()
 
+    async def get_by_user_ids(
+        self, db: AsyncSession, user_ids: list[int]
+    ) -> dict[int, UserProfile]:
+        """Batch get profiles by user_ids, returning {user_id: UserProfile} map."""
+        if not user_ids:
+            return {}
+        result = await db.exec(
+            select(UserProfile).where(UserProfile.user_id.in_(user_ids))
+        )
+        return {p.user_id: p for p in result.all()}
+
     async def create(self, db: AsyncSession, profile: UserProfile) -> UserProfile:
         """Create a new user profile."""
         db.add(profile)

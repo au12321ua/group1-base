@@ -193,6 +193,41 @@ class CourseManagementService:
             for user_no, info_id in user_no_to_info_id.items()
         }
 
+    async def batch_get_user_names(
+        self, db: AsyncSession, user_nos: set[str]
+    ) -> dict[str, str]:
+        """Batch-fetch user display names by user_no strings.
+
+        Returns {user_no: full_name} map. Falls back to username if no profile.
+        """
+        if not user_nos:
+            return {}
+        stmt = select(UserInfo.id, UserInfo.user_no, UserInfo.username).where(
+            UserInfo.user_no.in_(user_nos)
+        )
+        result = await db.exec(stmt)
+        user_info_rows = list(result.all())
+        if not user_info_rows:
+            return {}
+        info_id_to_no = {}
+        info_id_to_username = {}
+        info_ids = []
+        for row in user_info_rows:
+            info_id_to_no[row[0]] = row[1]
+            info_id_to_username[row[0]] = row[2]
+            info_ids.append(row[0])
+        stmt2 = select(UserProfile.user_id, UserProfile.full_name).where(
+            UserProfile.user_id.in_(info_ids)
+        )
+        result2 = await db.exec(stmt2)
+        info_id_to_name = {row[0]: row[1] for row in result2.all()}
+        return {
+            info_id_to_no[info_id]: info_id_to_name.get(
+                info_id, info_id_to_username.get(info_id, "")
+            )
+            for info_id in info_ids
+        }
+
     # ---- Courses ----
 
     async def create_course(
