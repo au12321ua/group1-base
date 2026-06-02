@@ -173,23 +173,38 @@ class AuthService:
     async def service_login(
         self, db: AsyncSession, client_id: str, client_secret: str
     ) -> ServiceLoginResponse:
-        """Authenticate a service client and issue a Service Token."""
+        """Authenticate a service client and issue a Service Token.
+
+        Looks up the client entry from SERVICE_CLIENT_<NAME>_* env vars.
+        Uses constant-time comparison to prevent timing attacks.
+        """
         settings = get_auth_settings()
-        id_ok = hmac.compare_digest(
-            client_id.encode("utf-8"),
-            settings.service_client_id.encode("utf-8"),
-        )
+        configs = settings.service_client_configs
+
+        # 查找匹配 client_id 的客户端条目（常量时间比较防时序攻击）
+        client_entry: dict[str, str] | None = None
+        for cfg in configs.values():
+            if hmac.compare_digest(
+                client_id.encode("utf-8"),
+                cfg["id"].encode("utf-8"),
+            ):
+                client_entry = cfg
+                break
+
+        if client_entry is None:
+            raise ServiceCredentialInvalidError()
+
         secret_ok = hmac.compare_digest(
             client_secret.encode("utf-8"),
-            settings.service_client_secret.encode("utf-8"),
+            client_entry["secret"].encode("utf-8"),
         )
-        if not (id_ok and secret_ok):
+        if not secret_ok:
             raise ServiceCredentialInvalidError()
 
         token = create_service_token(
             client_id=client_id,
-            scope=settings.service_token_scope,
-            audience=settings.service_token_audience,
+            scope=client_entry["scope"],
+            audience=client_entry["audience"],
         )
         payload = verify_token(token)
         await token_crud.create(

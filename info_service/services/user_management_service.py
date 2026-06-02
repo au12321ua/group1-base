@@ -4,7 +4,6 @@ import csv
 import io
 import logging
 
-import httpx
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from info_service.core.config import get_info_settings
@@ -36,53 +35,49 @@ class UserManagementService:
     # Auth Service HTTP helpers
     # ------------------------------------------------------------------
 
-    def _auth_url(self, path: str) -> str:
-        return f"{self._settings.auth_service_url}/api/v1/internal{path}"
+    @staticmethod
+    def _get_client():
+        from info_service.services.auth_http_client import get_auth_service_client
+        return get_auth_service_client()
 
     async def _sync_create_to_auth(
         self, user_id: int, username: str, role_ids: list[int]
     ) -> bool:
         """POST /internal/users — create auth user. Returns True on success."""
-        settings = self._settings
         try:
-            async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
-                resp = await client.post(
-                    self._auth_url("/users"),
-                    json={
-                        "user_id": str(user_id),
-                        "username": username,
-                        "role_ids": role_ids,
-                    },
-                )
-                return resp.status_code == 201
+            resp = await self._get_client().post_internal(
+                "/users",
+                json={
+                    "user_id": str(user_id),
+                    "username": username,
+                    "role_ids": role_ids,
+                },
+            )
+            return resp.status_code == 201
         except Exception:
             logger.exception("Failed to sync create user %s to Auth", user_id)
             return False
 
     async def _sync_disable_to_auth(self, user_id: int) -> None:
         """POST /internal/users/{id}/disable. Raises on failure for compensation."""
-        settings = self._settings
         try:
-            async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
-                resp = await client.post(
-                    self._auth_url(f"/users/{user_id}/disable")
-                )
-                if resp.status_code != 200:
-                    raise RuntimeError(f"Auth disable returned {resp.status_code}")
+            resp = await self._get_client().post_internal(
+                f"/users/{user_id}/disable"
+            )
+            if resp.status_code != 200:
+                raise RuntimeError(f"Auth disable returned {resp.status_code}")
         except Exception:
             logger.exception("Failed to sync disable user %s to Auth", user_id)
             raise
 
     async def _sync_enable_to_auth(self, user_id: int) -> None:
         """POST /internal/users/{id}/enable. Raises on failure."""
-        settings = self._settings
         try:
-            async with httpx.AsyncClient(timeout=settings.auth_service_timeout) as client:
-                resp = await client.post(
-                    self._auth_url(f"/users/{user_id}/enable")
-                )
-                if resp.status_code != 200:
-                    raise RuntimeError(f"Auth enable returned {resp.status_code}")
+            resp = await self._get_client().post_internal(
+                f"/users/{user_id}/enable"
+            )
+            if resp.status_code != 200:
+                raise RuntimeError(f"Auth enable returned {resp.status_code}")
         except Exception:
             logger.exception("Failed to sync enable user %s to Auth", user_id)
             raise

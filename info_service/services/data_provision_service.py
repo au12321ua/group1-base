@@ -3,7 +3,6 @@
 import re
 from datetime import UTC, datetime
 
-import httpx
 from sqlmodel import func, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -16,11 +15,9 @@ from info_service.models.user_profile import UserProfile
 from info_service.schemas.data_provision_schema import (
     AcademicCalendarDataResponse,
     CandidateStudentResponse,
-    SelectedStudentsResponse,
     TeacherDataResponse,
     TrainingProgramDataResponse,
 )
-from shared.exceptions import ExternalServiceError
 
 
 class DataProvisionService:
@@ -51,13 +48,6 @@ class DataProvisionService:
     def _infer_grade(user_no: str) -> str:
         match = re.match(r"^(\d{4})", user_no)
         return match.group(1) if match else ""
-
-    def _selected_students_url(self) -> str:
-        base_url = self._settings.course_selection_service_url.rstrip("/")
-        path = self._settings.course_selection_selected_students_path
-        if not path.startswith("/"):
-            path = f"/{path}"
-        return f"{base_url}{path}"
 
     @staticmethod
     def _ensure_utc(value: datetime | str) -> datetime:
@@ -286,49 +276,6 @@ class DataProvisionService:
             return versions[0]
         return "multiple" if versions else "1.0"
 
-    async def query_selected_students(self, _db: AsyncSession, **filters) -> dict:
-        """Proxy to C system for selected students query. Not stored locally."""
-        params = {
-            key: value
-            for key, value in filters.items()
-            if value is not None
-        }
-        try:
-            async with httpx.AsyncClient(
-                timeout=self._settings.course_selection_service_timeout
-            ) as client:
-                response = await client.get(self._selected_students_url(), params=params)
-                response.raise_for_status()
-                payload = response.json()
-        except httpx.HTTPStatusError as exc:
-            raise ExternalServiceError(
-                f"Course selection service returned {exc.response.status_code}"
-            ) from exc
-        except httpx.HTTPError as exc:
-            raise ExternalServiceError("Course selection service is unavailable") from exc
-        except ValueError as exc:
-            raise ExternalServiceError("Course selection service returned invalid JSON") from exc
-
-        data = payload.get("data", payload) if isinstance(payload, dict) else {}
-        if not isinstance(data, dict):
-            raise ExternalServiceError("Course selection service returned invalid payload")
-
-        selected_students = SelectedStudentsResponse(
-            items=data.get("items", []),
-            pagination=data.get("pagination")
-            or {
-                "total": len(data.get("items", [])),
-                "page": filters.get("page", 1),
-                "page_size": filters.get("page_size", len(data.get("items", []))),
-            },
-            snapshot_time=self._ensure_utc(
-                data.get("snapshot_time")
-                or data.get("snapshotTime")
-                or datetime.now(UTC)
-            ),
-            version=data.get("version", "1.0"),
-        )
-        return selected_students.model_dump()
 
 
 data_provision_service = DataProvisionService()

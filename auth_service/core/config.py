@@ -1,21 +1,16 @@
 """Auth Service configuration via Pydantic Settings."""
 
+import os
+import re
 from functools import lru_cache
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
+
+from shared.config import SharedSettings
 
 
-class AuthSettings(BaseSettings):
+class AuthSettings(SharedSettings):
     """Auth Service settings loaded from environment/.env file."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # Environment
-    env: str = "development"
 
     # Database
     auth_database_url: str = "sqlite+aiosqlite:///./data/auth.db"
@@ -36,25 +31,42 @@ class AuthSettings(BaseSettings):
     # Password hashing
     bcrypt_cost_factor: int = 12
 
-    # CORS
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
-
-    # Logging
-    log_level: str = "DEBUG"
-    log_output: str = "console"
-    log_dir: str = "./logs"
-    log_rotation: str = "daily"
-    log_retention: int = 30
-
     # Internal user provisioning (Info Service → POST /internal/users)
     default_initial_password: str = "ChangeMe123"
 
-    # Service-to-service login (/auth/sys/login)
-    service_client_id: str = "info_service"
-    service_client_secret: str = "change-me-service-secret"
-    service_token_scope: str = "user:read course:read calendar:read"
-    service_token_audience: str = "info_service"
+    # JWKS key identifier
     jwt_key_id: str = "auth-hs256-key-1"
+
+    # Service-to-service login (/auth/sys/login) — multi-client via env prefix
+    # Pattern: SERVICE_CLIENT_<NAME>_ID|SECRET|SCOPE|AUDIENCE
+    service_client_configs: dict[str, dict[str, str]] = {}
+
+    _SERVICE_CLIENT_RE = re.compile(
+        r"^SERVICE_CLIENT_(.+?)_(ID|SECRET|SCOPE|AUDIENCE)$"
+    )
+
+    @model_validator(mode="after")
+    def _populate_service_clients(self) -> "AuthSettings":
+        """Scan os.environ for SERVICE_CLIENT_* prefix vars and build config dict."""
+        clients: dict[str, dict[str, str]] = {}
+        for key, value in os.environ.items():
+            m = self._SERVICE_CLIENT_RE.match(key)
+            if m:
+                name = m.group(1).lower()
+                field = m.group(2).lower()
+                clients.setdefault(name, {})[field] = value
+
+        # Validate each client has all 4 required fields
+        for name, cfg in clients.items():
+            missing = [f for f in ("id", "secret", "scope", "audience") if f not in cfg]
+            if missing:
+                raise ValueError(
+                    f"Service client '{name}' is missing required fields: "
+                    f"{', '.join(f'SERVICE_CLIENT_{name.upper()}_{f.upper()}' for f in missing)}"
+                )
+
+        self.service_client_configs = clients
+        return self
 
 
 @lru_cache

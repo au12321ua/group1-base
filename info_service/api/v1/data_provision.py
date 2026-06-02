@@ -130,23 +130,3 @@ async def list_training_programs(
             version=resolved_version,
         )
     )
-
-
-@router.get("/selected-students", response_model=APIResponse[DataProvisionWrapper])
-async def query_selected_students(
-    db: InfoDbSession,
-    current_user: Annotated[IdentityContext, Depends(require_permission("data-provision:read"))],
-    course_id: int | None = Query(default=None),
-    term_code: str | None = Query(default=None),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=100, ge=1, le=500),
-) -> APIResponse[DataProvisionWrapper]:
-    """Proxy query selected students from C system (for B 排课 system)."""
-    data = await data_provision_service.query_selected_students(
-        db,
-        course_id=course_id,
-        term_code=term_code,
-        page=page,
-        page_size=page_size,
-    )
-    return APIResponse(data=DataProvisionWrapper(**data))
