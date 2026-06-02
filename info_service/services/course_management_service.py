@@ -24,6 +24,11 @@ from info_service.models.teacher_assignment import TeacherCourseAssignment
 from info_service.models.training_program import TrainingProgram
 from info_service.models.user import UserInfo
 from info_service.models.user_profile import UserProfile
+from info_service.schemas.classroom_schema import (
+    ClassroomCreateRequest,
+    ClassroomPatchRequest,
+    ClassroomUpdateRequest,
+)
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
     CoursePatchRequest,
@@ -518,6 +523,59 @@ class CourseManagementService:
                 "TeacherAssignment",
                 f"schedule={schedule_id}, teacher={normalized_teacher_id}",
             )
+
+    # ---- Classrooms ----
+
+    async def create_classroom(
+        self, db: AsyncSession, data: ClassroomCreateRequest
+    ) -> Classroom:
+        """Create a classroom."""
+        existing = await classroom_crud.get_by_room_no(db, data.room_no)
+        if existing:
+            raise BusinessRuleError(f"Classroom with room_no {data.room_no} already exists")
+        classroom = Classroom(**data.model_dump())
+        return await classroom_crud.create(db, classroom)
+
+    async def update_classroom(
+        self,
+        db: AsyncSession,
+        classroom_id: int,
+        data: ClassroomUpdateRequest | ClassroomPatchRequest,
+    ) -> Classroom:
+        """Update a classroom."""
+        classroom = await self._ensure_classroom_exists(db, classroom_id)
+        if isinstance(data, ClassroomUpdateRequest):
+            payload = data.model_dump(exclude_unset=False)
+        else:
+            payload = data.model_dump(exclude_unset=True)
+        room_no = payload.get("room_no")
+        if room_no and room_no != classroom.room_no:
+            existing = await classroom_crud.get_by_room_no(db, room_no)
+            if existing:
+                raise BusinessRuleError(f"Classroom with room_no {room_no} already exists")
+        return await classroom_crud.update(db, classroom, **payload)
+
+    async def patch_classroom(
+        self, db: AsyncSession, classroom_id: int, data: ClassroomPatchRequest
+    ) -> Classroom:
+        """Partial update a classroom."""
+        return await self.update_classroom(db, classroom_id, data)
+
+    async def delete_classroom(self, db: AsyncSession, classroom_id: int) -> None:
+        """Delete a classroom."""
+        deleted = await classroom_crud.delete(db, classroom_id)
+        if not deleted:
+            raise ResourceNotFoundError("Classroom", str(classroom_id))
+
+    async def list_classrooms(
+        self, db: AsyncSession, **filters
+    ) -> tuple[list[Classroom], int]:
+        """List classrooms with filters."""
+        return await classroom_crud.get_multi(db, **filters)
+
+    async def get_classroom(self, db: AsyncSession, classroom_id: int) -> Classroom:
+        """Get classroom detail."""
+        return await self._ensure_classroom_exists(db, classroom_id)
 
     # ---- Calendars ----
 

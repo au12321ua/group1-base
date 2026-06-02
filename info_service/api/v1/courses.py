@@ -6,15 +6,18 @@ from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.audit import AuditContext
+from info_service.crud.course_crud import course_crud
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.course_schema import (
     CourseCreateRequest,
     CoursePatchRequest,
+    CoursePrerequisiteCreateRequest,
+    CoursePrerequisiteResponse,
     CourseResponse,
     CourseUpdateRequest,
 )
 from info_service.services.course_management_service import course_management_service
-from shared.exceptions import AppError
+from shared.exceptions import AppError, BusinessRuleError
 from shared.response import (
     APIResponse,
     ListResponse,
@@ -137,6 +140,112 @@ async def delete_course(
                          target_id=str(course_id), action="course_deleted")
     try:
         await course_management_service.delete_course(db, course_id)
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
+    return APIResponse(data=None)
+
+
+# ---- Prerequisites (sub-resource of courses) ----
+
+
+async def _enrich_prerequisite(db, prereq) -> CoursePrerequisiteResponse:
+    """Enrich a prerequisite with course code/name."""
+    resp = CoursePrerequisiteResponse.model_validate(prereq)
+    course_map = await course_management_service.batch_get_courses(
+        db, {prereq.prerequisite_course_id}
+    )
+    course = course_map.get(prereq.prerequisite_course_id)
+    if course:
+        resp.prerequisite_course_code = course.course_code
+        resp.prerequisite_course_name = course.course_name
+    return resp
+
+
+@router.get("/{course_id}/prerequisites", response_model=ListResponse[CoursePrerequisiteResponse])
+async def list_prerequisites(
+    db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:read"))],
+    course_id: int,
+) -> ListResponse[CoursePrerequisiteResponse]:
+    """List prerequisites for a course."""
+    await course_management_service.get_course(db, course_id)  # ensure exists
+    items = await course_crud.list_prerequisites(db, course_id)
+    course_ids = {p.prerequisite_course_id for p in items}
+    course_map = await course_management_service.batch_get_courses(db, course_ids)
+    result = []
+    for p in items:
+        resp = CoursePrerequisiteResponse.model_validate(p)
+        course = course_map.get(p.prerequisite_course_id)
+        if course:
+            resp.prerequisite_course_code = course.course_code
+            resp.prerequisite_course_name = course.course_name
+        result.append(resp)
+    return ListResponse(
+        data=PaginatedData(
+            items=result,
+            pagination=PaginationMeta(total=len(result), page=1, page_size=len(result)),
+        )
+    )
+
+
+@router.post(
+    "/{course_id}/prerequisites",
+    response_model=SingleResponse[CoursePrerequisiteResponse],
+)
+async def add_prerequisite(
+    db: InfoDbSession,
+    audit_db: AuditDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:update"))],
+    course_id: int,
+    request: CoursePrerequisiteCreateRequest,
+    _admin: None = Depends(require_admin),
+) -> SingleResponse[CoursePrerequisiteResponse]:
+    """Add a prerequisite to a course (admin only)."""
+    audit = AuditContext(audit_db, current_user, "course",
+                         target_id=str(course_id),
+                         action="prerequisite_added",
+                         reason=f"prereq_id={request.prerequisite_course_id}")
+    try:
+        prereq = await course_crud.add_prerequisite(
+            db,
+            course_id=course_id,
+            prerequisite_course_id=request.prerequisite_course_id,
+            min_grade=request.min_grade,
+        )
+        await audit.log_success()
+    except AppError as exc:
+        await audit.log_failure(str(exc.message))
+        raise
+    return SingleResponse(data=await _enrich_prerequisite(db, prereq))
+
+
+@router.delete(
+    "/{course_id}/prerequisites/{prerequisite_course_id}",
+    response_model=APIResponse[None],
+)
+async def remove_prerequisite(
+    db: InfoDbSession,
+    audit_db: AuditDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("course:delete"))],
+    course_id: int,
+    prerequisite_course_id: int,
+    _admin: None = Depends(require_admin),
+) -> APIResponse[None]:
+    """Remove a prerequisite from a course (admin only)."""
+    audit = AuditContext(audit_db, current_user, "course",
+                         target_id=str(course_id),
+                         action="prerequisite_removed",
+                         reason=f"prereq_id={prerequisite_course_id}")
+    try:
+        removed = await course_crud.remove_prerequisite(
+            db,
+            course_id=course_id,
+            prerequisite_course_id=prerequisite_course_id,
+        )
+        if not removed:
+            raise BusinessRuleError("Prerequisite relation not found")
         await audit.log_success()
     except AppError as exc:
         await audit.log_failure(str(exc.message))
