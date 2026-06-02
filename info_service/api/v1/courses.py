@@ -159,7 +159,7 @@ async def list_prerequisites(
     """List prerequisites for a course."""
     items = await course_crud.list_prerequisites(db, course_id)
     course_ids = {p.prerequisite_course_id for p in items}
-    course_map = await course_crud.batch_get_by_ids(db, course_ids)
+    course_map = await course_management_service.batch_get_courses(db, course_ids)
     result = []
     for p in items:
         resp = CoursePrerequisiteResponse.model_validate(p)
@@ -205,7 +205,9 @@ async def add_prerequisite(
         await audit.log_failure(str(exc.message))
         raise
     # Enrich with prerequisite course code/name
-    course_map = await course_crud.batch_get_by_ids(db, {prereq.prerequisite_course_id})
+    course_map = await course_management_service.batch_get_courses(
+        db, {prereq.prerequisite_course_id}
+    )
     resp = CoursePrerequisiteResponse.model_validate(prereq)
     course = course_map.get(prereq.prerequisite_course_id)
     if course:

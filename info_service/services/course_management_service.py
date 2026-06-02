@@ -14,6 +14,7 @@ from info_service.crud.offering_crud import offering_crud
 from info_service.crud.schedule_crud import schedule_crud
 from info_service.crud.teacher_assignment_crud import teacher_assignment_crud
 from info_service.crud.training_program_crud import training_program_crud
+from info_service.crud.user_profile_crud import user_profile_crud
 from info_service.models.academic_calendar import AcademicCalendar
 from info_service.models.base_info_item import BaseInfoItem
 from info_service.models.classroom import Classroom
@@ -132,6 +133,44 @@ class CourseManagementService:
         if exclude_id is not None and existing.id == exclude_id:
             return
         raise BusinessRuleError(f"Training program code already exists: {program_code}")
+
+    # ------------------------------------------------------------------
+    # Batch enrichment helpers (thin wrappers delegating to CRUD)
+    # ------------------------------------------------------------------
+
+    async def batch_get_courses(
+        self, db: AsyncSession, course_ids: set[int]
+    ) -> dict[int, Course]:
+        """Batch-fetch courses by IDs — delegates to course_crud."""
+        return await course_crud.batch_get_by_ids(db, course_ids)
+
+    async def batch_get_offerings(
+        self, db: AsyncSession, offering_ids: set[int]
+    ) -> dict[int, CourseOffering]:
+        """Batch-fetch offerings by IDs — delegates to offering_crud."""
+        return await offering_crud.batch_get_by_ids(db, offering_ids)
+
+    async def batch_get_classrooms(
+        self, db: AsyncSession, classroom_ids: set[int]
+    ) -> dict[int, Classroom]:
+        """Batch-fetch classrooms by IDs — delegates to classroom_crud."""
+        return await classroom_crud.batch_get_by_ids(db, classroom_ids)
+
+    async def batch_get_teacher_names(
+        self, db: AsyncSession, teacher_ids: set[str]
+    ) -> dict[str, str]:
+        """Batch-fetch teacher display names — delegates to user_profile_crud."""
+        return await user_profile_crud.batch_get_display_names(
+            db, teacher_ids, fallback_to_username=False,
+        )
+
+    async def batch_get_user_names(
+        self, db: AsyncSession, user_nos: set[str]
+    ) -> dict[str, str]:
+        """Batch-fetch user display names — delegates to user_profile_crud."""
+        return await user_profile_crud.batch_get_display_names(
+            db, user_nos, fallback_to_username=True,
+        )
 
     # ---- Courses ----
 

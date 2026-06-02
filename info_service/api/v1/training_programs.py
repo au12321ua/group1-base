@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import AuditDbSession, InfoDbSession
 from info_service.core.audit import AuditContext
-from info_service.crud.course_crud import course_crud
 from info_service.crud.training_program_crud import training_program_crud
 from info_service.deps import require_admin, require_permission
 from info_service.schemas.training_program_schema import (
@@ -47,7 +46,7 @@ async def _build_program_response(
     # Build enriched course list
     if course_ids:
         if course_map is None:
-            course_map = await course_crud.batch_get_by_ids(db, set(course_ids))
+            course_map = await course_management_service.batch_get_courses(db, set(course_ids))
 
         resp.required_courses = [
             CourseBrief(id=cid, course_code=c.course_code, course_name=c.course_name)
@@ -78,7 +77,7 @@ async def list_training_programs(
     all_course_ids: set[int] = set()
     for cids in course_id_map.values():
         all_course_ids.update(cids)
-    course_map = await course_crud.batch_get_by_ids(db, all_course_ids)
+    course_map = await course_management_service.batch_get_courses(db, all_course_ids)
     return ListResponse(
         data=PaginatedData(
             items=[
@@ -134,7 +133,7 @@ async def get_by_major(
     all_course_ids: set[int] = set()
     for cids in course_id_map.values():
         all_course_ids.update(cids)
-    course_map = await course_crud.batch_get_by_ids(db, all_course_ids)
+    course_map = await course_management_service.batch_get_courses(db, all_course_ids)
     return ListResponse(
         data=PaginatedData(
             items=[
