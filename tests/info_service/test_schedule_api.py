@@ -257,6 +257,81 @@ class TestScheduleAPI:
         )
         assert resp.status_code == 422
 
+    async def test_update_schedule_rejects_conflict_after_identity_change(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """调整排课时间后若与现有排课冲突，应返回 409。"""
+        classroom_id = await create_classroom(room_no="B-206")
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS826",
+            course_name="Conflict Retargeting",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="05",
+            capacity=45,
+        )
+
+        first_schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=2,
+            start_period=3,
+            end_period=4,
+        )
+        second_schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=2,
+            start_period=7,
+            end_period=8,
+        )
+        assert first_schedule_id != second_schedule_id
+
+        resp = await async_client_info.patch(
+            f"/api/v1/info/schedules/{second_schedule_id}",
+            json={"start_period": 4, "end_period": 5},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 409
+
+    async def test_remove_teacher_returns_404_when_assignment_missing(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """删除不存在的教师分配应返回 404。"""
+        classroom_id = await create_classroom(room_no="B-207")
+        course_id = await create_course(
+            async_client_info,
+            course_code="CS827",
+            course_name="Teacher Removal Edge",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="06",
+            capacity=30,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=1,
+            start_period=1,
+            end_period=2,
+        )
+
+        resp = await async_client_info.delete(
+            f"/api/v1/info/schedules/{schedule_id}/teachers/t-missing",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 404
+
 
 @pytest.mark.integration
 class TestScheduleResourceAccess:

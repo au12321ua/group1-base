@@ -160,7 +160,7 @@ jobs:
         run: mkdir -p data logs "$UPLOAD_DIR"
 
       - name: Run coverage
-        run: uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=75
+        run: uv run pytest --cov=auth_service --cov=info_service --cov=shared --cov-report=term-missing --cov-fail-under=80
 
   publish:
     name: Publish Docker Images
