@@ -2,12 +2,14 @@
 
 import os
 
+import httpx
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from shared.database import create_tables
 from shared.models.audit_log import AUDIT_TABLE_NAMES
+from tests.utils import create_test_service_token
 
 # ---------------------------------------------------------------------------
 # Test env defaults
@@ -188,3 +190,44 @@ async def async_client_info():
     transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+class _AuthServiceBridgeClient:
+    """Bridge Info-side internal HTTP calls to the local Auth ASGI app."""
+
+    def __init__(self, app) -> None:
+        self._transport = httpx.ASGITransport(app=app)  # type: ignore[arg-type]
+        self._headers = {
+            "Authorization": f"Bearer {create_test_service_token()}",
+        }
+
+    async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
+        headers = {**self._headers, **kwargs.pop("headers", {})}
+        async with httpx.AsyncClient(
+            transport=self._transport,
+            base_url="http://auth-bridge",
+        ) as client:
+            return await client.request(
+                method,
+                f"/api/v1/internal{path}",
+                headers=headers,
+                **kwargs,
+            )
+
+    async def post_internal(self, path: str, **kwargs) -> httpx.Response:
+        return await self._request("POST", path, **kwargs)
+
+    async def delete_internal(self, path: str, **kwargs) -> httpx.Response:
+        return await self._request("DELETE", path, **kwargs)
+
+
+@pytest.fixture
+async def auth_service_bridge(async_client_auth, monkeypatch: pytest.MonkeyPatch):
+    """Patch Info Service cross-service client calls to use the local Auth app."""
+    from auth_service.main import app as auth_app
+    from info_service.services import auth_client, auth_http_client
+
+    bridge = _AuthServiceBridgeClient(auth_app)
+    monkeypatch.setattr(auth_http_client, "get_auth_service_client", lambda: bridge)
+    monkeypatch.setattr(auth_client, "get_auth_service_client", lambda: bridge)
+    yield bridge
