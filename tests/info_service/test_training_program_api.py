@@ -8,7 +8,7 @@ from tests.utils import build_identity_headers
 
 @pytest.mark.integration
 class TestTrainingProgramAPI:
-    """验证 /api/v1/training-programs 的 CRUD 及数据校验行为。"""
+    """验证 /api/v1/info/training-programs 的 CRUD 及数据校验行为。"""
 
     async def test_training_program_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、更新和删除培养方案。"""
@@ -20,7 +20,7 @@ class TestTrainingProgramAPI:
         )
 
         create_resp = await async_client_info.post(
-            "/api/v1/training-programs/",
+            "/api/v1/info/training-programs/",
             json={
                 "program_code": "CS-AI-2026",
                 "major_code": "CS",
@@ -37,13 +37,13 @@ class TestTrainingProgramAPI:
         program_id = created["id"]
 
         list_resp = await async_client_info.get(
-            "/api/v1/training-programs/", headers=auth_headers
+            "/api/v1/info/training-programs/", headers=auth_headers
         )
         assert list_resp.status_code == 200
         assert list_resp.json()["data"]["pagination"]["total"] == 1
 
         by_major_resp = await async_client_info.get(
-            "/api/v1/training-programs/by-major",
+            "/api/v1/info/training-programs/by-major",
             params={"major_code": "CS", "grade": "2026", "page": 1, "page_size": 5},
             headers=auth_headers,
         )
@@ -53,13 +53,13 @@ class TestTrainingProgramAPI:
         assert by_major_data["pagination"] == {"total": 1, "page": 1, "page_size": 5}
 
         get_resp = await async_client_info.get(
-            f"/api/v1/training-programs/{program_id}", headers=auth_headers
+            f"/api/v1/info/training-programs/{program_id}", headers=auth_headers
         )
         assert get_resp.status_code == 200
         assert get_resp.json()["data"]["major_code"] == "CS"
 
         patch_resp = await async_client_info.patch(
-            f"/api/v1/training-programs/{program_id}",
+            f"/api/v1/info/training-programs/{program_id}",
             json={"version": "2.0", "required_course_ids": [course_id]},
             headers=auth_headers,
         )
@@ -69,13 +69,13 @@ class TestTrainingProgramAPI:
         assert patched["required_course_ids"] == [course_id]
 
         delete_resp = await async_client_info.delete(
-            f"/api/v1/training-programs/{program_id}", headers=auth_headers
+            f"/api/v1/info/training-programs/{program_id}", headers=auth_headers
         )
         assert delete_resp.status_code == 200
         assert delete_resp.json()["data"] is None
 
         missing_resp = await async_client_info.get(
-            f"/api/v1/training-programs/{program_id}", headers=auth_headers
+            f"/api/v1/info/training-programs/{program_id}", headers=auth_headers
         )
         assert missing_resp.status_code == 404
 
@@ -84,7 +84,7 @@ class TestTrainingProgramAPI:
     ) -> None:
         """required_course_ids 包含不存在课程时应返回 404。"""
         resp = await async_client_info.post(
-            "/api/v1/training-programs/",
+            "/api/v1/info/training-programs/",
             json={
                 "program_code": "CS-AI-2027",
                 "major_code": "CS",
@@ -112,7 +112,7 @@ class TestTrainingProgramResourceAccess:
             course_name="Auth Training Test",
         )
         create_resp = await async_client_info.post(
-            "/api/v1/training-programs/",
+            "/api/v1/info/training-programs/",
             json={
                 "program_code": "CS-AUTH-2026",
                 "major_code": "CS",
@@ -128,7 +128,7 @@ class TestTrainingProgramResourceAccess:
             user_id="student-1", role="STUDENT", permissions=["training:update"]
         )
         resp = await async_client_info.patch(
-            f"/api/v1/training-programs/{program_id}",
+            f"/api/v1/info/training-programs/{program_id}",
             json={"version": "hacked"},
             headers=student_headers,
         )
@@ -144,7 +144,7 @@ class TestTrainingProgramResourceAccess:
             course_name="Auth Delete Program Test",
         )
         create_resp = await async_client_info.post(
-            "/api/v1/training-programs/",
+            "/api/v1/info/training-programs/",
             json={
                 "program_code": "CS-DEL-2026",
                 "major_code": "CS",
@@ -160,7 +160,7 @@ class TestTrainingProgramResourceAccess:
             user_id="teacher-1", role="TEACHER", permissions=["training:delete"]
         )
         resp = await async_client_info.delete(
-            f"/api/v1/training-programs/{program_id}", headers=teacher_headers
+            f"/api/v1/info/training-programs/{program_id}", headers=teacher_headers
         )
         assert resp.status_code == 403
 
@@ -174,7 +174,7 @@ class TestTrainingProgramResourceAccess:
             course_name="Admin Program Test",
         )
         create_resp = await async_client_info.post(
-            "/api/v1/training-programs/",
+            "/api/v1/info/training-programs/",
             json={
                 "program_code": "CS-ADMIN-2026",
                 "major_code": "CS",
@@ -190,7 +190,7 @@ class TestTrainingProgramResourceAccess:
             user_id="admin-user", role="SYS_ADMIN", permissions=["training:update"]
         )
         resp = await async_client_info.patch(
-            f"/api/v1/training-programs/{program_id}",
+            f"/api/v1/info/training-programs/{program_id}",
             json={"version": "2.0"},
             headers=admin_headers,
         )

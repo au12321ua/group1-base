@@ -14,7 +14,7 @@ from tests.utils import build_identity_headers
 
 @pytest.mark.integration
 class TestOfferingAPI:
-    """验证 /api/v1/offerings 的 CRUD 及关键约束。"""
+    """验证 /api/v1/info/offerings 的 CRUD 及关键约束。"""
 
     async def test_offering_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、列表、更新和删除开课记录。"""
@@ -26,7 +26,7 @@ class TestOfferingAPI:
         )
 
         create_resp = await async_client_info.post(
-            "/api/v1/offerings/",
+            "/api/v1/info/offerings/",
             json={
                 "course_id": course_id,
                 "term_code": "2026-FALL",
@@ -41,7 +41,7 @@ class TestOfferingAPI:
         offering_id = created["id"]
 
         list_resp = await async_client_info.get(
-            "/api/v1/offerings/",
+            "/api/v1/info/offerings/",
             params={"course_id": course_id, "term_code": "2026-FALL", "status": "ACTIVE"},
             headers=auth_headers,
         )
@@ -51,13 +51,13 @@ class TestOfferingAPI:
         assert payload["items"][0]["id"] == offering_id
 
         get_resp = await async_client_info.get(
-            f"/api/v1/offerings/{offering_id}", headers=auth_headers
+            f"/api/v1/info/offerings/{offering_id}", headers=auth_headers
         )
         assert get_resp.status_code == 200
         assert get_resp.json()["data"]["class_no"] == "01"
 
         patch_resp = await async_client_info.patch(
-            f"/api/v1/offerings/{offering_id}",
+            f"/api/v1/info/offerings/{offering_id}",
             json={"status": "COMPLETED"},
             headers=auth_headers,
         )
@@ -66,13 +66,13 @@ class TestOfferingAPI:
         assert patched["status"] == "COMPLETED"
 
         delete_resp = await async_client_info.delete(
-            f"/api/v1/offerings/{offering_id}", headers=auth_headers
+            f"/api/v1/info/offerings/{offering_id}", headers=auth_headers
         )
         assert delete_resp.status_code == 200
         assert delete_resp.json()["data"] is None
 
         missing_resp = await async_client_info.get(
-            f"/api/v1/offerings/{offering_id}", headers=auth_headers
+            f"/api/v1/info/offerings/{offering_id}", headers=auth_headers
         )
         assert missing_resp.status_code == 404
 
@@ -97,7 +97,7 @@ class TestOfferingAPI:
         assert first_offering_id > 0
 
         duplicate_resp = await async_client_info.post(
-            "/api/v1/offerings/",
+            "/api/v1/info/offerings/",
             json={
                 "course_id": course_id,
                 "term_code": "2026-FALL",
@@ -128,7 +128,7 @@ class TestOfferingAPI:
         )
 
         put_resp = await async_client_info.put(
-            f"/api/v1/offerings/{offering_id}",
+            f"/api/v1/info/offerings/{offering_id}",
             json={
                 "course_id": course_id,
                 "term_code": "2026-FALL",
@@ -173,7 +173,7 @@ class TestOfferingResourceAccess:
         )
         # Assign teacher t-100 via the schedule (creates TeacherCourseAssignment)
         await async_client_info.put(
-            f"/api/v1/schedules/{schedule_id}/teachers/t-100",
+            f"/api/v1/info/schedules/{schedule_id}/teachers/t-100",
             json={"teacher_id": "t-100", "role_type": "instructor"},
             headers=auth_headers,
         )
@@ -181,7 +181,7 @@ class TestOfferingResourceAccess:
             user_id="t-100", role="TEACHER", permissions=["offering:update"]
         )
         resp = await async_client_info.patch(
-            f"/api/v1/offerings/{offering_id}",
+            f"/api/v1/info/offerings/{offering_id}",
             json={"status": "COMPLETED"},
             headers=teacher_headers,
         )
@@ -214,7 +214,7 @@ class TestOfferingResourceAccess:
         )
         # Assign teacher t-200 to the offering via schedule, then try to update as t-999
         await async_client_info.post(
-            f"/api/v1/schedules/{schedule_id}/teachers/t-200",
+            f"/api/v1/info/schedules/{schedule_id}/teachers/t-200",
             json={"teacher_id": "t-200", "role_type": "instructor"},
             headers=auth_headers,
         )
@@ -222,7 +222,7 @@ class TestOfferingResourceAccess:
             user_id="t-999", role="TEACHER", permissions=["offering:update"]
         )
         resp = await async_client_info.patch(
-            f"/api/v1/offerings/{offering_id}",
+            f"/api/v1/info/offerings/{offering_id}",
             json={"status": "CANCELLED"},
             headers=other_teacher_headers,
         )
@@ -248,7 +248,7 @@ class TestOfferingResourceAccess:
             user_id="student-99", role="STUDENT", permissions=["offering:delete"]
         )
         resp = await async_client_info.delete(
-            f"/api/v1/offerings/{offering_id}", headers=student_headers
+            f"/api/v1/info/offerings/{offering_id}", headers=student_headers
         )
         assert resp.status_code == 403
 
@@ -272,6 +272,6 @@ class TestOfferingResourceAccess:
             user_id="admin-user", role="SYS_ADMIN", permissions=["offering:delete"]
         )
         resp = await async_client_info.delete(
-            f"/api/v1/offerings/{offering_id}", headers=admin_delete_headers
+            f"/api/v1/info/offerings/{offering_id}", headers=admin_delete_headers
         )
         assert resp.status_code == 200

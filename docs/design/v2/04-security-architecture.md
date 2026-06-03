@@ -69,7 +69,7 @@ sequenceDiagram
     participant Auth as Auth Service
     participant Info as Info Service
 
-    User->>Gateway: GET /api/v1/users (Authorization: Bearer <access_token>)
+    User->>Gateway: GET /api/v1/info/users (Authorization: Bearer <access_token>)
     Gateway->>Gateway: 提取 Authorization Header
     Gateway->>Auth: POST /internal/verify (access_token)
     Auth->>Auth: 验签 JWT (HS256)

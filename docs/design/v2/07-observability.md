@@ -138,7 +138,7 @@ Client → Nginx Gateway → Auth Service → Info Service
   "message": "Request completed",
   "request_id": "req_9aef8a7d",
   "method": "GET",
-  "path": "/api/v1/users",
+  "path": "/api/v1/info/users",
   "status_code": 200,
   "duration_ms": 45,
   "user_id": "42"

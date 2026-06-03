@@ -41,21 +41,21 @@ class TestInfoRouterRegistration:
         resp = await async_client_info.get("/openapi.json")
         schema = resp.json()
         paths = schema["paths"]
-        assert any(p.startswith("/api/v1/users") for p in paths)
+        assert any(p.startswith("/api/v1/info/users") for p in paths)
 
     async def test_v1_courses_route_exists(self, async_client_info):
         """GET /api/v1/courses is registered in the schema."""
         resp = await async_client_info.get("/openapi.json")
         schema = resp.json()
         paths = schema["paths"]
-        assert any(p.startswith("/api/v1/courses") for p in paths)
+        assert any(p.startswith("/api/v1/info/courses") for p in paths)
 
     async def test_v1_schedules_route_exists(self, async_client_info):
         """GET /api/v1/schedules is registered in the schema."""
         resp = await async_client_info.get("/openapi.json")
         schema = resp.json()
         paths = schema["paths"]
-        assert any(p.startswith("/api/v1/schedules") for p in paths)
+        assert any(p.startswith("/api/v1/info/schedules") for p in paths)
 
 
 # ---------------------------------------------------------------------------

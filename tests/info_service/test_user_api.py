@@ -23,7 +23,7 @@ def _make_user_payload(*, suffix: str) -> dict[str, object]:
 
 @pytest.mark.integration
 class TestUserAPI:
-    """验证 /api/v1/users 的 CRUD、鉴权和跨服务补偿行为。"""
+    """验证 /api/v1/info/users 的 CRUD、鉴权和跨服务补偿行为。"""
 
     @pytest.fixture(autouse=True)
     def mock_auth_sync(self, monkeypatch) -> None:
@@ -41,7 +41,7 @@ class TestUserAPI:
     async def test_user_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、更新、部分更新和逻辑删除用户。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="1101"),
             headers=auth_headers,
         )
@@ -55,7 +55,7 @@ class TestUserAPI:
         assert created["profile"]["full_name"] == "集成测试用户1101"
 
         list_resp = await async_client_info.get(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             params={"keyword": "1101", "page": 1, "page_size": 10},
             headers=auth_headers,
         )
@@ -65,14 +65,14 @@ class TestUserAPI:
         assert list_payload["items"][0]["id"] == user_id
 
         get_resp = await async_client_info.get(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             headers=auth_headers,
         )
         assert get_resp.status_code == 200
         assert get_resp.json()["data"]["username"] == "user_1101"
 
         put_resp = await async_client_info.put(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             json={
                 "user_no": "S20261101-U",
                 "username": "user_1101_u",
@@ -93,7 +93,7 @@ class TestUserAPI:
         assert updated["profile"]["full_name"] == "用户1101更新"
 
         patch_resp = await async_client_info.patch(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             json={"full_name": "用户1101补丁", "phone": "13700000000"},
             headers=auth_headers,
         )
@@ -103,21 +103,21 @@ class TestUserAPI:
         assert patched["profile"]["phone"] == "13700000000"
 
         delete_resp = await async_client_info.delete(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             headers=auth_headers,
         )
         assert delete_resp.status_code == 200
         assert delete_resp.json()["data"] is None
 
         get_deleted_resp = await async_client_info.get(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             headers=auth_headers,
         )
         assert get_deleted_resp.status_code == 200
         assert get_deleted_resp.json()["data"]["is_deleted"] is True
 
         list_after_delete_resp = await async_client_info.get(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             params={"keyword": "1101", "page": 1, "page_size": 10},
             headers=auth_headers,
         )
@@ -128,21 +128,21 @@ class TestUserAPI:
         """重复 user_no 或 username 应返回 409。"""
         payload = _make_user_payload(suffix="1102")
         first_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=payload,
             headers=auth_headers,
         )
         assert first_resp.status_code == 201
 
         duplicate_no_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json={**_make_user_payload(suffix="2202"), "user_no": payload["user_no"]},
             headers=auth_headers,
         )
         assert duplicate_no_resp.status_code == 409
 
         duplicate_name_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json={**_make_user_payload(suffix="3302"), "username": payload["username"]},
             headers=auth_headers,
         )
@@ -153,7 +153,7 @@ class TestUserAPI:
     ) -> None:
         """当 Auth 禁用失败时，应补偿回滚 is_deleted 状态。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="1103"),
             headers=auth_headers,
         )
@@ -167,13 +167,13 @@ class TestUserAPI:
         )
 
         delete_resp = await async_client_info.delete(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             headers=auth_headers,
         )
         assert delete_resp.status_code == 409
 
         get_resp = await async_client_info.get(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             headers=auth_headers,
         )
         assert get_resp.status_code == 200
@@ -181,26 +181,26 @@ class TestUserAPI:
 
     async def test_user_routes_enforce_auth_and_validation(self, async_client_info) -> None:
         """用户接口应正确返回 401/403/422。"""
-        missing_header_resp = await async_client_info.get("/api/v1/users/")
+        missing_header_resp = await async_client_info.get("/api/v1/info/users/")
         assert missing_header_resp.status_code == 401
 
         low_perm_headers = build_identity_headers(permissions=["user:read"])
         forbidden_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="1104"),
             headers=low_perm_headers,
         )
         assert forbidden_resp.status_code == 403
 
         invalid_query_resp = await async_client_info.get(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             params={"page": 0},
             headers=low_perm_headers,
         )
         assert invalid_query_resp.status_code == 422
 
         invalid_payload_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json={
                 "user_no": "",
                 "username": "invalid_user",
@@ -239,7 +239,7 @@ class TestUserResourceAccess:
     ) -> None:
         """非管理员用户可以查看自己的资料。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="2101"),
             headers=auth_headers,
         )
@@ -249,7 +249,7 @@ class TestUserResourceAccess:
             user_id=str(user_id), role="STUDENT", permissions=["user:read"]
         )
         resp = await async_client_info.get(
-            f"/api/v1/users/{user_id}", headers=own_headers
+            f"/api/v1/info/users/{user_id}", headers=own_headers
         )
         assert resp.status_code == 200
 
@@ -258,7 +258,7 @@ class TestUserResourceAccess:
     ) -> None:
         """非管理员用户查看他人资料应返回 403。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="2102"),
             headers=auth_headers,
         )
@@ -268,7 +268,7 @@ class TestUserResourceAccess:
             user_id="other-user", role="STUDENT", permissions=["user:read"]
         )
         resp = await async_client_info.get(
-            f"/api/v1/users/{user_id}", headers=other_headers
+            f"/api/v1/info/users/{user_id}", headers=other_headers
         )
         assert resp.status_code == 403
 
@@ -277,7 +277,7 @@ class TestUserResourceAccess:
     ) -> None:
         """管理员可以查看任意用户资料。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="2103"),
             headers=auth_headers,
         )
@@ -287,7 +287,7 @@ class TestUserResourceAccess:
             user_id="admin-user", role="SYS_ADMIN", permissions=["user:read"]
         )
         resp = await async_client_info.get(
-            f"/api/v1/users/{user_id}", headers=admin_headers
+            f"/api/v1/info/users/{user_id}", headers=admin_headers
         )
         assert resp.status_code == 200
 
@@ -296,7 +296,7 @@ class TestUserResourceAccess:
     ) -> None:
         """非管理员用户更新他人资料应返回 403。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="2104"),
             headers=auth_headers,
         )
@@ -306,7 +306,7 @@ class TestUserResourceAccess:
             user_id="other-user", role="TEACHER", permissions=["user:update"]
         )
         resp = await async_client_info.put(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             json={
                 "user_no": "S20262104",
                 "username": "user_2104",
@@ -326,7 +326,7 @@ class TestUserResourceAccess:
     ) -> None:
         """非管理员用户可以更新自己的资料。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="2105"),
             headers=auth_headers,
         )
@@ -336,7 +336,7 @@ class TestUserResourceAccess:
             user_id=str(user_id), role="STUDENT", permissions=["user:update"]
         )
         resp = await async_client_info.patch(
-            f"/api/v1/users/{user_id}",
+            f"/api/v1/info/users/{user_id}",
             json={"full_name": "自己更新"},
             headers=own_headers,
         )
@@ -348,7 +348,7 @@ class TestUserResourceAccess:
     ) -> None:
         """非管理员用户删除用户应返回 403（即使删除自己也不行）。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="2106"),
             headers=auth_headers,
         )
@@ -358,7 +358,7 @@ class TestUserResourceAccess:
             user_id=str(user_id), role="TEACHER", permissions=["user:delete"]
         )
         resp = await async_client_info.delete(
-            f"/api/v1/users/{user_id}", headers=own_headers
+            f"/api/v1/info/users/{user_id}", headers=own_headers
         )
         assert resp.status_code == 403
 
@@ -367,7 +367,7 @@ class TestUserResourceAccess:
     ) -> None:
         """管理员可以删除用户。"""
         create_resp = await async_client_info.post(
-            "/api/v1/users/",
+            "/api/v1/info/users/",
             json=_make_user_payload(suffix="2107"),
             headers=auth_headers,
         )
@@ -377,6 +377,6 @@ class TestUserResourceAccess:
             user_id="admin-user", role="SYS_ADMIN", permissions=["user:delete"]
         )
         resp = await async_client_info.delete(
-            f"/api/v1/users/{user_id}", headers=admin_delete_headers
+            f"/api/v1/info/users/{user_id}", headers=admin_delete_headers
         )
         assert resp.status_code == 200

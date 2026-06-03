@@ -6,7 +6,7 @@
 
 | 约定 | 规则 |
 |------|------|
-| 前缀 | `/api/v1/` |
+| 前缀 | `/api/v1/`（Auth: `/api/v1/auth/*`、`/api/v1/internal/*`；Info: `/api/v1/info/*`） |
 | 风格 | RESTful |
 | 请求格式 | `application/json` |
 | 响应格式 | 统一 `{code, message, data}` |

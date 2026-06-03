@@ -8,14 +8,14 @@ from tests.utils import build_identity_headers
 
 @pytest.mark.integration
 class TestCourseAPI:
-    """测试 /api/v1/courses 已实现的 HTTP 参数校验契约。"""
+    """测试 /api/v1/info/courses 已实现的 HTTP 参数校验契约。"""
 
     async def test_list_courses_rejects_invalid_query(
         self, async_client_info, auth_headers
     ) -> None:
         """当分页参数非法时，应在参数校验阶段返回 422。"""
         resp = await async_client_info.get(
-            "/api/v1/courses/", params={"page_size": 101}, headers=auth_headers
+            "/api/v1/info/courses/", params={"page_size": 101}, headers=auth_headers
         )
         assert resp.status_code == 422
 
@@ -24,7 +24,7 @@ class TestCourseAPI:
     ) -> None:
         """当缺少必填字段时，应在请求体验证阶段返回 422。"""
         resp = await async_client_info.post(
-            "/api/v1/courses/",
+            "/api/v1/info/courses/",
             json={
                 "course_code": "CS101",
                 "credit": 3,
@@ -45,12 +45,12 @@ class TestCourseAPI:
         )
 
         delete_resp = await async_client_info.delete(
-            f"/api/v1/courses/{course_id}", headers=auth_headers
+            f"/api/v1/info/courses/{course_id}", headers=auth_headers
         )
         assert delete_resp.status_code == 200
 
         recreate_resp = await async_client_info.post(
-            "/api/v1/courses/",
+            "/api/v1/info/courses/",
             json={
                 "course_code": "CS200",
                 "course_name": "Another Course",
@@ -79,7 +79,7 @@ class TestCourseResourceAccess:
             user_id="student-1", role="STUDENT", permissions=["course:update"]
         )
         resp = await async_client_info.put(
-            f"/api/v1/courses/{course_id}",
+            f"/api/v1/info/courses/{course_id}",
             json={
                 "course_code": "CS701",
                 "course_name": "Hacked Course",
@@ -104,7 +104,7 @@ class TestCourseResourceAccess:
             user_id="student-2", role="STUDENT", permissions=["course:update"]
         )
         resp = await async_client_info.patch(
-            f"/api/v1/courses/{course_id}",
+            f"/api/v1/info/courses/{course_id}",
             json={"course_name": "Hacked Name"},
             headers=student_headers,
         )
@@ -123,7 +123,7 @@ class TestCourseResourceAccess:
             user_id="teacher-1", role="TEACHER", permissions=["course:delete"]
         )
         resp = await async_client_info.delete(
-            f"/api/v1/courses/{course_id}", headers=teacher_headers
+            f"/api/v1/info/courses/{course_id}", headers=teacher_headers
         )
         assert resp.status_code == 403
 
@@ -137,7 +137,7 @@ class TestCourseResourceAccess:
             course_name="Admin Access Test",
         )
         resp = await async_client_info.put(
-            f"/api/v1/courses/{course_id}",
+            f"/api/v1/info/courses/{course_id}",
             json={
                 "course_code": "CS704",
                 "course_name": "Admin Updated Course",

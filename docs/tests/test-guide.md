@@ -50,7 +50,7 @@
 - 通过 `async_client_*` 发送真实 HTTP 请求
 - 使用真实数据库（in-memory SQLite 可接受）
 
-**示例**：`POST /api/v1/auth/login`、`GET /api/v1/users`
+**示例**：`POST /api/v1/auth/login`、`GET /api/v1/info/users`
 
 ### `@pytest.mark.regression`
 
@@ -109,7 +109,7 @@ class TestBugFix123:
 @pytest.mark.integration
 class TestUserEndpoints:
     async def test_get_users_returns_list(self, async_client_info):
-        response = await async_client_info.get("/api/v1/users")
+        response = await async_client_info.get("/api/v1/info/users")
         assert response.status_code == 200
         body = response.json()
         assert "data" in body
@@ -133,7 +133,7 @@ class TestUserEndpoints:
 )
 async def test_access_control(self, async_client_info, user_id, role, expected_status):
     headers = build_identity_headers(user_id=user_id, role=role)
-    response = await async_client_info.get("/api/v1/admin/users", headers=headers)
+    response = await async_client_info.get("/api/v1/info/admin/users", headers=headers)
     assert response.status_code == expected_status
 ```
 

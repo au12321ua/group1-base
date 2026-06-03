@@ -1,4 +1,4 @@
-"""Integration tests for /api/v1/data-provision endpoints."""
+"""Integration tests for /api/v1/info/data-provision endpoints."""
 
 from datetime import UTC, datetime
 
@@ -99,7 +99,7 @@ class TestDataProvisionAPI:
         )
 
         teacher_resp = await async_client_info.get(
-            "/api/v1/data-provision/teachers",
+            "/api/v1/info/data-provision/teachers",
             params={"page": 1, "page_size": 20},
             headers=auth_headers,
         )
@@ -112,7 +112,7 @@ class TestDataProvisionAPI:
         assert "teacher_api" in teacher_usernames
 
         student_resp = await async_client_info.get(
-            "/api/v1/data-provision/candidate-students",
+            "/api/v1/info/data-provision/candidate-students",
             params={"page": 1, "page_size": 20},
             headers=auth_headers,
         )
@@ -140,7 +140,7 @@ class TestDataProvisionAPI:
         )
 
         resp = await async_client_info.get(
-            "/api/v1/data-provision/calendars", headers=auth_headers
+            "/api/v1/info/data-provision/calendars", headers=auth_headers
         )
 
         assert resp.status_code == 200
@@ -154,7 +154,7 @@ class TestDataProvisionAPI:
     async def test_get_calendars_empty(self, async_client_info, auth_headers) -> None:
         """Should return empty items with fallback snapshot and pagination."""
         resp = await async_client_info.get(
-            "/api/v1/data-provision/calendars", headers=auth_headers
+            "/api/v1/info/data-provision/calendars", headers=auth_headers
         )
 
         assert resp.status_code == 200
@@ -184,7 +184,7 @@ class TestDataProvisionAPI:
         )
 
         resp = await async_client_info.get(
-            "/api/v1/data-provision/training-programs",
+            "/api/v1/info/data-provision/training-programs",
             params={
                 "page": 1,
                 "page_size": 10,

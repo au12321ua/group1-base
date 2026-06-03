@@ -34,7 +34,7 @@ async def create_course(
     if auth_headers is None:
         auth_headers = _default_auth_headers("course")
     response = await async_client_info.post(
-        "/api/v1/courses/",
+        "/api/v1/info/courses/",
         json=make_course_payload(
             course_code=course_code,
             course_name=course_name,
@@ -59,7 +59,7 @@ async def create_offering(
     if auth_headers is None:
         auth_headers = _default_auth_headers("offering")
     response = await async_client_info.post(
-        "/api/v1/offerings/",
+        "/api/v1/info/offerings/",
         json={
             "course_id": course_id,
             "term_code": term_code,
@@ -86,7 +86,7 @@ async def create_schedule(
     if auth_headers is None:
         auth_headers = _default_auth_headers("schedule")
     response = await async_client_info.post(
-        "/api/v1/schedules/",
+        "/api/v1/info/schedules/",
         json={
             "offering_id": offering_id,
             "classroom_id": classroom_id,
