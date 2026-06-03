@@ -38,6 +38,12 @@ class TestUserAPI:
             "_sync_disable_to_auth",
             AsyncMock(return_value=None),
         )
+
+        monkeypatch.setattr(
+            "info_service.services.user_management_service.batch_fetch_role_names",
+            AsyncMock(return_value={}),
+        )
+
     async def test_user_crud_flow(self, async_client_info, auth_headers) -> None:
         """应支持创建、查询、更新、部分更新和逻辑删除用户。"""
         create_resp = await async_client_info.post(
@@ -216,6 +222,38 @@ class TestUserAPI:
         )
         assert invalid_payload_resp.status_code == 422
 
+    async def test_batch_import_users_returns_partial_result(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """CSV 导入接口应返回部分成功结果，并持久化成功行。"""
+        csv_content = (
+            "user_no,username,full_name,gender,email,phone\n"
+            "S20265001,import_user_5001,导入用户5001,MALE,import5001@test.edu.cn,13800000001\n"
+            "S20265002,,缺少用户名,FEMALE,missing@test.edu.cn,13800000002\n"
+            "S20265001,import_user_dup,重复学号,MALE,dup@test.edu.cn,13800000003\n"
+        ).encode()
+
+        resp = await async_client_info.post(
+            "/api/v1/info/users/import",
+            files={"file": ("users.csv", csv_content, "text/csv")},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        result = resp.json()["data"]
+        assert result["total"] == 3
+        assert result["success_count"] == 1
+        assert result["failed_count"] == 2
+        assert len(result["errors"]) == 2
+
+        list_resp = await async_client_info.get(
+            "/api/v1/info/users/",
+            params={"keyword": "import_user_5001", "page": 1, "page_size": 10},
+            headers=auth_headers,
+        )
+        list_payload = list_resp.json()["data"]
+        assert list_payload["pagination"]["total"] == 1
+        assert list_payload["items"][0]["username"] == "import_user_5001"
+
 
 @pytest.mark.integration
 class TestUserResourceAccess:
@@ -234,6 +272,12 @@ class TestUserResourceAccess:
             "_sync_disable_to_auth",
             AsyncMock(return_value=None),
         )
+
+        monkeypatch.setattr(
+            "info_service.services.user_management_service.batch_fetch_role_names",
+            AsyncMock(return_value={}),
+        )
+
     async def test_non_admin_can_view_own_profile(
         self, async_client_info, auth_headers
     ) -> None:
