@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Response
+from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auth_service.api.deps import AuditDbSession, AuthDbSession
@@ -52,10 +53,26 @@ async def verify_token(
     request: InternalVerifyRequest,
     db: AuthDbSession,
     _service_auth: ServiceTokenPayload,  # guard: validates service token before endpoint runs
-) -> APIResponse[InternalVerifyResponse]:
-    """Verify JWT and return identity info (called by Gateway)."""
+) -> JSONResponse:
+    """Verify JWT and return identity info (called by Gateway).
+
+    Also returns user identity in response headers (X-User-Id, X-User-Role,
+    X-User-Permissions) so nginx can extract them via auth_request_set.
+    """
     data = await identity_service.verify_token(db, request)
-    return APIResponse(data=data)
+    permissions = (
+        ",".join(data.permissions) if isinstance(data.permissions, list)
+        else str(data.permissions) if data.permissions
+        else ""
+    )
+    return JSONResponse(
+        content=APIResponse(data=data).model_dump(),
+        headers={
+            "X-User-Id": str(data.user_id) if data.user_id else "",
+            "X-User-Role": str(data.role) if data.role else "",
+            "X-User-Permissions": permissions,
+        },
+    )
 
 
 @router.post(
