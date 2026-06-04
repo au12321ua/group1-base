@@ -1,5 +1,7 @@
 """Info Service 集成测试的通用辅助函数。"""
 
+from uuid import uuid4
+
 from httpx import AsyncClient, Response
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -107,9 +109,10 @@ async def create_classroom(
     capacity: int = 80,
 ) -> int:
     """直接写入测试数据库创建教室并返回 classroom_id。"""
+    unique_room_no = f"{room_no}-{uuid4().hex[:8]}"
     async with AsyncSession(info_engine, expire_on_commit=False) as session:
         classroom = Classroom(
-            room_no=room_no,
+            room_no=unique_room_no,
             building=building,
             capacity=capacity,
         )

@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.info_service.api_helpers import create_course
+from tests.info_service.api_helpers import assert_status_and_data, create_course
 from tests.utils import build_identity_headers
 
 
@@ -60,6 +60,108 @@ class TestCourseAPI:
             headers=auth_headers,
         )
         assert recreate_resp.status_code == 409
+
+    async def test_course_crud_and_prerequisite_flow(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """应支持课程列表、详情、更新与先修课子资源操作。"""
+        target_course_id = await create_course(
+            async_client_info,
+            course_code="CS240",
+            course_name="Algorithms",
+        )
+        prerequisite_course_id = await create_course(
+            async_client_info,
+            course_code="CS140",
+            course_name="Programming Foundations",
+        )
+
+        list_resp = await async_client_info.get(
+            "/api/v1/info/courses/",
+            params={"keyword": "Algorithms", "page": 1, "page_size": 10, "is_active": True},
+            headers=auth_headers,
+        )
+        list_data = assert_status_and_data(list_resp)
+        assert list_data["pagination"]["total"] == 1
+        assert list_data["items"][0]["id"] == target_course_id
+
+        get_resp = await async_client_info.get(
+            f"/api/v1/info/courses/{target_course_id}",
+            headers=auth_headers,
+        )
+        get_data = assert_status_and_data(get_resp)
+        assert get_data["course_name"] == "Algorithms"
+
+        put_resp = await async_client_info.put(
+            f"/api/v1/info/courses/{target_course_id}",
+            json={
+                "course_code": "CS240",
+                "course_name": "Algorithms and Design",
+                "credit": 4,
+                "capacity": 90,
+                "assessment_method": "exam",
+                "is_active": True,
+            },
+            headers=auth_headers,
+        )
+        put_data = assert_status_and_data(put_resp)
+        assert put_data["course_name"] == "Algorithms and Design"
+        assert put_data["assessment_method"] == "exam"
+
+        patch_resp = await async_client_info.patch(
+            f"/api/v1/info/courses/{target_course_id}",
+            json={"capacity": 95, "assessment_method": "project"},
+            headers=auth_headers,
+        )
+        patch_data = assert_status_and_data(patch_resp)
+        assert patch_data["capacity"] == 95
+        assert patch_data["assessment_method"] == "project"
+
+        add_prereq_resp = await async_client_info.post(
+            f"/api/v1/info/courses/{target_course_id}/prerequisites",
+            json={"prerequisite_course_id": prerequisite_course_id, "min_grade": "B"},
+            headers=auth_headers,
+        )
+        prereq_data = assert_status_and_data(add_prereq_resp)
+        assert prereq_data["prerequisite_course_id"] == prerequisite_course_id
+        assert prereq_data["prerequisite_course_code"] == "CS140"
+        assert prereq_data["prerequisite_course_name"] == "Programming Foundations"
+
+        list_prereq_resp = await async_client_info.get(
+            f"/api/v1/info/courses/{target_course_id}/prerequisites",
+            headers=auth_headers,
+        )
+        prereq_list = assert_status_and_data(list_prereq_resp)
+        assert prereq_list["pagination"]["total"] == 1
+        assert prereq_list["items"][0]["min_grade"] == "B"
+
+        remove_prereq_resp = await async_client_info.delete(
+            f"/api/v1/info/courses/{target_course_id}/prerequisites/{prerequisite_course_id}",
+            headers=auth_headers,
+        )
+        assert remove_prereq_resp.status_code == 200
+        assert remove_prereq_resp.json()["data"] is None
+
+    async def test_remove_missing_prerequisite_returns_409(
+        self, async_client_info, auth_headers
+    ) -> None:
+        """删除不存在的先修课关联时应返回 409。"""
+        target_course_id = await create_course(
+            async_client_info,
+            course_code="CS241",
+            course_name="Operating Systems",
+        )
+        prerequisite_course_id = await create_course(
+            async_client_info,
+            course_code="CS141",
+            course_name="Computer Organization",
+        )
+
+        resp = await async_client_info.delete(
+            f"/api/v1/info/courses/{target_course_id}/prerequisites/{prerequisite_course_id}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 409
 
 
 @pytest.mark.integration

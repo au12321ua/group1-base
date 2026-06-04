@@ -46,7 +46,7 @@ async def search_audit_logs(
     name_map = await course_management_service.batch_get_user_names(info_db, operator_ids)
     result_items = []
     for a in items:
-        resp = AuditLogResponse.model_validate(a)
+        resp = AuditLogResponse.model_validate(a, from_attributes=True)
         resp.operator_name = name_map.get(a.operator_user_id) if a.operator_user_id else None
         result_items.append(resp)
     return APIResponse(
