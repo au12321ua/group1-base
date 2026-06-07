@@ -194,8 +194,8 @@ jobs:
           tags: |
             ghcr.io/au12321ua/stss-auth:latest
             ghcr.io/au12321ua/stss-auth:${{ steps.sha.outputs.short }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=stss-auth
+          cache-to: type=gha,mode=min,scope=stss-auth
 
       - name: Build and push stss-info
         uses: docker/build-push-action@v6
@@ -206,8 +206,8 @@ jobs:
           tags: |
             ghcr.io/au12321ua/stss-info:latest
             ghcr.io/au12321ua/stss-info:${{ steps.sha.outputs.short }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=stss-info
+          cache-to: type=gha,mode=min,scope=stss-info
 
       - name: Build and push stss-seed
         uses: docker/build-push-action@v6
@@ -218,5 +218,5 @@ jobs:
           tags: |
             ghcr.io/au12321ua/stss-seed:latest
             ghcr.io/au12321ua/stss-seed:${{ steps.sha.outputs.short }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=stss-seed
+          cache-to: type=gha,mode=min,scope=stss-seed
