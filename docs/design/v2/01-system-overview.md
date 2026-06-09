@@ -99,7 +99,7 @@ A（信息管理）
 | ORM | SQLModel | 与 FastAPI/Pydantic 原生适配，减少 Schema 重复定义 |
 | 数据库 | SQLite（原型）→ PostgreSQL | 原型阶段零配置部署；Model-First 模式（create_all 自动建表），生产切换时启用 Alembic |
 | 迁移工具 | Alembic（生产预留） | 原型阶段使用 SQLModel.metadata.create_all()，Alembic 配置保留为模板 |
-| 认证 | JWT（HS256） | 对称密钥，原型阶段简单可靠；预留 RS256 + JWKS 扩展点 |
+| 认证 | JWT（HS256 / RS256） | 双算法可配置；Auth 内签发与验签，密钥 via env（见 `docs/auth-jwt-keys.md`） |
 | 跨服务通信 | HTTP 同步 + 补偿重试 | 原型阶段不引入 MQ，但预留事件发布接口 |
 | 容器化 | Docker + Docker Compose | 环境一致性，一键启动 |
 

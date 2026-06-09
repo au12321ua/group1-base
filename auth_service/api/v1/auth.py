@@ -7,7 +7,6 @@ from auth_service.core.security import verify_token
 from auth_service.deps import CurrentUserId
 from auth_service.schemas.auth_schema import (
     ChangePasswordRequest,
-    JwksResponse,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
@@ -18,7 +17,6 @@ from auth_service.schemas.auth_schema import (
 )
 from auth_service.schemas.user_schema import AuthUserResponse
 from auth_service.services.auth_service import auth_service
-from auth_service.services.key_service import key_service
 from shared.exceptions import AccountDisabledError, AccountLockedError, AuthenticationError
 from shared.response import APIResponse
 from shared.services.audit_service import audit_service
@@ -162,9 +160,3 @@ async def change_password(
         result="success",
     )
     return APIResponse(data=None)
-
-
-@router.get("/public-key", response_model=APIResponse[JwksResponse])
-async def get_public_keys() -> APIResponse[JwksResponse]:
-    """Return JWKS public key set (no auth required)."""
-    return APIResponse(data=key_service.get_public_keys())

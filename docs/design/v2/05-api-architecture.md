@@ -84,7 +84,6 @@
 | `/auth/refresh` | POST | 刷新 Token 对 | Refresh Token |
 | `/auth/me` | GET | 当前用户信息 | Access Token（仅 user access） |
 | `/auth/change-password` | POST | 修改密码 | Access Token |
-| `/auth/public-key` | GET | JWKS 公钥集 | 无 |
 
 ### 2.2 Info Service — 用户管理
 

@@ -52,7 +52,9 @@
 
 | 层 | 文件 | 说明 |
 |-----|------|------|
-| Core | `core/security.py` | JWT 签发/验签、密码哈希、JWKS 密钥管理 |
+| Core | `core/security.py` | JWT 签发/验签入口、密码哈希 |
+| Core | `core/jwt_keys.py` | HS256/RS256 签发与验签（env 配置） |
+| Core | `core/token_hash.py` | Token SHA-256 指纹（DB 不存明文） |
 | Core | `core/config.py` | 已完成 |
 | CRUD | `crud/credential_crud.py` | 凭据增删改查、登录失败计数、账户锁定 |
 | CRUD | `crud/token_crud.py` | Token 记录管理（签发/吊销/查询） |
@@ -60,9 +62,8 @@
 | CRUD | `crud/role_crud.py` | 角色 CRUD + 用户角色关联 |
 | CRUD | `crud/permission_crud.py` | 权限查询 + 角色权限关联 |
 | Service | `services/auth_service.py` | 登录/登出/刷新/改密/用户管理 |
-| Service | `services/key_service.py` | JWKS 公钥发布 + 密钥轮换 |
 | Service | `services/identity_service.py` | 内部 Token 验签 |
-| API | `api/v1/auth.py` | 7 个公开端点 |
+| API | `api/v1/auth.py` | 6 个公开端点 |
 | API | `api/v1/internal.py` | 6 个内部端点 |
 | **单元测试** | `tests/auth_service/` | 由 Dev-A 编写（见下方清单） |
 
@@ -258,7 +259,7 @@ graph TD
 
 | 角色 | 任务 | 前置条件 |
 |------|------|----------|
-| Dev-A | `core/security.py` — JWT 签发、密码哈希、JWKS | 无 |
+| Dev-A | `core/security.py` + `jwt_keys.py` — JWT 双算法、密码哈希 | 无 |
 | Dev-B | `calendar_crud.py` + `base_info_crud.py` — 独立 CRUD 实现 | 无 |
 | Dev-C | `course_crud.py` + `classroom_crud.py` — 独立 CRUD 实现 | 无 |
 | FE | 页面框架（表格模板、搜索表单、按钮组件）；API 模块骨架 | 无 |
@@ -310,7 +311,6 @@ tests/auth_service/
 ├── test_role_crud.py          # 角色CRUD + 用户角色关联
 ├── test_permission_crud.py    # 权限查询 + 角色权限关联
 ├── test_auth_service.py       # 登录/登出/刷新/改密 (Mock CRUD)
-├── test_key_service.py        # JWKS发布/轮换
 └── test_identity_service.py   # 内部验签
 ```
 

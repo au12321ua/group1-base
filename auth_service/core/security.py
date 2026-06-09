@@ -5,10 +5,10 @@ from typing import Any
 from uuid import uuid4
 
 import bcrypt
-from jose import JWTError, jwt
-from jose.exceptions import ExpiredSignatureError
+from jose.exceptions import ExpiredSignatureError, JWTError
 
 from auth_service.core.config import get_auth_settings
+from auth_service.core.jwt_keys import decode_jwt, encode_jwt
 from shared.exceptions import AuthenticationError, TokenExpiredError
 
 _TOKEN_TYPE_ACCESS = "access"
@@ -18,15 +18,6 @@ _TOKEN_TYPE_SERVICE = "service"
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
-
-
-def _encode_jwt(payload: dict[str, Any]) -> str:
-    settings = get_auth_settings()
-    return jwt.encode(
-        payload,
-        settings.token_secret_key,
-        algorithm=settings.jwt_algorithm,
-    )
 
 
 def create_access_token(
@@ -57,7 +48,7 @@ def create_access_token(
     }
     if permissions:
         payload["permissions"] = permissions
-    return _encode_jwt(payload)
+    return encode_jwt(payload, settings)
 
 
 def create_refresh_token(user_id: str) -> str:
@@ -74,7 +65,7 @@ def create_refresh_token(user_id: str) -> str:
         "iat": now,
         "exp": now + timedelta(days=settings.refresh_token_expire_days),
     }
-    return _encode_jwt(payload)
+    return encode_jwt(payload, settings)
 
 
 def create_service_token(
@@ -98,7 +89,7 @@ def create_service_token(
         "iat": now,
         "exp": now + timedelta(hours=settings.service_token_expire_hours),
     }
-    return _encode_jwt(payload)
+    return encode_jwt(payload, settings)
 
 
 def verify_token(token: str) -> dict[str, Any]:
@@ -108,12 +99,7 @@ def verify_token(token: str) -> dict[str, Any]:
     """
     settings = get_auth_settings()
     try:
-        return jwt.decode(
-            token,
-            settings.token_secret_key,
-            algorithms=[settings.jwt_algorithm],
-            options={"verify_aud": False},
-        )
+        return decode_jwt(token, settings)
     except ExpiredSignatureError as exc:
         raise TokenExpiredError() from exc
     except JWTError as exc:
@@ -138,8 +124,3 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
         plain_password.encode("utf-8"),
         password_hash.encode("utf-8"),
     )
-
-
-def generate_key_id() -> str:
-    """Generate a unique key ID for JWKS."""
-    return str(uuid4())

@@ -10,12 +10,13 @@ from auth_service.core.security import (
     create_access_token,
     create_refresh_token,
     create_service_token,
-    generate_key_id,
     get_password_hash,
     verify_password,
     verify_token,
 )
 from shared.exceptions import AuthenticationError, TokenExpiredError
+
+_TEST_TOKEN_SECRET = "test-secret-key-for-unit-tests-only-32chars!"
 
 
 @pytest.mark.unit
@@ -93,7 +94,7 @@ class TestAccessToken:
         expired_token = jwt.encode(
             payload,
             settings.token_secret_key,
-            algorithm=settings.jwt_algorithm,
+            algorithm=settings.jwt_signing_algorithm,
         )
 
         with pytest.raises(TokenExpiredError):
@@ -159,9 +160,36 @@ class TestVerifyTokenErrors:
 
 
 @pytest.mark.unit
-class TestGenerateKeyId:
-    """测试 JWKS key id 生成。"""
+class TestRs256Jwt:
+    """测试 RS256 签发与验签。"""
 
-    def test_generate_key_id_is_unique(self, auth_security_env: None) -> None:
-        """每次生成的 kid 应不同。"""
-        assert generate_key_id() != generate_key_id()
+    def test_rs256_access_token_roundtrip(self, auth_rs256_env: None) -> None:
+        """RS256 Access Token 应能验签并含 kid。"""
+        from jose import jwt as jose_jwt
+
+        token = create_access_token("user-rs256", "STUDENT")
+        header = jose_jwt.get_unverified_header(token)
+        payload = verify_token(token)
+
+        assert header["alg"] == "RS256"
+        assert header["kid"] == "test-rs256-key-1"
+        assert payload["sub"] == "user-rs256"
+
+    def test_dual_algorithm_verify_hs256_while_signing_rs256(
+        self, monkeypatch: pytest.MonkeyPatch, auth_rs256_env: None
+    ) -> None:
+        """JWT_SUPPORT 双开时，应按 header alg 验签（非仅签发算法）。"""
+        monkeypatch.setenv("JWT_SUPPORT_HS256", "true")
+        monkeypatch.setenv("TOKEN_SECRET_KEY", _TEST_TOKEN_SECRET)
+        get_auth_settings.cache_clear()
+
+        hs256_token = jwt.encode(
+            {
+                "sub": "dual-u1",
+                "type": "access",
+                "exp": datetime.now(UTC) + timedelta(hours=1),
+            },
+            _TEST_TOKEN_SECRET,
+            algorithm="HS256",
+        )
+        assert verify_token(hs256_token)["sub"] == "dual-u1"

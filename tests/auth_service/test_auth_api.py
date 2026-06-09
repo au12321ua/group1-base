@@ -55,12 +55,6 @@ class TestAuthAPI:
         assert verify_resp.status_code == 200
         assert verify_resp.json()["data"]["user_id"] == user_id
 
-    async def test_public_key(self, async_client_auth, auth_security_env) -> None:
-        """GET /auth/public-key 应返回 JWKS。"""
-        resp = await async_client_auth.get("/api/v1/auth/public-key")
-        assert resp.status_code == 200
-        assert resp.json()["data"]["keys"]
-
     async def test_service_login(self, async_client_auth, auth_service_credentials) -> None:
         """POST /auth/sys/login 在正确凭据下应成功。"""
         settings = get_auth_settings()

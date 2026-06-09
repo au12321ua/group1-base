@@ -52,20 +52,6 @@ class LogoutRequest(BaseModel):
     refresh_token: str = Field(..., min_length=1)
 
 
-# ---- JWKS / Public Key ----
-
-
-class JwksKey(BaseModel):
-    kty: str = "oct"
-    use: str = "sig"
-    alg: str = "HS256"
-    kid: str
-
-
-class JwksResponse(BaseModel):
-    keys: list[JwksKey]
-
-
 # ---- Internal endpoint schemas ----
 
 
