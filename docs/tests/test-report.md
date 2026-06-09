@@ -2,9 +2,6 @@
 
 ## 1. 报告范围
 
-- 报告日期：2026-06-09
-- 当前分支：`test/integration`
-- 基线提交：`af7372a`（同步自最新 `origin/main` 后创建测试分支）
 - 测试框架：`pytest` + `pytest-asyncio` + `pytest-cov`
 - 测试边界：按 Router、Service、CRUD、Model 分层统计
 - 覆盖对象：`auth_service`、`info_service`、`shared`
