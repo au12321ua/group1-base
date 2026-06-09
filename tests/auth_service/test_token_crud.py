@@ -35,14 +35,14 @@ class TestTokenCRUD:
     async def test_revoke_all_for_user(self, auth_db_session) -> None:
         """应能吊销某用户全部未撤销 Token。"""
         expires = datetime.now(UTC) + timedelta(hours=1)
-        t1 = await token_crud.create(
+        await token_crud.create(
             auth_db_session,
             user_id="tok-u2",
             token_type=TokenType.ACCESS,
             token_value="access-1",
             expires_at=expires,
         )
-        t2 = await token_crud.create(
+        await token_crud.create(
             auth_db_session,
             user_id="tok-u2",
             token_type=TokenType.REFRESH,
@@ -51,8 +51,21 @@ class TestTokenCRUD:
         )
 
         await token_crud.revoke_all_for_user(auth_db_session, "tok-u2")
-        assert (await token_crud.get_by_value(auth_db_session, t1.token_value)).revoked_at
-        assert (await token_crud.get_by_value(auth_db_session, t2.token_value)).revoked_at
+        assert (await token_crud.get_by_value(auth_db_session, "access-1")).revoked_at
+        assert (await token_crud.get_by_value(auth_db_session, "refresh-2")).revoked_at
+
+    async def test_token_stores_hash_not_plaintext(self, auth_db_session) -> None:
+        """数据库应只存 token_hash，不存 JWT 明文。"""
+        raw = "super-secret-jwt-string"
+        row = await token_crud.create(
+            auth_db_session,
+            user_id="tok-u4",
+            token_type=TokenType.ACCESS,
+            token_value=raw,
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        )
+        assert row.token_hash != raw
+        assert len(row.token_hash) == 64
 
     async def test_delete_by_user(self, auth_db_session) -> None:
         """应能删除用户全部 Token 记录。"""
