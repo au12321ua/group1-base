@@ -11,7 +11,7 @@ STSS 大组 P2-A 子系统 — 教务信息管理系统，负责认证授权（A
 | ORM | SQLModel | Pydantic v2 + SQLAlchemy |
 | 数据库 | SQLite → PostgreSQL | 原型 → 生产 |
 | 迁移 | Alembic | 三条独立迁移链（见 `docs/alembic-guide.md`） |
-| 认证 | JWT HS256 | 预留 RS256 扩展 |
+| 认证 | JWT HS256 / RS256 | 默认 HS256；生产推荐 RS256（env 配置，Auth 内验签） |
 | 包管理 | uv | — |
 | Lint | ruff | — |
 | 测试 | pytest + pytest-asyncio | — |
@@ -116,6 +116,7 @@ group1-base/
 | [TEAM_GUIDE.md](TEAM_GUIDE.md) | 团队协作流程，含分支策略、PR 模板、任务分工 |
 | [docs/BRANCH_STRATEGY.md](docs/BRANCH_STRATEGY.md) | 分支管理详细规范 |
 | [docs/design/v2/README.md](docs/design/v2/README.md) | 架构设计文档索引 |
+| [docs/auth-jwt-keys.md](docs/auth-jwt-keys.md) | JWT HS256/RS256 配置与换密钥（env + 重启） |
 | [docs/require-spec/](docs/require-spec/) | 需求规格 + 验证矩阵 |
 
 ### 架构硬约束
@@ -129,10 +130,11 @@ group1-base/
 
 | 项 | 说明 |
 |----|------|
-| 迁移 | `uv run alembic -c auth_service/migrations/alembic.ini upgrade b2c3d4e5f6a7`（SQLite 原型；003 见 alembic-guide） |
-| 种子数据 | `002_seed_roles_permissions_admin`：4 角色、RBAC 权限映射、管理员 `admin` |
-| 种子密码 | `ChangeMe123`（002 硬编码）；`DEFAULT_INITIAL_PASSWORD` 用于 Info 调 `POST /internal/users` |
+| JWT | `JWT_SUPPORT_HS256` / `JWT_SUPPORT_RS256` + `JWT_SIGNING_ALGORITHM`（见 [docs/auth-jwt-keys.md](docs/auth-jwt-keys.md)） |
+| 验签 | 均在 Auth 内完成（`/internal/verify`）；**无** `/auth/public-key` 端点 |
+| Token 存储 | DB 仅存 `token_hash`（SHA-256），不存 JWT 明文 |
+| 种子数据 | `uv run python -m scripts.seed_data` |
 | 内部 API | `POST /api/v1/internal/users` 返回 **201**；`DELETE .../users/{id}` 返回 **204** |
-| 服务登录 | `POST /api/v1/auth/sys/login`，凭据见 `SERVICE_CLIENT_ID` / `SERVICE_CLIENT_SECRET` |
+| 服务登录 | `POST /api/v1/auth/sys/login`，凭据见 `SERVICE_CLIENT_*` 环境变量 |
 
 更多约束见 [CLAUDE.md](CLAUDE.md) 与 [docs/design/v2/04-security-architecture.md](docs/design/v2/04-security-architecture.md)。

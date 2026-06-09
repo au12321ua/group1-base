@@ -47,7 +47,7 @@
 |------|------|----------|
 | `users` | 最小用户标识 | id, userId, username, status, created_at |
 | `credentials` | 认证凭据 | id, user_id, password_hash, password_salt, failed_login_count, locked_until |
-| `tokens` | Token 记录 | id, user_id, type, token_value, issued_at, expires_at, revoked_at |
+| `tokens` | Token 记录 | id, user_id, type, token_hash（SHA-256）, issued_at, expires_at, revoked_at |
 | `authentication_sessions` | 登录会话 | id, user_id, access_token_id, refresh_token_id, status, client_ip |
 | `roles` | 角色定义 | id, code, name, description, is_active |
 | `permissions` | 权限点定义 | id, code, name, resource, action |

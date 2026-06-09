@@ -51,7 +51,6 @@ project/
 │   │       └── internal.py    # /internal/* 内部端点
 │   ├── services/
 │   │   ├── auth_service.py    # 登录、令牌签发/续期/撤销
-│   │   ├── key_service.py     # 密钥管理、JWKS 发布
 │   │   └── identity_service.py # Token 验签、身份提取（供 Gateway 调用）
 │   ├── crud/
 │   │   ├── credential_crud.py
@@ -164,7 +163,6 @@ project/
 | `/auth/refresh` | POST | `AuthService.refresh_token()` |
 | `/auth/me` | GET | `AuthService.get_current_user()` |
 | `/auth/change-password` | POST | `AuthService.change_password()` |
-| `/auth/public-key` | GET | `KeyService.get_public_keys()` |
 | `/internal/verify` | POST | `IdentityService.verify_token()` |
 | `/internal/users` | POST | `AuthService.create_internal_user()` |
 | `/internal/users/{id}/disable` | POST | `AuthService.disable_user()` |
@@ -180,11 +178,6 @@ project/
 - `refresh_token(refresh_token)` → 验证 → 签发新 Token 对
 - `change_password(user_id, old_pw, new_pw)` → 验证旧密码 → 更新哈希
 - 登录保护：连续失败 5 次 → 锁定 10 分钟
-
-**KeyService** — 密钥管理：
-- 管理当前及历史签名密钥
-- 提供 JWKS 格式公钥集（`/auth/public-key`）
-- 预留密钥轮换能力
 
 **IdentityService** — 身份验证（供 Gateway 调用）：
 - 验签 JWT（Access Token / Service Token）

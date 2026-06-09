@@ -5,16 +5,50 @@ Place auth-specific fixtures here when needed.
 """
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from auth_service.core.config import get_auth_settings
 
 _TEST_TOKEN_SECRET = "test-secret-key-for-unit-tests-only-32chars!"
 
 
+def _generate_rsa_pem_pair() -> tuple[str, str]:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("utf-8")
+    return private_pem, public_pem
+
+
 @pytest.fixture
 def auth_security_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """固定 JWT 密钥，避免测试依赖本地 .env。"""
+    monkeypatch.setenv("JWT_SUPPORT_HS256", "true")
+    monkeypatch.setenv("JWT_SUPPORT_RS256", "false")
+    monkeypatch.setenv("JWT_SIGNING_ALGORITHM", "HS256")
     monkeypatch.setenv("TOKEN_SECRET_KEY", _TEST_TOKEN_SECRET)
+    get_auth_settings.cache_clear()
+    yield
+    get_auth_settings.cache_clear()
+
+
+@pytest.fixture
+def auth_rs256_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """RS256 测试用临时 RSA 密钥对。"""
+    private_pem, public_pem = _generate_rsa_pem_pair()
+    monkeypatch.setenv("JWT_SUPPORT_HS256", "false")
+    monkeypatch.setenv("JWT_SUPPORT_RS256", "true")
+    monkeypatch.setenv("JWT_SIGNING_ALGORITHM", "RS256")
+    monkeypatch.setenv("JWT_RSA_KEY_ID", "test-rs256-key-1")
+    monkeypatch.setenv("JWT_RSA_PRIVATE_KEY_PEM", private_pem)
+    monkeypatch.setenv("JWT_RSA_PUBLIC_KEY_PEM", public_pem)
     get_auth_settings.cache_clear()
     yield
     get_auth_settings.cache_clear()

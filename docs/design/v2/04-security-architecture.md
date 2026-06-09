@@ -180,9 +180,11 @@ sequenceDiagram
 ### 3.1 原型方案（HS256）
 
 ```python
-# 配置项
-JWT_ALGORITHM = "HS256"
-TOKEN_SECRET_KEY = env("TOKEN_SECRET_KEY")  # 对称密钥
+# 配置项（见 docs/auth-jwt-keys.md）
+JWT_SUPPORT_HS256 = True
+JWT_SIGNING_ALGORITHM = "HS256"
+TOKEN_SECRET_KEY = env("TOKEN_SECRET_KEY")
+JWT_HS256_KEY_ID = "auth-hs256-key-1"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15            # 普通用户
 ADMIN_ACCESS_TOKEN_EXPIRE_MINUTES = 5       # 管理员（更短）
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -217,11 +219,23 @@ SERVICE_TOKEN_EXPIRE_HOURS = 8              # Service Token
 }
 ```
 
-### 3.3 密钥轮换机制
+### 3.3 密钥与 JWT 算法
 
-- `/auth/public-key` 返回 JWKS 格式公钥集，当前返回 HS256 的对称密钥标识。
-- 密钥轮换期间保留 `当前 Key + 上一版本 Key`，避免生效中的 Token 瞬时失效。
-- 后续迁移至 RS256 时，接口签名不变，仅替换公钥内容。
+Auth Service 在内部完成 **签发与验签**；Gateway/下游**不持有 JWT 密钥**，也**不提供**公钥 HTTP 端点。
+
+| 变量 | 说明 |
+|------|------|
+| `JWT_SUPPORT_HS256` | 是否接受 HS256 Token（验签） |
+| `JWT_SUPPORT_RS256` | 是否接受 RS256 Token（验签） |
+| `JWT_SIGNING_ALGORITHM` | 新签发 Token 使用的算法（须在 SUPPORT 列表中） |
+| `TOKEN_SECRET_KEY` | HS256 对称密钥 |
+| `JWT_RSA_*_PEM` | RS256 密钥对（私钥签发，公钥验签） |
+
+两种算法密钥可同时配置，便于 HS256 → RS256 迁移：双开 SUPPORT 后，旧 HS256 Token 在过期前仍可验签。
+
+**Token 持久化**：`tokens.token_hash` 仅存 SHA-256 摘要，不存 JWT 明文。
+
+换密钥：更新环境变量并重启服务；不做在线 JWKS 轮换。
 
 ### 3.4 鉴权职责分配
 
@@ -229,7 +243,7 @@ SERVICE_TOKEN_EXPIRE_HOURS = 8              # Service Token
 
 | 职责 | Gateway | Auth Service | Info Service |
 |------|---------|-------------|-------------|
-| JWT 验签 (HS256) | —（调用 Auth） | ✓ | — |
+| JWT 验签 (HS256/RS256) | —（调用 Auth） | ✓ | — |
 | Token 身份提取 | —（调用 Auth） | ✓ | — |
 | 透传身份 Header | ✓ | — | — |
 | 读取身份 Header | — | — | ✓ |

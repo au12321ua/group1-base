@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from auth_service.core.token_hash import hash_token
 from auth_service.models.token import Token, TokenType
 
 
@@ -20,11 +21,11 @@ class TokenCRUD:
         token_value: str,
         expires_at: datetime,
     ) -> Token:
-        """Persist a newly issued token."""
+        """Persist a newly issued token (stores SHA-256 hash, not raw JWT)."""
         token = Token(
             user_id=user_id,
             type=token_type,
-            token_value=token_value,
+            token_hash=hash_token(token_value),
             expires_at=expires_at,
         )
         db.add(token)
@@ -33,8 +34,10 @@ class TokenCRUD:
         return token
 
     async def get_by_value(self, db: AsyncSession, token_value: str) -> Token | None:
-        """Find a token by its value."""
-        result = await db.exec(select(Token).where(Token.token_value == token_value))
+        """Find a token by raw JWT value (hashed before lookup)."""
+        result = await db.exec(
+            select(Token).where(Token.token_hash == hash_token(token_value))
+        )
         return result.first()
 
     async def revoke(self, db: AsyncSession, token_id: int) -> None:
