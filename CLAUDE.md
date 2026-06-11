@@ -25,7 +25,8 @@
 ```
 group1-base/
 ├── docs/
-│   ├── design/v2/              ← 架构设计（9 份编号文档 + README，Agent 编码前必读）
+│   ├── design/v3/              ← 架构设计（10 份编号文档 + README，Agent 编码前必读）★ V3 当前版本
+│   ├── design/v2/              ← 架构设计 V2（历史参考，已不再维护）
 │   ├── require-spec/           ← 需求规格（验收标准来源）
 │   ├── tests/                  ← 测试文档：README 概览 + 完整编写指南
 │   ├── BRANCH_STRATEGY.md      ← 分支管理策略（GitHub Flow）
@@ -130,7 +131,7 @@ Gateway → Auth Service /internal/verify → X-User-Id, X-User-Role, X-User-Per
 ## 开发工作流
 
 1. 从 `main` 创建分支：`feat/xxx`、`fix/xxx`、`chore/xxx`
-2. 让 Agent 先阅读 `docs/design/v2/` 下对应设计文档
+2. 让 Agent 先阅读 `docs/design/v3/` 下对应设计文档
 3. 编写实现（Agent 生成或手写）
 4. 本地验证：
    - 后端完整检查：`uv run ruff check . && uv run pytest`
@@ -160,13 +161,13 @@ uv run pytest
 
 | 任务类型 | 必读文档 |
 |----------|----------|
-| Auth 相关 | `docs/design/v2/04-security-architecture.md`、`02-module-architecture.md` |
-| CRUD 接口 | `docs/design/v2/05-api-architecture.md`、`03-data-architecture.md` |
-| 业务流程 | `docs/design/v2/06-business-flows.md` |
-| 部署/环境 | `docs/design/v2/08-deployment.md` |
+| Auth 相关 | `docs/design/v3/04-security-architecture.md`、`02-module-architecture.md` |
+| CRUD 接口 | `docs/design/v3/05-api-architecture.md`、`03-data-architecture.md` |
+| 业务流程 | `docs/design/v3/06-business-flows.md` |
+| 部署/环境 | `docs/design/v3/08-deployment.md` |
 | 数据库 | `docs/alembic-guide.md` |
-| 前端开发 | `docs/frontend/README.md`、`docs/frontend/development-guide.md` |
-| 全部 | `docs/design/v2/README.md`（索引入口） |
+| 全部 | `docs/design/v3/README.md`（索引入口） |
+| 未来规划 | `docs/design/v3/10-future-roadmap.md`（Redis/PG 暂未实现） |
 
 完整需求规格在 `docs/require-spec/`，测试矩阵在 `docs/require-spec/validation_matrices/`。
 
