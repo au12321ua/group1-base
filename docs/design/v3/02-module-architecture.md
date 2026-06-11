@@ -4,24 +4,25 @@
 
 两个服务统一采用 **Router → Service → CRUD → Model** 四层单向依赖架构，遵循 Clean Architecture 的依赖规则。
 
-```
-┌─────────────────────────────────────────────────┐
-│                  Router 层                       │
-│  api/v1/  — 薄路由：参数校验、调用 Service、     │
-│             返回 Schema，不写业务逻辑             │
-├─────────────────────────────────────────────────┤
-│                  Service 层                      │
-│  services/  — 厚服务：业务逻辑、权限校验、        │
-│               跨模块编排、事务管理                 │
-├─────────────────────────────────────────────────┤
-│                  CRUD 层                         │
-│  crud/  — 数据访问：纯 SQL/ORM 操作，            │
-│           不包含业务判断                          │
-├─────────────────────────────────────────────────┤
-│                  Model 层                        │
-│  models/  — SQLModel 实体定义，                  │
-│            纯粹的数据结构映射                      │
-└─────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Router["Router 层"]
+        R_desc["api/v1/ — 薄路由<br/>参数校验、调用 Service、返回 Schema<br/>不写业务逻辑"]
+    end
+
+    subgraph Service["Service 层"]
+        S_desc["services/ — 厚服务<br/>业务逻辑、权限校验<br/>跨模块编排、事务管理"]
+    end
+
+    subgraph CRUD["CRUD 层"]
+        C_desc["crud/ — 数据访问<br/>纯 SQL/ORM 操作<br/>不包含业务判断"]
+    end
+
+    subgraph Model["Model 层"]
+        M_desc["models/ — SQLModel 实体定义<br/>纯粹的数据结构映射"]
+    end
+
+    Router -->|"依赖"| Service -->|"依赖"| CRUD -->|"依赖"| Model
 ```
 
 ### 1.1 依赖规则

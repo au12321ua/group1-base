@@ -174,6 +174,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173
 # 配置加载示例 (auth_service/core/config.py)
 from shared.config import SharedSettings
 
+
 class AuthServiceSettings(SharedSettings):
     auth_database_url: str = "sqlite+aiosqlite:///auth_service/data/auth.db"
     token_secret_key: str = "change-me-in-production"
@@ -211,25 +212,24 @@ docker compose up -d
 
 ## 5. 网络拓扑
 
-```
-                    ┌──────────────┐
-                    │   Gateway    │
-                    │ Nginx :8000  │ (其他组)
-                    └──┬────────┬──┘
-                       │        │
-              :8001    │        │    :8002
-            ┌──────────▼──┐ ┌──▼──────────┐
-            │ Auth Service│ │ Info Service│
-            │    :8001    │ │    :8002    │
-            │  (本组)     │ │  (本组)     │
-            └──────┬──────┘ └──┬────┬─────┘
-                   │           │    │
-            ┌──────▼──┐  ┌────▼──┐ ┌▼──────┐
-            │ Auth DB │  │Info DB│ │Audit  │
-            │(auth.db)│  │(info. │ │  DB   │
-            │         │  │ db)   │ │(audit.│
-            │         │  │       │ │ db)   │
-            └─────────┘  └───────┘ └───────┘
+```mermaid
+flowchart TD
+    GW["Nginx Gateway :8000<br/>(其他组)"]
+
+    subgraph OurGroup["本组负责"]
+        Auth["Auth Service :8001"]
+        Info["Info Service :8002"]
+        AuthDB[("Auth DB<br/>auth.db")]
+        InfoDB[("Info DB<br/>info.db")]
+        AuditDB[("Audit DB<br/>audit.db")]
+    end
+
+    GW -->|":8001"| Auth
+    GW -->|":8002"| Info
+    Auth --> AuthDB
+    Info --> InfoDB
+    Info --> AuditDB
+    Auth --> AuditDB
 ```
 
 ### 5.1 通信方式

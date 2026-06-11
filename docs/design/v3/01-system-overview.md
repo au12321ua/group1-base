@@ -58,19 +58,51 @@ flowchart LR
 
 ### 2.2 主数据流
 
-```
-A（信息管理）
-  ├─ 教师名单、校历 ──→ B（排课）
-  ├─ 培养方案 ──→ C（选课）
-  └─ 教师/学生/校历 ──→ F（成绩）
+```mermaid
+flowchart LR
+    subgraph A["P2-A 信息管理（本组）"]
+        teachers["教师名单"]
+        calendars["校历"]
+        programs["培养方案"]
+        students["学生名单"]
+    end
+
+    subgraph B["P3-B 排课"]
+        B_core["自动排课"]
+    end
+
+    subgraph C["P4-C 选课"]
+        C_core["智能选课"]
+    end
+
+    subgraph F["P7-F 成绩"]
+        F_core["成绩管理"]
+    end
+
+    teachers -->|"教师名单、校历"| B_core
+    calendars -->|"校历"| B_core
+    programs -->|"培养方案"| C_core
+    teachers -->|"教师/学生/校历"| F_core
+    students -->|"学生名单"| F_core
+    calendars -->|"校历"| F_core
 ```
 
 ### 2.3 跨子系统通信模型
 
-```
-用户请求 → Nginx Gateway → Gateway 调用 Auth Service 验签 → 透传身份 Header
-  → Auth Service（签发/验证 Token，提供 /internal/verify）
-  → Info Service（信任 Gateway Header → 业务处理 → 返回结果）
+```mermaid
+sequenceDiagram
+    actor User as 用户
+    participant GW as Nginx Gateway
+    participant Auth as Auth Service
+    participant Info as Info Service
+
+    User->>GW: HTTP 请求（含 Authorization Header）
+    GW->>Auth: POST /internal/verify（验签 JWT）
+    Auth-->>GW: 200 {user_id, role, permissions}
+    GW->>Info: 透传请求 + X-User-Id, X-User-Role, X-User-Permissions
+    Info->>Info: 信任 Header → 业务处理
+    Info-->>GW: 200 业务结果
+    GW-->>User: 响应
 ```
 
 - **用户态请求**：Gateway 调用 Auth Service `/internal/verify` 完成 JWT 验签与身份提取，然后通过 `X-User-Id`、`X-User-Role`、`X-User-Permissions` Header 透传给下游服务。下游服务不再本地验签。
@@ -138,5 +170,5 @@ A（信息管理）
 
 - **目标**：SQLite → PostgreSQL，支持并发写入和生产级性能
 - **准备就绪**：Alembic 配置已保留为模板，3 条迁移链（auth/info/audit）已配置
-- **切换步骤**：修改连接字符串 → 启用 Alembic → 生成初始迁移 → 数据迁移 → 上线
+- **切换步骤**：修改连接字符串 → 启用 Alembic → 生成初始迁移 → 运行种子脚本 → 上线
 - **预计影响**：并发能力大幅提升；部署需额外 PostgreSQL 容器/实例

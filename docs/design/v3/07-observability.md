@@ -4,18 +4,23 @@
 
 ### 1.1 架构概览
 
-```
-┌─────────────────────────────────────────────────┐
-│                    日志系统                       │
-├─────────────────┬───────────────────────────────┤
-│   应用日志       │         审计日志               │
-│  (AppLogger)    │       (AuditService)          │
-│                 │                               │
-│ ▪ 控制台输出     │  ▪ 独立 Audit DB (audit.db)     │
-│ ▪ 文件按天轮转   │  ▪ 高风险操作 + 数据提供记录   │
-│ ▪ JSON 格式     │  ▪ 不可抵赖                    │
-│ ▪ 四级分级       │  ▪ 支持检索 + CSV 导出         │
-└─────────────────┴───────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph LogSystem["日志系统"]
+        subgraph AppLog["应用日志 (AppLogger)"]
+            AL1["▪ 控制台输出"]
+            AL2["▪ 文件按天轮转"]
+            AL3["▪ JSON 格式"]
+            AL4["▪ 四级分级"]
+        end
+
+        subgraph AuditLog["审计日志 (AuditService)"]
+            AU1["▪ 独立 Audit DB (audit.db)"]
+            AU2["▪ 高风险操作 + 数据提供记录"]
+            AU3["▪ 不可抵赖"]
+            AU4["▪ 支持检索 + CSV 导出"]
+        end
+    end
 ```
 
 ### 1.2 日志级别定义
@@ -55,15 +60,15 @@
 ```python
 # 开发环境
 LOG_LEVEL = "DEBUG"
-LOG_OUTPUT = "console"        # 控制台
+LOG_OUTPUT = "console"  # 控制台
 LOG_FORMAT = "json"
 
 # 生产环境
 LOG_LEVEL = "INFO"
-LOG_OUTPUT = "file"           # 文件
+LOG_OUTPUT = "file"  # 文件
 LOG_DIR = "/var/log/stss/"
-LOG_ROTATION = "daily"        # 按天轮转
-LOG_RETENTION = 30            # 保留 30 天
+LOG_ROTATION = "daily"  # 按天轮转
+LOG_RETENTION = 30  # 保留 30 天
 ```
 
 ## 2. 审计日志
@@ -106,11 +111,20 @@ LOG_RETENTION = 30            # 保留 30 天
 
 ### 3.1 X-Request-ID 全链路透传
 
-```
-Client → Nginx Gateway → Auth Service → Info Service
-   │           │                │              │
-   └── 生成 X-Request-ID ──────┴──────────────┘
-        (若无则生成 UUID)      透传不修改      透传不修改
+```mermaid
+sequenceDiagram
+    actor Client
+    participant GW as Nginx Gateway
+    participant Auth as Auth Service
+    participant Info as Info Service
+
+    Client->>GW: HTTP 请求
+    GW->>GW: 生成 X-Request-ID（若无则生成 UUID）
+    GW->>Auth: 透传 X-Request-ID
+    Auth->>Auth: 透传不修改
+    Auth->>Info: 透传 X-Request-ID
+    Info->>Info: 透传不修改
+    Note over Client,Info: X-Request-ID 全链路透传，用于日志串联
 ```
 
 - **生成**：Gateway 在请求入口生成 `X-Request-ID`（UUID v4），若上游已传则透传。

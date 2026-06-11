@@ -4,39 +4,22 @@
 
 系统使用 **3 个独立 SQLite 数据库**，分别服务于认证、业务和审计日志。
 
+```mermaid
+flowchart TB
+    Auth["<b>Auth Service</b><br/>8001<br/>───────<br/>Auth DB<br/>8 tables"]
+    Info["<b>Info Service</b><br/>8002<br/>───────<br/>Info DB<br/>14 tables"]
+    Audit["<b>Audit DB</b><br/>3 tables<br/>───────<br/>Shared Write"]
+    
+    Auth -.->|logical<br/>relation| Info
+    Auth -->|audit write| Audit
+    Info -->|audit write| Audit
+    
+    style Auth fill:#e8f4f8
+    style Info fill:#e8f8e8
+    style Audit fill:#fff3e0
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│    Auth DB      │     │    Info DB      │     │    Audit DB     │
-│  (auth.db)      │     │  (info.db)      │     │  (audit.db)     │
-│                 │     │                 │     │                 │
-│ ▪ users         │     │ ▪ users_info    │     │ ▪ audit_logs    │
-│ ▪ credentials   │     │ ▪ user_profiles │     │ ▪ dead_letter   │
-│ ▪ tokens        │     │ ▪ courses       │     │   _queue        │
-│ ▪ authentication │     │ ▪ course_       │     │ ▪ operation_logs│
-│   _sessions     │     │   offerings     │     │                 │
-│ ▪ roles         │     │ ▪ course_       │     │                 │
-│ ▪ permissions   │     │   schedules     │     │                 │
-│ ▪ user_roles    │     │ ▪ course_       │     │                 │
-│ ▪ role_         │     │   prerequisites │     │                 │
-│   permissions   │     │ ▪ classrooms    │     │                 │
-│                 │     │ ▪ teacher_      │     │                 │
-│                 │     │   course_       │     │                 │
-│                 │     │   assignments   │     │                 │
-│                 │     │ ▪ academic_     │     │                 │
-│                 │     │   calendars     │     │                 │
-│                 │     │ ▪ training_     │     │                 │
-│                 │     │   programs      │     │                 │
-│                 │     │ ▪ training_     │     │                 │
-│                 │     │   program_      │     │                 │
-│                 │     │   courses       │     │                 │
-│                 │     │ ▪ base_info_    │     │                 │
-│                 │     │   items         │     │                 │
-│                 │     │ ▪ file_resources│     │                 │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-       ↑ 8001                  ↑ 8002                ↑ 8001 + 8002
-   Auth Service           Info Service         Auth + Info Service
-                                              (共享写入)
-```
+
+> **端口与所有权**：Auth Service（8001）独占 Auth DB；Info Service（8002）独占 Info DB；Audit DB 由 Auth + Info Service 共享写入（8001 + 8002）。
 
 ### 1.1 分库原则
 
@@ -220,18 +203,25 @@ erDiagram
 
 原型阶段采用 **HTTP 同步调用 + 补偿重试** 模式：
 
-```
-Info Service（主写方）                     Auth Service（从写方）
-      │                                         │
-      │  ① 写 Info DB（事务内）                  │
-      │  ② HTTP POST /internal/users            │
-      │ ──────────────────────────────────────→ │
-      │                                         │  ③ 写 Auth DB
-      │  ④ 成功 ←──────────────────────────── │
-      │                                         │
-      │  若 ②/③ 失败：                          │
-      │  ⑤ 补偿删除 Info DB 记录                │
-      │  ⑥ 记录异常日志                          │
+```mermaid
+sequenceDiagram
+    participant Info as Info Service（主写方）
+    participant InfoDB as Info DB
+    participant Auth as Auth Service（从写方）
+    participant AuthDB as Auth DB
+
+    Info->>InfoDB: ① 写 Info DB（事务内）
+    InfoDB-->>Info: 写入成功
+    Info->>Auth: ② HTTP POST /internal/users
+    Auth->>AuthDB: ③ 写 Auth DB
+    alt 成功
+        AuthDB-->>Auth: 写入成功
+        Auth-->>Info: ④ 成功
+    else ②/③ 失败
+        Auth-->>Info: 调用失败
+        Info->>InfoDB: ⑤ 补偿删除 Info DB 记录
+        Info->>Info: ⑥ 记录异常日志
+    end
 ```
 
 ### 3.2 场景覆盖

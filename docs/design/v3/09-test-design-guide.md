@@ -15,8 +15,9 @@
 
 测试设计应在功能设计完成之后、编码之前进行，遵循以下流程：
 
-```
-需求分析 → 测试策略制定 → 测试架构设计 → 用例设计 → 数据设计 → 评审 → 编码
+```mermaid
+flowchart LR
+    A["需求分析"] --> B["测试策略制定"] --> C["测试架构设计"] --> D["用例设计"] --> E["数据设计"] --> F["评审"] --> G["编码"]
 ```
 
 | 阶段 | 输入 | 输出 | 参与角色 |
@@ -131,6 +132,7 @@ async def auth_db_engine():
 @pytest.fixture(scope="function")
 async def async_client_auth():
     from auth_service.main import app
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
@@ -147,10 +149,12 @@ async def async_client_auth():
 ```python
 @pytest.fixture
 def fake_auth_client():
-    return FakeAuthServiceClient(responses={
-        "create_user": {"status": "created", "user_id": "u1"},
-        "disable_user": {"status": "disabled"},
-    })
+    return FakeAuthServiceClient(
+        responses={
+            "create_user": {"status": "created", "user_id": "u1"},
+            "disable_user": {"status": "disabled"},
+        }
+    )
 ```
 
 **设计要点**：

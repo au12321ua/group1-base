@@ -5,14 +5,33 @@
 
 ## 1. 演进概览
 
-```
-原型阶段（当前）           中期（v1.x）              远期（v2.x）
-──────────────────────────────────────────────────────────
-SQLite (3 DB)      →     PostgreSQL (3 DB)    →    PostgreSQL + 读写分离
-无缓存              →     Redis 查询缓存       →    Redis 集群
-HTTP 同步补偿        →     HTTP + 补偿重试      →    MQ 异步 (RabbitMQ)
-Model-First 建表    →     Alembic 迁移          →    CI/CD 自动迁移
-单机部署             →     Docker Compose       →    K8s 容器编排
+```mermaid
+flowchart LR
+    subgraph Phase1["原型阶段（当前）"]
+        P1_DB["SQLite (3 DB)"]
+        P1_Cache["无缓存"]
+        P1_Comm["HTTP 同步补偿"]
+        P1_Mig["Model-First 建表"]
+        P1_Deploy["单机部署"]
+    end
+
+    subgraph Phase2["中期（v1.x）"]
+        P2_DB["PostgreSQL (3 DB)"]
+        P2_Cache["Redis 查询缓存"]
+        P2_Comm["HTTP + 补偿重试"]
+        P2_Mig["Alembic 迁移<br/>(无数据迁移负担)"]
+        P2_Deploy["Docker Compose"]
+    end
+
+    subgraph Phase3["远期（v2.x）"]
+        P3_DB["PostgreSQL + 读写分离"]
+        P3_Cache["Redis 集群"]
+        P3_Comm["MQ 异步 (RabbitMQ)"]
+        P3_Mig["CI/CD 自动迁移"]
+        P3_Deploy["K8s 容器编排"]
+    end
+
+    Phase1 --> Phase2 --> Phase3
 ```
 
 ## 2. Redis 缓存层
@@ -40,7 +59,6 @@ Model-First 建表    →     Alembic 迁移          →    CI/CD 自动迁移
 
 **Cache-Aside（旁路缓存）— 主要模式**：
 
-```
 读取路径：
   1. 查询 Redis → 命中则返回
   2. 未命中 → 查询 DB → 写入 Redis（设 TTL）→ 返回
@@ -48,38 +66,21 @@ Model-First 建表    →     Alembic 迁移          →    CI/CD 自动迁移
 写入路径：
   1. 更新 DB
   2. 删除 Redis 对应缓存（invalidate）
-```
 
 **Write-Through（写穿）— 用于 Token 黑名单**：
 
-```
 写入路径：
   1. 同时写入 Redis + DB
   2. Redis 设 TTL 自动过期
-```
 
 ### 2.3 架构设计
 
-```
-┌──────────────────────────────────────────┐
-│               Info Service                │
-│                                           │
-│  ┌──────────┐    ┌──────────────────┐    │
-│  │  Router   │ →  │     Service      │    │
-│  └──────────┘    └───────┬──────────┘    │
-│                          │               │
-│              ┌───────────┼───────────┐   │
-│              ▼           ▼           ▼   │
-│        ┌─────────┐ ┌─────────┐ ┌───────┐│
-│        │ Cache   │ │  CRUD   │ │ Auth  ││
-│        │ Layer   │ │  Layer  │ │ Client││
-│        └────┬────┘ └────┬────┘ └───────┘│
-│             │           │                │
-└─────────────┼───────────┼────────────────┘
-              │           │
-        ┌─────▼───┐  ┌───▼──────┐
-        │  Redis  │  │ PostgreSQL│
-        └─────────┘  └──────────┘
+```mermaid
+flowchart LR
+    subgraph WritePath["写入路径"]
+        direction LR
+        W1["1. 同时写入 Redis + DB"] --> W2["2. Redis 设 TTL 自动过期"]
+    end
 ```
 
 ### 2.4 实现方案
@@ -120,6 +121,7 @@ from typing import Callable, TypeVar
 
 T = TypeVar("T")
 
+
 class CacheLayer:
     """Redis 缓存层 — 暂未实现，接口预留"""
 
@@ -145,14 +147,15 @@ class CacheLayer:
 
 def cached(key_pattern: str, ttl: int = 300):
     """缓存装饰器 — 暂未实现，接口预留。
-    
+
     用于 Service 层方法，自动处理 Cache-Aside 模式。
-    
+
     Usage:
         @cached("user:{user_id}", ttl=300)
         async def get_user(self, user_id: str) -> UserResponse:
             ...
     """
+
     def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -160,7 +163,9 @@ def cached(key_pattern: str, ttl: int = 300):
             # TODO: 命中 → 返回缓存数据
             # TODO: 未命中 → 调用原函数 → 写入缓存 → 返回
             return await func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 ```
 
@@ -222,7 +227,7 @@ volumes:
 | SQLModel 模型定义 | ✅ 已就绪 | 使用标准 SQLModel 类型，无需修改 |
 | Alembic 配置 | ✅ 已保留 | 3 条迁移链（auth/info/audit）配置完整 |
 | 数据库连接配置 | ✅ 已支持 | 通过环境变量切换 URL 即可 |
-| 数据迁移方案 | ⬜ 待制定 | 需 SQLite → PostgreSQL 数据迁移工具 |
+| 种子数据脚本 | ✅ 已就绪 | SQLModel 跨数据库兼容，seed 脚本无需修改；如有自定义 SQL 需注意语法差异 |
 | 连接池配置 | ⬜ 待添加 | 需要配置 SQLAlchemy 连接池参数 |
 
 ### 3.3 切换方案
@@ -263,29 +268,40 @@ def create_engine(database_url: str):
         echo=False,
     )
 
+
 # shared/database.py — PostgreSQL 切换后
 def create_engine(database_url: str):
     is_postgres = database_url.startswith("postgresql")
     return create_async_engine(
         database_url,
         echo=False,
-        pool_size=20 if is_postgres else None,        # PG 连接池
-        max_overflow=10 if is_postgres else None,      # 溢出连接
+        pool_size=20 if is_postgres else None,  # PG 连接池
+        max_overflow=10 if is_postgres else None,  # 溢出连接
         pool_pre_ping=True if is_postgres else False,  # 连接健康检查
     )
 ```
 
 ### 3.4 Alembic 迁移流程
 
-```
-原型状态：                        PostgreSQL 切换后：
-                                  
-SQLModel.metadata.create_all()    1. 生成初始迁移
-       ↓                          2. alembic revision --autogenerate
-  自动建表（3 条链）               3. alembic upgrade head（初始基准）
-       ↓                          4. 数据迁移（SQLite → PG）
-  无版本历史                      5. 后续增量迁移
-                                  6. CI/CD 自动执行迁移
+```mermaid
+flowchart TD
+    subgraph Proto["原型状态"]
+        P1["SQLModel.metadata.create_all()"]
+        P2["自动建表（3 条链）"]
+        P3["无版本历史"]
+        P1 --> P2 --> P3
+    end
+
+    subgraph PG["PostgreSQL 切换后"]
+        Q1["1. 生成初始迁移"]
+        Q2["2. alembic revision --autogenerate"]
+        Q3["3. alembic upgrade head（初始基准）"]
+        Q4["4. 后续增量迁移"]
+        Q5["5. CI/CD 自动执行迁移"]
+        Q1 --> Q2 --> Q3 --> Q4 --> Q5
+    end
+
+    Proto -.->|"切换"| PG
 ```
 
 #### 迁移命令参考
@@ -353,17 +369,27 @@ SQLite 与 PostgreSQL 的差异需要在切换前检查：
 | 并发写入 | 单写锁 | MVCC 多版本 | 性能大幅提升 |
 | 外键约束 | 默认关闭 | 默认开启 | 需确保代码不依赖 SQLite 宽松行为 |
 
-### 3.8 数据迁移方案
+### 3.8 种子数据初始化
+
+> **无需数据迁移**：项目处于原型阶段，使用 Model-First（`create_all` 自动建表），数据库中无持久化生产数据需要迁移。切换 PostgreSQL 时只需重新运行种子脚本即可完成数据初始化。
+
+当前种子脚本位于 `scripts/` 目录：
+
+| 脚本 | 职责 | PostgreSQL 兼容性 |
+|------|------|-------------------|
+| `seed_data.py` | 主入口 | ✅ SQLModel 跨数据库兼容 |
+| `seed_auth.py` | Auth 种子数据（角色、权限、管理员） | ✅ 无需修改 |
+| `seed_info.py` | Info 种子数据（课程、校历、教室等） | ✅ 无需修改 |
+| `seed_utils.py` | 共享工具 | ✅ 无需修改 |
+
+**切换时重新初始化**：
 
 ```bash
-# 方案 A：使用 pgloader（推荐）
-pgloader sqlite:///auth.db postgresql://user:pass@localhost/auth_db
-pgloader sqlite:///info.db postgresql://user:pass@localhost/info_db
-pgloader sqlite:///audit.db postgresql://user:pass@localhost/audit_db
-
-# 方案 B：Python 脚本逐表导出导入
-uv run python scripts/migrate_sqlite_to_pg.py
+# PostgreSQL 切换后重新运行种子脚本
+uv run python scripts/seed_data.py
 ```
+
+> **注意**：若未来种子脚本中添加了自定义 SQL（绕过 SQLModel ORM），需注意 SQLite 与 PostgreSQL 的语法差异（如自增主键、日期类型、LIKE 大小写等，详见 §3.7 不兼容项表）。
 
 ### 3.9 切换步骤
 
@@ -377,9 +403,9 @@ uv run python scripts/migrate_sqlite_to_pg.py
 3. **迁移阶段**：
    - 启用 Alembic，生成初始迁移
    - 执行 `alembic upgrade head` 建表
-4. **数据迁移**：
-   - 使用 pgloader 或自定义脚本迁移数据
-   - 验证数据完整性（行数、关联关系）
+4. **种子数据**：
+   - 运行 `uv run python scripts/seed_data.py` 初始化数据
+   - 验证种子数据完整性
 5. **验证阶段**：
    - 全量测试套件通过
    - 性能基准测试

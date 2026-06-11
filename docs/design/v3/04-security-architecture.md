@@ -99,17 +99,21 @@ sequenceDiagram
 
 ### 2.1 RBAC + 资源级权限（混合模型）
 
-```
-┌──────────────────────────────────────┐
-│           资源级权限（Info Service）    │
-│   Owner/Scope 校验：教师只能操作自己    │
-│   授课班级，管理员不受资源级限制        │
-├──────────────────────────────────────┤
-│           RBAC（Auth Service）        │
-│   Role → Permission (resource:action) │
-├──────────────────────────────────────┤
-│           默认拒绝 + 显式授权          │
-└──────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph ResourcePerm["资源级权限（Info Service）"]
+        R_desc["Owner/Scope 校验：教师只能操作自己<br/>授课班级，管理员不受资源级限制"]
+    end
+
+    subgraph RBAC["RBAC（Auth Service）"]
+        RBAC_desc["Role → Permission (resource:action)"]
+    end
+
+    subgraph Default["默认拒绝 + 显式授权"]
+        D_desc["所有接口默认要求鉴权，显式授权访问"]
+    end
+
+    ResourcePerm --> RBAC --> Default
 ```
 
 ### 2.2 角色定义
@@ -182,14 +186,14 @@ sequenceDiagram
 ```python
 # 配置项
 JWT_SUPPORT_HS256 = True
-JWT_SUPPORT_RS256 = False           # 暂未启用
+JWT_SUPPORT_RS256 = False  # 暂未启用
 JWT_SIGNING_ALGORITHM = "HS256"
 TOKEN_SECRET_KEY = env("TOKEN_SECRET_KEY")
 JWT_HS256_KEY_ID = "auth-hs256-key-1"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15    # 普通用户
+ACCESS_TOKEN_EXPIRE_MINUTES = 15  # 普通用户
 ADMIN_ACCESS_TOKEN_EXPIRE_MINUTES = 5  # 管理员（更短）
 REFRESH_TOKEN_EXPIRE_DAYS = 7
-SERVICE_TOKEN_EXPIRE_HOURS = 8     # Service Token
+SERVICE_TOKEN_EXPIRE_HOURS = 8  # Service Token
 ```
 
 ### 3.2 Token Payload 结构
@@ -288,11 +292,11 @@ Auth Service 在内部完成 **签发与验签**；Gateway/下游**不持有 JWT
 
 ### 5.2 登录保护
 
-```
-连续失败 N 次 → 锁定 10 分钟
-  N = 5（默认，可配置 via MAX_LOGIN_ATTEMPTS）
-  锁定 = 拒绝所有登录尝试
-  解除 = 10 分钟后自动解除 或 管理员手动解除
+```mermaid
+flowchart LR
+    Normal["正常状态"] -->|"连续失败 5 次<br/>(MAX_LOGIN_ATTEMPTS)"| Locked["锁定状态<br/>拒绝所有登录尝试"]
+    Locked -->|"10 分钟后自动解除<br/>(ACCOUNT_LOCK_MINUTES)"| Normal
+    Locked -->|"管理员手动解除"| Normal
 ```
 
 ### 5.3 接口保护
