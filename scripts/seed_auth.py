@@ -78,28 +78,33 @@ _PERMISSIONS: list[tuple[str, str, str, str]] = [
     ("calendar:create", "创建校历", "calendar", "create"),
     ("calendar:update", "更新校历", "calendar", "update"),
     ("calendar:delete", "删除校历", "calendar", "delete"),
-    # training_program
-    ("training_program:read", "查看培养方案", "training_program", "read"),
-    ("training_program:create", "创建培养方案", "training_program", "create"),
-    ("training_program:update", "更新培养方案", "training_program", "update"),
-    ("training_program:delete", "删除培养方案", "training_program", "delete"),
-    # base_info
-    ("base_info:read", "查看基础数据", "base_info", "read"),
-    ("base_info:create", "创建基础数据", "base_info", "create"),
-    ("base_info:update", "更新基础数据", "base_info", "update"),
-    ("base_info:delete", "删除基础数据", "base_info", "delete"),
-    # recycle_bin
-    ("recycle_bin:read", "查看回收站", "recycle_bin", "read"),
-    ("recycle_bin:restore", "恢复数据", "recycle_bin", "restore"),
-    ("recycle_bin:delete", "彻底删除", "recycle_bin", "delete"),
-    # files
-    ("files:read", "查看文件", "files", "read"),
-    ("files:upload", "上传文件", "files", "upload"),
-    ("files:delete", "删除文件", "files", "delete"),
-    # audit_logs
-    ("audit_logs:read", "查看审计日志", "audit_logs", "read"),
-    # data_provision
-    ("data_provision:read", "查看数据供给", "data_provision", "read"),
+    # training
+    ("training:read", "查看培养方案", "training", "read"),
+    ("training:create", "创建培养方案", "training", "create"),
+    ("training:update", "更新培养方案", "training", "update"),
+    ("training:delete", "删除培养方案", "training", "delete"),
+    # base-info
+    ("base-info:read", "查看基础数据", "base-info", "read"),
+    ("base-info:create", "创建基础数据", "base-info", "create"),
+    ("base-info:update", "更新基础数据", "base-info", "update"),
+    ("base-info:delete", "删除基础数据", "base-info", "delete"),
+    # classroom
+    ("classroom:read", "查看教室", "classroom", "read"),
+    ("classroom:create", "创建教室", "classroom", "create"),
+    ("classroom:update", "更新教室", "classroom", "update"),
+    ("classroom:delete", "删除教室", "classroom", "delete"),
+    # recycle
+    ("recycle:read", "查看回收站", "recycle", "read"),
+    ("recycle:restore", "恢复数据", "recycle", "restore"),
+    ("recycle:delete", "彻底删除", "recycle", "delete"),
+    # file
+    ("file:read", "查看文件", "file", "read"),
+    ("file:create", "上传文件", "file", "create"),
+    ("file:delete", "删除文件", "file", "delete"),
+    # audit
+    ("audit:read", "查看审计日志", "audit", "read"),
+    # data-provision
+    ("data-provision:read", "查看数据供给", "data-provision", "read"),
     # role
     ("role:read", "查看角色", "role", "read"),
     ("role:assign", "分配角色", "role", "assign"),
@@ -148,23 +153,24 @@ _ROLE_PERMISSION_MAP: dict[str, list[str]] = {
         "course:read", "course:create", "course:update", "course:delete",
         "offering:read", "offering:create", "offering:update", "offering:delete",
         "schedule:read", "schedule:create", "schedule:update", "schedule:delete",
+        "classroom:read", "classroom:create", "classroom:update", "classroom:delete",
         "calendar:read", "calendar:create", "calendar:update", "calendar:delete",
-        "training_program:read", "training_program:create",
-        "training_program:update", "training_program:delete",
-        "base_info:read", "base_info:create", "base_info:update", "base_info:delete",
-        "recycle_bin:read", "recycle_bin:restore", "recycle_bin:delete",
-        "files:read", "files:upload", "files:delete",
-        "audit_logs:read",
-        "data_provision:read",
+        "training:read", "training:create", "training:update", "training:delete",
+        "base-info:read", "base-info:create", "base-info:update", "base-info:delete",
+        "recycle:read", "recycle:restore", "recycle:delete",
+        "file:read", "file:create", "file:delete",
+        "audit:read",
+        "data-provision:read",
     ],
     "TEACHER": [
         "course:read", "offering:read", "schedule:read",
-        "calendar:read", "training_program:read",
-        "files:read", "files:upload",
+        "classroom:read",
+        "calendar:read", "training:read",
+        "file:read", "file:create",
     ],
     "STUDENT": [
         "course:read", "offering:read", "schedule:read",
-        "calendar:read", "training_program:read",
+        "calendar:read", "training:read",
     ],
 }
 
