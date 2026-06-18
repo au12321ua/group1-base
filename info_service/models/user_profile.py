@@ -16,7 +16,8 @@ class UserProfile(SQLModel, table=True):
     gender: str = Field(default="", max_length=16)
     email: str = Field(default="", max_length=256)
     phone: str = Field(default="", max_length=32)
-    status: str = Field(default="ACTIVE", max_length=32)  # ACTIVE / DISABLED / DELETED
+    # ACTIVE / DISABLED（软删除时设为 DISABLED
+    status: str = Field(default="ACTIVE", max_length=32)
     avatar_file_id: int | None = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
