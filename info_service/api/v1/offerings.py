@@ -16,6 +16,7 @@ from info_service.schemas.offering_schema import (
     OfferingResponse,
     OfferingUpdateRequest,
 )
+from info_service.schemas.schedule_schema import TeacherAssignmentResponse
 from info_service.services.course_management_service import course_management_service
 from shared.exceptions import AppError, AuthorizationError
 from shared.response import (
@@ -101,6 +102,31 @@ async def _enrich_offering(
     return resp
 
 
+async def _enrich_teacher_assignment(
+    db, assignment, teacher_name_map=None
+) -> TeacherAssignmentResponse:
+    """Enrich a teacher assignment with teacher name."""
+    resp = TeacherAssignmentResponse.model_validate(assignment)
+    if teacher_name_map is None:
+        teacher_name_map = await course_management_service.batch_get_teacher_names(
+            db, {assignment.teacher_id},
+        )
+    resp.teacher_name = teacher_name_map.get(assignment.teacher_id, "")
+    return resp
+
+
+def _teacher_assignment_list_response(
+    items,
+) -> ListResponse[TeacherAssignmentResponse]:
+    """Wrap teacher assignments in the common paginated response shape."""
+    return ListResponse(
+        data=PaginatedData(
+            items=items,
+            pagination=PaginationMeta(total=len(items), page=1, page_size=len(items)),
+        )
+    )
+
+
 @router.post("/", response_model=SingleResponse[OfferingResponse])
 async def create_offering(
     db: InfoDbSession,
@@ -128,6 +154,25 @@ async def get_offering(
     """Get offering detail."""
     offering = await course_management_service.get_offering(db, offering_id)
     return SingleResponse(data=await _enrich_offering(db, offering))
+
+
+@router.get("/{offering_id}/teachers", response_model=ListResponse[TeacherAssignmentResponse])
+async def list_offering_teachers(
+    db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("offering:read"))],
+    offering_id: int,
+) -> ListResponse[TeacherAssignmentResponse]:
+    """List teachers assigned to an offering."""
+    items = await course_management_service.list_teachers_for_offering(db, offering_id)
+    teacher_ids = {item.teacher_id for item in items}
+    teacher_name_map = await course_management_service.batch_get_teacher_names(
+        db, teacher_ids,
+    )
+    enriched = [
+        await _enrich_teacher_assignment(db, item, teacher_name_map=teacher_name_map)
+        for item in items
+    ]
+    return _teacher_assignment_list_response(enriched)
 
 
 @router.put("/{offering_id}", response_model=SingleResponse[OfferingResponse])
