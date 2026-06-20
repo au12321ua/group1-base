@@ -123,6 +123,28 @@ class TestOfferingRouteHelpers:
         assert response.course_code == "CS101"
         assert response.course_name == "Algorithms"
 
+    async def test_enrich_teacher_assignment_fetches_name(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            offering_routes.course_management_service,
+            "batch_get_teacher_names",
+            AsyncMock(return_value={"teacher-1": "Ada Lovelace"}),
+        )
+
+        response = await offering_routes._enrich_teacher_assignment(
+            object(),
+            _assignment(),
+        )
+
+        assert response.teacher_name == "Ada Lovelace"
+
+    def test_teacher_assignment_list_response_uses_item_count(self) -> None:
+        response = offering_routes._teacher_assignment_list_response([])
+
+        assert response.data.items == []
+        assert response.data.pagination.total == 0
+
 
 @pytest.mark.unit
 class TestOfferingRoutes:
@@ -210,6 +232,53 @@ class TestOfferingRoutes:
         )
 
         assert response.data.course_name == "Algorithms"
+
+    async def test_list_offering_teachers_returns_enriched_items(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            offering_routes.course_management_service,
+            "list_teachers_for_offering",
+            AsyncMock(return_value=[_assignment()]),
+        )
+        monkeypatch.setattr(
+            offering_routes.course_management_service,
+            "batch_get_teacher_names",
+            AsyncMock(return_value={"teacher-1": "Ada Lovelace"}),
+        )
+
+        response = await offering_routes.list_offering_teachers(
+            db=object(),
+            current_user=_identity(),
+            offering_id=1,
+        )
+
+        assert response.data.pagination.total == 1
+        assert response.data.items[0].teacher_id == "teacher-1"
+        assert response.data.items[0].teacher_name == "Ada Lovelace"
+
+    async def test_list_offering_teachers_allows_empty_list(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            offering_routes.course_management_service,
+            "list_teachers_for_offering",
+            AsyncMock(return_value=[]),
+        )
+        monkeypatch.setattr(
+            offering_routes.course_management_service,
+            "batch_get_teacher_names",
+            AsyncMock(return_value={}),
+        )
+
+        response = await offering_routes.list_offering_teachers(
+            db=object(),
+            current_user=_identity(),
+            offering_id=1,
+        )
+
+        assert response.data.items == []
+        assert response.data.pagination.total == 0
 
     async def test_update_offering_logs_success(
         self, monkeypatch: pytest.MonkeyPatch

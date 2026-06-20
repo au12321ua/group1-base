@@ -418,6 +418,13 @@ class CourseManagementService:
         offering_id = await self._get_schedule_offering_id(db, schedule_id)
         return await teacher_assignment_crud.get_by_offering(db, offering_id)
 
+    async def list_teachers_for_offering(
+        self, db: AsyncSession, offering_id: int
+    ) -> list[TeacherCourseAssignment]:
+        """List teachers assigned to an offering."""
+        await self._ensure_offering_exists(db, offering_id)
+        return await teacher_assignment_crud.get_by_offering(db, offering_id)
+
     async def replace_teachers(
         self, db: AsyncSession, schedule_id: int, teacher_ids: list[str]
     ) -> list[TeacherCourseAssignment]:

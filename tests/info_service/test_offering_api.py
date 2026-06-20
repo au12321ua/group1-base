@@ -1,5 +1,7 @@
 """开课 API 集成测试。"""
 
+from uuid import uuid4
+
 import pytest
 
 from tests.info_service.api_helpers import (
@@ -275,3 +277,99 @@ class TestOfferingResourceAccess:
             f"/api/v1/info/offerings/{offering_id}", headers=admin_delete_headers
         )
         assert resp.status_code == 200
+
+
+@pytest.mark.integration
+class TestOfferingTeachersAPI:
+    """验证 /api/v1/info/offerings/{offering_id}/teachers 只读接口。"""
+
+    async def test_list_offering_teachers_returns_assignments(
+        self, async_client_info, auth_headers
+    ) -> None:
+        classroom_id = await create_classroom(room_no="C-701")
+        course_id = await create_course(
+            async_client_info,
+            course_code=f"CS701-{uuid4().hex[:8]}",
+            course_name="Offering Teachers Test",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            capacity=60,
+        )
+        schedule_id = await create_schedule(
+            async_client_info,
+            offering_id=offering_id,
+            classroom_id=classroom_id,
+            day_of_week=2,
+            start_period=1,
+            end_period=2,
+        )
+        await async_client_info.put(
+            f"/api/v1/info/schedules/{schedule_id}/teachers/t-701",
+            json={"teacher_id": "t-701", "role_type": "instructor"},
+            headers=auth_headers,
+        )
+
+        response = await async_client_info.get(
+            f"/api/v1/info/offerings/{offering_id}/teachers",
+            headers=build_identity_headers(permissions=["offering:read"]),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()["data"]
+        assert payload["pagination"]["total"] == 1
+        assert payload["items"][0]["teacher_id"] == "t-701"
+        assert payload["items"][0]["offering_id"] == offering_id
+        assert payload["items"][0]["role_type"] == "instructor"
+
+    async def test_list_offering_teachers_empty_list(
+        self, async_client_info
+    ) -> None:
+        course_id = await create_course(
+            async_client_info,
+            course_code=f"CS702-{uuid4().hex[:8]}",
+            course_name="Offering Teachers Empty Test",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            capacity=60,
+        )
+
+        response = await async_client_info.get(
+            f"/api/v1/info/offerings/{offering_id}/teachers",
+            headers=build_identity_headers(permissions=["offering:read"]),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()["data"]
+        assert payload["items"] == []
+        assert payload["pagination"]["total"] == 0
+
+    async def test_list_offering_teachers_requires_offering_read(
+        self, async_client_info
+    ) -> None:
+        course_id = await create_course(
+            async_client_info,
+            course_code=f"CS703-{uuid4().hex[:8]}",
+            course_name="Offering Teachers Permission Test",
+        )
+        offering_id = await create_offering(
+            async_client_info,
+            course_id=course_id,
+            term_code="2026-FALL",
+            class_no="01",
+            capacity=60,
+        )
+
+        response = await async_client_info.get(
+            f"/api/v1/info/offerings/{offering_id}/teachers",
+            headers=build_identity_headers(permissions=[]),
+        )
+
+        assert response.status_code == 403
