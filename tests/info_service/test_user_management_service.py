@@ -56,6 +56,11 @@ class TestUserManagementService:
             "info_service.services.user_management_service.batch_fetch_role_names",
             AsyncMock(return_value={}),
         )
+        monkeypatch.setattr(
+            user_management_service,
+            "_sync_roles_to_auth",
+            AsyncMock(return_value=True),
+        )
 
     async def test_get_user(self, info_db_session):
         user = await _setup_user(info_db_session)
@@ -211,7 +216,7 @@ class TestUserManagementService:
         assert result.profile is not None
         assert result.profile.full_name == "补建档案"
 
-    async def test_patch_user_creates_missing_profile_and_ignores_role_ids(self, info_db_session):
+    async def test_patch_user_creates_missing_profile_and_syncs_role_ids(self, info_db_session):
         user = await _setup_user_without_profile(
             info_db_session,
             user_no="S103",
