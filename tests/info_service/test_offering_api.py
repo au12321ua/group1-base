@@ -1,5 +1,7 @@
 """开课 API 集成测试。"""
 
+from uuid import uuid4
+
 import pytest
 
 from tests.info_service.api_helpers import (
@@ -287,7 +289,7 @@ class TestOfferingTeachersAPI:
         classroom_id = await create_classroom(room_no="C-701")
         course_id = await create_course(
             async_client_info,
-            course_code="CS701",
+            course_code=f"CS701-{uuid4().hex[:8]}",
             course_name="Offering Teachers Test",
         )
         offering_id = await create_offering(
@@ -328,7 +330,7 @@ class TestOfferingTeachersAPI:
     ) -> None:
         course_id = await create_course(
             async_client_info,
-            course_code="CS702",
+            course_code=f"CS702-{uuid4().hex[:8]}",
             course_name="Offering Teachers Empty Test",
         )
         offering_id = await create_offering(
@@ -354,7 +356,7 @@ class TestOfferingTeachersAPI:
     ) -> None:
         course_id = await create_course(
             async_client_info,
-            course_code="CS703",
+            course_code=f"CS703-{uuid4().hex[:8]}",
             course_name="Offering Teachers Permission Test",
         )
         offering_id = await create_offering(
