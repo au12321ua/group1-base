@@ -35,6 +35,11 @@ class TestUserAPI:
         )
         monkeypatch.setattr(
             user_management_service,
+            "_sync_roles_to_auth",
+            AsyncMock(return_value=True),
+        )
+        monkeypatch.setattr(
+            user_management_service,
             "_sync_disable_to_auth",
             AsyncMock(return_value=None),
         )

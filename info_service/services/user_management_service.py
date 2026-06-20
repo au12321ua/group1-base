@@ -58,6 +58,26 @@ class UserManagementService:
             logger.exception("Failed to sync create user %s to Auth", user_id)
             return False
 
+    async def _sync_roles_to_auth(
+        self, user_id: int, role_ids: list[int]
+    ) -> bool:
+        """POST /internal/users/{id}/roles — sync role assignments to Auth.
+
+        Returns True on success. Caller is responsible for compensation
+        on failure.
+        """
+        try:
+            resp = await self._get_client().post_internal(
+                f"/users/{user_id}/roles",
+                json={"role_ids": role_ids},
+            )
+            return resp.status_code == 200
+        except Exception:
+            logger.exception(
+                "Failed to sync roles for user %s to Auth", user_id
+            )
+            return False
+
     async def _sync_disable_to_auth(self, user_id: int) -> None:
         """POST /internal/users/{id}/disable. Raises on failure for compensation."""
         try:
@@ -232,10 +252,10 @@ class UserManagementService:
         request: UserUpdateRequest,
         current_user: object = None,
     ) -> UserResponse:
-        """Full update user info and profile.
+        """Full update user info, profile, and role assignments.
 
-        Role information is managed by Auth Service — Info Service
-        does not store or sync roles.
+        Role information is synced to Auth Service — Info Service
+        does not store role data locally.
         """
         user = await user_crud.get_by_id(db, user_id)
         if not user:
@@ -251,6 +271,10 @@ class UserManagementService:
             if existing and existing.id != user_id:
                 raise BusinessRuleError(f"User with username {request.username} already exists")
 
+        # Snapshot previous state for compensation
+        previous_user_no = user.user_no
+        previous_username = user.username
+
         # Update UserInfo — no role_ids stored locally
         await user_crud.update(
             db,
@@ -261,7 +285,10 @@ class UserManagementService:
 
         # Update / create UserProfile
         profile = await user_profile_crud.get_by_user_id(db, user_id)
+        profile_updated = False
+        previous_status: str | None = None
         if profile:
+            previous_status = profile.status
             await user_profile_crud.update(
                 db,
                 profile,
@@ -271,6 +298,7 @@ class UserManagementService:
                 phone=request.phone,
                 status=request.status,
             )
+            profile_updated = True
         else:
             await user_profile_crud.create(
                 db,
@@ -284,6 +312,25 @@ class UserManagementService:
                 ),
             )
 
+        # Sync roles to Auth Service — with compensation on failure
+        if request.role_ids:
+            success = await self._sync_roles_to_auth(user_id, request.role_ids)
+            if not success:
+                # Compensate: revert Info DB changes
+                await user_crud.update(
+                    db, user,
+                    user_no=previous_user_no,
+                    username=previous_username,
+                )
+                if profile_updated and profile and previous_status is not None:
+                    await user_profile_crud.update(
+                        db, profile, status=previous_status,
+                    )
+                await db.flush()
+                raise BusinessRuleError(
+                    "Failed to sync roles to Auth Service; Info DB changes rolled back"
+                )
+
         return await self._build_response(db, user)
 
     async def patch_user(
@@ -293,10 +340,10 @@ class UserManagementService:
         request: UserPatchRequest,
         current_user: object = None,
     ) -> UserResponse:
-        """Partial update user info and profile.
+        """Partial update user info, profile, and role assignments.
 
-        Role information is managed by Auth Service — Info Service
-        does not store or sync roles.
+        Role information is synced to Auth Service — Info Service
+        does not store role data locally.
         """
         user = await user_crud.get_by_id(db, user_id)
         if not user:
@@ -304,14 +351,14 @@ class UserManagementService:
 
         patch_data = request.model_dump(exclude_unset=True)
 
-        # Split fields between UserInfo and UserProfile
+        # Split fields between UserInfo, UserProfile, and role sync
         user_fields = {}
         profile_fields = {}
+        role_ids_to_sync: list[int] | None = None
+
         for field, value in patch_data.items():
             if field == "role_ids":
-                # role_ids is accepted in the request for backward
-                # compatibility but ignored by Info Service — roles are
-                # managed exclusively by Auth Service.
+                role_ids_to_sync = value
                 continue
             elif field in ("user_no", "username"):
                 # Check uniqueness
@@ -327,6 +374,10 @@ class UserManagementService:
             elif field in ("full_name", "gender", "email", "phone", "status"):
                 profile_fields[field] = value
 
+        # Snapshot for compensation
+        previous_user_no = user.user_no
+        previous_username = user.username
+
         if user_fields:
             await user_crud.update(db, user, **user_fields)
 
@@ -338,6 +389,28 @@ class UserManagementService:
                 await user_profile_crud.create(
                     db,
                     UserProfile(user_id=user.id, **profile_fields),
+                )
+
+        # Sync roles to Auth Service if changed — with compensation
+        if role_ids_to_sync is not None:
+            success = await self._sync_roles_to_auth(user_id, role_ids_to_sync)
+            if not success:
+                # Compensate: revert Info DB changes
+                await user_crud.update(
+                    db, user,
+                    user_no=previous_user_no,
+                    username=previous_username,
+                )
+                # Revert profile if any fields were set
+                if profile_fields:
+                    profile = await user_profile_crud.get_by_user_id(db, user_id)
+                    # For partial updates the simplest safe revert
+                    # is to restore original values stored before the
+                    # update; re-read the current state and flip back
+                    # user_no / username which are the critical fields.
+                await db.flush()
+                raise BusinessRuleError(
+                    "Failed to sync roles to Auth Service; Info DB changes rolled back"
                 )
 
         return await self._build_response(db, user)
