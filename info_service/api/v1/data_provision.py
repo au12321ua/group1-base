@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, Query
 
 from info_service.api.deps import InfoDbSession
 from info_service.deps import require_permission
-from info_service.schemas.data_provision_schema import DataProvisionWrapper
+from info_service.schemas.data_provision_schema import DataProvisionWrapper, UserDataResponse
 from info_service.services.data_provision_service import data_provision_service
+from shared.exceptions import ResourceNotFoundError
 from shared.response import APIResponse
 from shared.security import IdentityContext
 
@@ -21,6 +22,19 @@ def _pagination(total: int, page: int, page_size: int) -> dict[str, int]:
         "page": page,
         "page_size": page_size,
     }
+
+
+@router.get("/users/{user_key}", response_model=APIResponse[UserDataResponse])
+async def get_user(
+    user_key: str,
+    db: InfoDbSession,
+    current_user: Annotated[IdentityContext, Depends(require_permission("data-provision:read"))],
+) -> APIResponse[UserDataResponse]:
+    """Get one active user by internal id or business user_no for downstream services."""
+    item = await data_provision_service.get_user(db, user_key)
+    if item is None:
+        raise ResourceNotFoundError("User", user_key)
+    return APIResponse(data=item)
 
 
 @router.get("/teachers", response_model=APIResponse[DataProvisionWrapper])

@@ -17,6 +17,7 @@ from info_service.schemas.data_provision_schema import (
     CandidateStudentResponse,
     TeacherDataResponse,
     TrainingProgramDataResponse,
+    UserDataResponse,
 )
 
 
@@ -90,6 +91,34 @@ class DataProvisionService:
     async def get_candidate_student_snapshot_time(self, db: AsyncSession) -> datetime:
         """Return the latest update time for candidate student data."""
         return await self.get_user_snapshot_time(db, self._settings.student_role_id)
+
+    async def get_user(self, db: AsyncSession, user_key: str) -> UserDataResponse | None:
+        """Get one active user by internal id or business user_no for downstream services."""
+        conditions = self._active_user_conditions()
+        if user_key.isdigit():
+            conditions.append(UserInfo.id == int(user_key))
+        else:
+            conditions.append(UserInfo.user_no == user_key)
+
+        row = (
+            await db.exec(
+                select(UserInfo, UserProfile)
+                .join(UserProfile, UserProfile.user_id == UserInfo.id, isouter=True)
+                .where(*conditions)
+            )
+        ).first()
+        if row is None:
+            return None
+        user, profile = row
+        return UserDataResponse(
+            user_id=str(user.id),
+            user_no=user.user_no,
+            username=user.username,
+            full_name=profile.full_name if profile else "",
+            email=profile.email if profile else "",
+            phone=profile.phone if profile else "",
+            status=profile.status if profile else "ACTIVE",
+        )
 
     async def list_teachers(
         self, db: AsyncSession, page: int = 1, page_size: int = 100

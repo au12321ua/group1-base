@@ -24,6 +24,18 @@ class CandidateStudentResponse(BaseModel):
     grade: str = ""
 
 
+class UserDataResponse(BaseModel):
+    """User identity snapshot provided to downstream services."""
+
+    user_id: str
+    user_no: str
+    username: str
+    full_name: str
+    email: str = ""
+    phone: str = ""
+    status: str = "ACTIVE"
+
+
 class AcademicCalendarDataResponse(BaseModel):
     """Academic calendar snapshot provided to B system."""
 
