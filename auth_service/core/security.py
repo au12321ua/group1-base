@@ -70,12 +70,14 @@ def create_refresh_token(user_id: str) -> str:
 
 def create_service_token(
     client_id: str,
-    scope: str,
     audience: str,
 ) -> str:
     """Create a JWT service token for inter-service calls.
 
-    Payload: {sub, jti, type: "service", client_id, scope, aud, iat, exp}
+    Payload: {sub, jti, type: "service", client_id, aud, iat, exp}
+
+    Permissions are resolved at verify-time from the SERVICE role in DB,
+    not embedded in the token payload.
     """
     settings = get_auth_settings()
     now = _utc_now()
@@ -84,7 +86,6 @@ def create_service_token(
         "jti": str(uuid4()),
         "type": _TOKEN_TYPE_SERVICE,
         "client_id": client_id,
-        "scope": scope,
         "aud": audience,
         "iat": now,
         "exp": now + timedelta(hours=settings.service_token_expire_hours),

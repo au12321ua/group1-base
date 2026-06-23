@@ -118,11 +118,10 @@ class TestRefreshToken:
 class TestServiceToken:
     """测试 Service Token。"""
 
-    def test_service_token_audience_and_scope(self, auth_security_env: None) -> None:
-        """Service Token 应包含 client_id、scope、aud。"""
+    def test_service_token_payload(self, auth_security_env: None) -> None:
+        """Service Token 应包含 client_id、aud（权限由 DB SERVICE 角色管理，不在 payload 中）。"""
         token = create_service_token(
             client_id="course_arrangement",
-            scope="teacher:read calendar:read",
             audience="info_service",
         )
         payload = verify_token(token)
@@ -130,8 +129,8 @@ class TestServiceToken:
         assert payload["type"] == "service"
         assert payload["sub"] == "course_arrangement"
         assert payload["client_id"] == "course_arrangement"
-        assert payload["scope"] == "teacher:read calendar:read"
         assert payload["aud"] == "info_service"
+        assert "scope" not in payload
 
 
 @pytest.mark.unit

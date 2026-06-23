@@ -60,7 +60,7 @@ class AuthSettings(SharedSettings):
                 clients.setdefault(name, {})[field] = value
 
         for name, cfg in clients.items():
-            missing = [f for f in ("id", "secret", "scope", "audience") if f not in cfg]
+            missing = [f for f in ("id", "secret") if f not in cfg]
             if missing:
                 raise ValueError(
                     f"Service client '{name}' is missing required fields: "
