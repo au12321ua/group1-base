@@ -146,7 +146,7 @@ def seed_permissions(engine: Engine) -> dict[str, int]:
 # Which permission codes each role gets
 _ROLE_PERMISSION_MAP: dict[str, list[str]] = {
     "SYS_ADMIN": [
-        # all permissions
+        # all permissions (resolved at runtime via perm_map.keys())
     ],
     "ACADEMIC_ADMIN": [
         "user:read", "user:create", "user:update", "user:delete",
@@ -159,18 +159,33 @@ _ROLE_PERMISSION_MAP: dict[str, list[str]] = {
         "base-info:read", "base-info:create", "base-info:update", "base-info:delete",
         "recycle:read", "recycle:restore", "recycle:delete",
         "file:read", "file:create", "file:delete",
-        "audit:read",
+        # audit:read intentionally omitted — only SYS_ADMIN per §2.4
         "data-provision:read",
     ],
     "TEACHER": [
+        # self-profile
+        "user:read", "user:update",
+        # read-only resources
+        "course:read",
+        "classroom:read",
+        "calendar:read", "training:read",
+        "base-info:read",
+        # offering & schedule — can mutate assigned ones (resource-level check)
+        "offering:read", "offering:update", "offering:delete",
+        "schedule:read", "schedule:update", "schedule:delete",
+        # files — own uploads only (resource-level check)
+        "file:read", "file:create", "file:delete",
+    ],
+    "STUDENT": [
+        # self-profile
+        "user:read", "user:update",
+        # read-only resources
         "course:read", "offering:read", "schedule:read",
         "classroom:read",
         "calendar:read", "training:read",
-        "file:read", "file:create",
-    ],
-    "STUDENT": [
-        "course:read", "offering:read", "schedule:read",
-        "calendar:read", "training:read",
+        "base-info:read",
+        # files — own uploads only (resource-level check)
+        "file:read", "file:create", "file:delete",
     ],
 }
 

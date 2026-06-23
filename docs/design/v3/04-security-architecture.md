@@ -138,38 +138,51 @@ flowchart TD
 | calendar | `calendar:read`, `calendar:create`, `calendar:update`, `calendar:delete` |
 | training | `training:read`, `training:create`, `training:update`, `training:delete` |
 | base-info | `base-info:read`, `base-info:create`, `base-info:update`, `base-info:delete` |
+| classroom | `classroom:read`, `classroom:create`, `classroom:update`, `classroom:delete` |
 | file | `file:read`, `file:create`, `file:delete` |
 | data-provision | `data-provision:read` |
 | audit | `audit:read` |
 | recycle | `recycle:read`, `recycle:restore`, `recycle:delete` |
+| role | `role:read`, `role:assign` |
+| permission | `permission:read` |
 
 ### 2.4 角色-权限映射
+
+> **说明**：`(self)` = 资源级校验允许用户操作自己的数据（如 `check_resource_access(owner=user_id)`）；`(assigned)` = 教师仅可操作被分配到的开课/排课（如 `_check_offering_access(teacher_ids)`）。
 
 | 权限点 | STUDENT | TEACHER | ACADEMIC_ADMIN | SYS_ADMIN |
 |--------|---------|---------|----------------|-----------|
 | user:read (self) | ✓ | ✓ | — | — |
 | user:read (all) | — | — | ✓ | ✓ |
+| user:update (self) | ✓ | ✓ | — | — |
+| user:update (all) | — | — | ✓ | ✓ |
 | user:create | — | — | ✓ | ✓ |
-| user:update | — | — | ✓ | ✓ |
 | user:delete | — | — | ✓ | ✓ |
 | course:read | ✓ | ✓ | ✓ | ✓ |
 | course:create/update/delete | — | — | ✓ | ✓ |
 | offering:read | ✓ | ✓ | ✓ | ✓ |
-| offering:create/update/delete | — | — | ✓ | ✓ |
+| offering:create | — | — | ✓ | ✓ |
+| offering:update/delete (assigned) | — | ✓ | ✓ | ✓ |
 | schedule:read | ✓ | ✓ | ✓ | ✓ |
-| schedule:create/update/delete | — | — | ✓ | ✓ |
+| schedule:create | — | — | ✓ | ✓ |
+| schedule:update/delete (assigned) | — | ✓ | ✓ | ✓ |
 | calendar:read | ✓ | ✓ | ✓ | ✓ |
 | calendar:create/update/delete | — | — | ✓ | ✓ |
 | training:read | ✓ | ✓ | ✓ | ✓ |
 | training:create/update/delete | — | — | ✓ | ✓ |
 | base-info:read | ✓ | ✓ | ✓ | ✓ |
 | base-info:create/update/delete | — | — | ✓ | ✓ |
+| classroom:read | ✓ | ✓ | ✓ | ✓ |
+| classroom:create/update/delete | — | — | ✓ | ✓ |
 | file:read | ✓ | ✓ | ✓ | ✓ |
 | file:create | ✓ | ✓ | ✓ | ✓ |
 | file:delete | ✓ | ✓ | ✓ | ✓ |
 | data-provision:read | — | — | ✓ | ✓ |
 | audit:read | — | — | — | ✓ |
 | recycle:* | — | — | ✓ | ✓ |
+| role:read | — | — | — | ✓ |
+| role:assign | — | — | — | ✓ |
+| permission:read | — | — | — | ✓ |
 
 ### 2.5 资源级权限校验规则
 

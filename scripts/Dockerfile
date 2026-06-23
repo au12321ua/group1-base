@@ -14,4 +14,4 @@ COPY scripts/ ./scripts/
 
 ENV PYTHONPATH=/app
 
-CMD ["uv", "run", "python", "-m", "scripts.seed_data"]
+CMD ["uv", "run", "python", "-m", "scripts.seed_data", "--full"]

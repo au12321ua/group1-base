@@ -1,8 +1,7 @@
 """Seed data CLI entry point.
 
 Usage:
-    uv run seed                 # minimal mode (roles + permissions + admin)
-    uv run seed --full          # full mode (includes sample data)
+    uv run seed                 # full mode (default; includes sample data)
     uv run seed --reset         # delete all existing data first
     uv run seed --env-file .env.prod
 """
@@ -57,8 +56,7 @@ def _parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    uv run seed                     minimal mode (default)
-    uv run seed --full              include sample data
+    uv run seed                     full mode (default)
     uv run seed --reset             clear all data first
     uv run seed --reset --full      full reset and seed
         """,
@@ -66,8 +64,8 @@ Examples:
     parser.add_argument(
         "--full",
         action="store_true",
-        default=False,
-        help="Include sample data (departments, classrooms, calendars)",
+        default=True,
+        help="Include sample data (departments, classrooms, calendars). Enabled by default.",
     )
     parser.add_argument(
         "--reset",
@@ -118,7 +116,7 @@ def main() -> None:
     admin_user_no = os.environ.get("SEED_ADMIN_USER_NO", "STSS-ADMIN-001")
     admin_full_name = os.environ.get("SEED_ADMIN_FULL_NAME", "系统管理员")
 
-    mode = "完整模式 (--full)" if args.full else "最小模式 (--minimal)"
+    mode = "完整模式 (--full)" if args.full else "最小模式 (--minimal, 仅角色+权限+管理员)"
     print_header(f"STSS 数据库种子脚本 — {mode}")
 
     # Create sync engines
