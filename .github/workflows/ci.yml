@@ -168,10 +168,48 @@ jobs:
       - name: Run coverage
         run: uv run pytest --cov=auth_service --cov=info_service --cov=shared --cov-report=term-missing --cov-fail-under=80
 
+  changes:
+    name: Detect Image Changes
+    runs-on: ubuntu-latest
+    needs: coverage
+    outputs:
+      auth: ${{ steps.filter.outputs.auth }}
+      info: ${{ steps.filter.outputs.info }}
+      seed: ${{ steps.filter.outputs.seed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed image inputs
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            auth:
+              - 'auth_service/**'
+              - 'shared/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'auth_service/Dockerfile'
+            info:
+              - 'info_service/**'
+              - 'shared/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'info_service/Dockerfile'
+            seed:
+              - 'scripts/**'
+              - 'shared/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'scripts/Dockerfile'
+
   publish:
     name: Publish Docker Images
     runs-on: ubuntu-latest
-    needs: coverage
+    needs: [coverage, changes]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Checkout
@@ -192,6 +230,7 @@ jobs:
         run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push stss-auth
+        if: needs.changes.outputs.auth == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -204,6 +243,7 @@ jobs:
           cache-to: type=gha,mode=min,scope=stss-auth
 
       - name: Build and push stss-info
+        if: needs.changes.outputs.info == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -216,6 +256,7 @@ jobs:
           cache-to: type=gha,mode=min,scope=stss-info
 
       - name: Build and push stss-seed
+        if: needs.changes.outputs.seed == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .

@@ -9,7 +9,6 @@ RUN uv sync --group dev --frozen
 
 COPY shared/ ./shared/
 COPY auth_service/ ./auth_service/
-COPY scripts/ ./scripts/
 
 ENV PYTHONPATH=/app
 
