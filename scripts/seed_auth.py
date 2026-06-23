@@ -18,6 +18,11 @@ _ROLES: list[dict] = [
         "description": "教务管理员，拥有除系统管理外的全部权限",
     },
     {"code": "SYS_ADMIN", "name": "系统管理员", "description": "系统管理员，拥有全部权限"},
+    {
+        "code": "SERVICE",
+        "name": "系统服务",
+        "description": "服务间调用统一角色，拥有数据供给等系统集成权限（权限由种子脚本统一管理）",
+    },
 ]
 
 
@@ -186,6 +191,18 @@ _ROLE_PERMISSION_MAP: dict[str, list[str]] = {
         "base-info:read",
         # files — own uploads only (resource-level check)
         "file:read", "file:create", "file:delete",
+    ],
+    "SERVICE": [
+        # 数据供给 — B/C/F 系统消费 Info Service 的 /data-provision/* 端点
+        "data-provision:read",
+        # 预留：未来服务间调用如需更多权限在此追加
+        "internal:verify",
+        "user:read",
+        "classroom:read",
+        "file:read", "file:create", "file:delete",
+        "course:read", "offering:read", "schedule:read",
+        "calendar:read", "training:read",
+        "base-info:read",
     ],
 }
 

@@ -203,7 +203,6 @@ class AuthService:
 
         token = create_service_token(
             client_id=client_id,
-            scope=client_entry["scope"],
             audience=client_entry["audience"],
         )
         payload = verify_token(token)

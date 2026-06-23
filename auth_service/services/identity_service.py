@@ -1,7 +1,5 @@
 """IdentityService — token verification and identity extraction (for Gateway)."""
 
-import re
-
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -11,13 +9,6 @@ from auth_service.crud.role_crud import role_crud
 from auth_service.models.user import User, UserStatus
 from auth_service.schemas.auth_schema import InternalVerifyRequest, InternalVerifyResponse
 from shared.exceptions import AccountDisabledError, AuthenticationError
-
-_SCOPE_SPLIT_RE = re.compile(r"[\s,]+")
-
-
-def _parse_scope(scope: str) -> list[str]:
-    """Parse JWT scope claim (space- or comma-separated permission codes)."""
-    return [part for part in _SCOPE_SPLIT_RE.split(scope.strip()) if part]
 
 
 class IdentityService:
@@ -34,8 +25,12 @@ class IdentityService:
 
         if token_type == "service":
             client_id = str(payload.get("client_id") or payload.get("sub", ""))
-            scope = str(payload.get("scope", ""))
-            permissions = _parse_scope(scope)
+            # Resolve permissions from the SERVICE role in DB (seed-managed),
+            # not from the JWT scope claim — keeps service permissions in the
+            # same RBAC system as human users.
+            permissions = await permission_crud.get_role_permissions_by_code(
+                db, "SERVICE"
+            )
             return InternalVerifyResponse(
                 user_id=client_id,
                 username=client_id,

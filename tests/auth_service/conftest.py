@@ -59,7 +59,6 @@ def auth_service_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     """固定系统服务登录凭据，供 service_login 测试使用。"""
     monkeypatch.setenv("SERVICE_CLIENT_TEST_CLIENT_ID", "test-client")
     monkeypatch.setenv("SERVICE_CLIENT_TEST_CLIENT_SECRET", "test-secret")
-    monkeypatch.setenv("SERVICE_CLIENT_TEST_CLIENT_SCOPE", "test:scope")
     monkeypatch.setenv("SERVICE_CLIENT_TEST_CLIENT_AUDIENCE", "test-audience")
     get_auth_settings.cache_clear()
     yield

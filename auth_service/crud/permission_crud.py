@@ -4,7 +4,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auth_service.models.permission import Permission, RolePermission
-from auth_service.models.role import UserRole
+from auth_service.models.role import Role, UserRole
 
 
 class PermissionCRUD:
@@ -32,6 +32,24 @@ class PermissionCRUD:
             .join(RolePermission, RolePermission.permission_id == Permission.id)
             .join(UserRole, UserRole.role_id == RolePermission.role_id)
             .where(UserRole.user_id == user_id)
+            .distinct()
+        )
+        result = await db.exec(stmt)
+        return list(result.all())
+
+    async def get_role_permissions_by_code(
+        self, db: AsyncSession, role_code: str
+    ) -> list[str]:
+        """Get all permission codes for a role by its code.
+
+        Used by IdentityService to resolve Service Token permissions from the
+        SERVICE role in the database instead of the JWT scope claim.
+        """
+        stmt = (
+            select(Permission.code)
+            .join(RolePermission, RolePermission.permission_id == Permission.id)
+            .join(Role, Role.id == RolePermission.role_id)
+            .where(Role.code == role_code)
             .distinct()
         )
         result = await db.exec(stmt)
