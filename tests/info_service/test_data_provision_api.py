@@ -18,7 +18,7 @@ async def _seed_user(
     username: str,
     full_name: str,
     status: str = "ACTIVE",
-) -> None:
+) -> int:
     async with AsyncSession(info_engine, expire_on_commit=False) as session:
         user = UserInfo(user_no=user_no, username=username)
         session.add(user)
@@ -33,6 +33,7 @@ async def _seed_user(
             )
         )
         await session.commit()
+        return user.id
 
 
 async def _seed_calendar(*, term_code: str, term_name: str, snapshot_time: datetime) -> None:
@@ -82,6 +83,41 @@ async def _cleanup_table(table) -> None:
 @pytest.mark.integration
 class TestDataProvisionAPI:
     """Verify the data provision endpoints used by downstream systems."""
+
+    async def test_get_user_by_user_no_or_id(self, async_client_info, auth_headers) -> None:
+        """Should expose one active user for downstream services without owner checks."""
+        user_id = await _seed_user(
+            user_no="S20260001",
+            username="student_lookup",
+            full_name="Lookup Student",
+        )
+
+        by_no_resp = await async_client_info.get(
+            "/api/v1/info/data-provision/users/S20260001",
+            headers=auth_headers,
+        )
+        assert by_no_resp.status_code == 200
+        by_no = by_no_resp.json()["data"]
+        assert by_no["user_id"] == str(user_id)
+        assert by_no["user_no"] == "S20260001"
+        assert by_no["username"] == "student_lookup"
+        assert by_no["full_name"] == "Lookup Student"
+
+        by_id_resp = await async_client_info.get(
+            f"/api/v1/info/data-provision/users/{user_id}",
+            headers=auth_headers,
+        )
+        assert by_id_resp.status_code == 200
+        assert by_id_resp.json()["data"]["user_no"] == "S20260001"
+
+        missing_resp = await async_client_info.get(
+            "/api/v1/info/data-provision/users/NO_SUCH_USER",
+            headers=auth_headers,
+        )
+        assert missing_resp.status_code == 404
+
+        await _cleanup_table(UserProfile)
+        await _cleanup_table(UserInfo)
 
     async def test_list_teachers_and_candidate_students(
         self, async_client_info, auth_headers
@@ -204,4 +240,3 @@ class TestDataProvisionAPI:
         assert data["snapshot_time"] == "2026-04-01T00:00:00Z"
 
         await _cleanup_table(TrainingProgram)
-
